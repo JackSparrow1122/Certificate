@@ -57,7 +57,7 @@ export default function Sidebar() {
       onMouseLeave={() => setExpanded(false)}
       className={`${
         expanded ? "w-72" : "w-20"
-      } min-h-screen bg-[#0B2A4A] text-white flex flex-col justify-between
+      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#0B2A4A] text-white flex flex-col justify-between
          transition-all duration-300 ease-in-out`}
     >
       {/* TOP */}

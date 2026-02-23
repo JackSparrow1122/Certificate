@@ -10,7 +10,7 @@ export default function CourseCard({ title, status }) {
     <div className="bg-white rounded-xl shadow-sm p-5 border">
       <div className="h-8 bg-gray-200 rounded mb-4" />
 
-      <h3 className="text-lg font-semibold mb-3">{title}</h3>
+      <h3 className="text-base sm:text-lg font-semibold mb-3 break-words">{title}</h3>
 
       <span
         className={`px-3 py-1 rounded-full text-sm font-medium ${

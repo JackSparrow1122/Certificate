@@ -13,8 +13,8 @@ export default function StudentProfile() {
   }
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-sm max-w-4xl">
-      <h1 className="text-2xl font-bold mb-6">
+    <div className="bg-white p-4 sm:p-8 rounded-xl shadow-sm max-w-4xl w-full">
+      <h1 className="text-xl sm:text-2xl font-bold mb-6">
         Student Profile
       </h1>
 

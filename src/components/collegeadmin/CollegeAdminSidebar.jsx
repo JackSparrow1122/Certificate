@@ -1,25 +1,35 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import {
-  LayoutDashboard,
+  LayoutGrid,
   Users,
   Award,
   FileText,
-  HelpCircle,
+  CircleHelp,
   LogOut,
 } from "lucide-react";
+import { signOut } from "firebase/auth";
+import { auth } from "../../firebase/config";
 import logo from "../../assets/logo.png";
+import { useAuth } from "../../context/AuthContext";
 
 export default function CollegeAdminSidebar() {
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const { user, role, profile } = useAuth();
+
+  const adminName =
+    profile?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
+  const roleLabel =
+    role === "collegeAdmin" ? "College Admin" : role === "superAdmin" ? "Super Admin" : "Admin";
+  const adminInitial = adminName.charAt(0).toUpperCase();
 
   const links = [
     {
       name: "Dashboard",
       path: "/college-admin",
       end: true,
-      icon: LayoutDashboard,
+      icon: LayoutGrid,
     },
     {
       name: "Students",
@@ -39,64 +49,81 @@ export default function CollegeAdminSidebar() {
     {
       name: "Help",
       path: "/college-admin/help",
-      icon: HelpCircle,
+      icon: CircleHelp,
     },
   ];
 
-  const handleSignOut = () => {
-    navigate("/login");
+  const handleSignOut = async () => {
+    await signOut(auth);
+    localStorage.clear();
+    navigate("/login", { replace: true });
   };
 
   return (
     <aside
-      onMouseEnter={() => setCollapsed(false)}
-      onMouseLeave={() => setCollapsed(true)}
-      className={`h-screen bg-[#062a4d] text-white flex flex-col
-      transition-all duration-300 ease-in-out
-      ${collapsed ? "w-20" : "w-64"}`}
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      className={`${
+        expanded ? "w-72" : "w-20"
+      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#0B2A4A] text-white flex flex-col justify-between transition-all duration-300 ease-in-out`}
     >
-      {/* LOGO */}
-      <div className="h-20 flex items-center justify-center border-b border-white/10">
-        <img
-          src={logo}
-          alt="ERP Logo"
-          className={`object-contain transition-all duration-300 ${
-            collapsed ? "h-8" : "h-10"
+      <div>
+        {/* Logo */}
+        <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
+          <img
+            src={logo}
+            alt="ERP Logo"
+            className={`object-contain transition-all duration-300 ${
+              expanded ? "h-16" : "h-10"
+            }`}
+          />
+        </div>
+
+        {/* Profile */}
+        <div
+          className={`mx-3 mt-6 p-4 rounded-xl bg-white/10 flex items-center gap-3 transition-all ${
+            expanded ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
-        />
+        >
+          <div className="h-12 w-12 rounded-full bg-gray-300 text-[#0B2A4A] font-semibold flex items-center justify-center">
+            {adminInitial}
+          </div>
+          <div>
+            <p className="font-semibold leading-tight">{adminName}</p>
+            <span className="text-sm opacity-70">{roleLabel}</span>
+          </div>
+        </div>
+
+        {/* Nav Links */}
+        <nav className="mt-8 space-y-2 px-3">
+          {links.map(({ name, path, end, icon: Icon }) => (
+            <NavLink
+              key={path}
+              to={path}
+              end={end}
+              className={({ isActive }) =>
+                `flex items-center gap-4 px-4 py-3 rounded-xl transition ${
+                  isActive
+                    ? "bg-white text-[#0B2A4A] font-semibold shadow"
+                    : "text-white/90 hover:bg-white/10"
+                }`
+              }
+            >
+              <Icon size={22} />
+              {expanded && <span className="whitespace-nowrap">{name}</span>}
+            </NavLink>
+          ))}
+        </nav>
       </div>
 
-      {/* NAV LINKS */}
-      <nav className="px-2 py-6 space-y-2 flex-1">
-        {links.map(({ name, path, end, icon: Icon }) => (
-          <NavLink
-            key={path}
-            to={path}
-            end={end}
-            className={({ isActive }) =>
-              `flex items-center gap-4 px-4 py-3 rounded-lg transition
-              ${
-                isActive
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-300 hover:bg-white/10"
-              }`
-            }
-          >
-            <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span>{name}</span>}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* SIGN OUT */}
-      <div className="px-2 pb-6">
+      {/* Sign Out */}
+      <div className="px-3 py-6 border-t border-white/10">
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-4 w-full px-4 py-3 rounded-lg
-                     text-red-400 hover:bg-red-500/10 hover:text-red-300 transition"
+          className="flex items-center gap-4 px-4 py-3 rounded-xl text-white/80 hover:bg-white/10 hover:text-red-400 transition w-full"
         >
-          <LogOut className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
+          <LogOut size={22} />
+          {expanded && <span>Sign Out</span>}
         </button>
       </div>
     </aside>
