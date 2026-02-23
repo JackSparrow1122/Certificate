@@ -2,7 +2,7 @@ export const projectCodes = [
   {
     id: 1,
     code: "RCOEM/ENGG/3rd/OT/26-27",
-    collegeCode: "RCOEM",   // ✅ MATCHES colleges.code
+    collegeCode: "RCOEM",  
     college: "Ramdev Baba College of Engineering",
     matched: true,
     course: "Engineering",

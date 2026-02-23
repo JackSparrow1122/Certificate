@@ -1,36 +1,36 @@
 export const colleges = [
   {
-    id: "1",
+  
     collegeId: "rcoem",
     name: "Ramdev Baba College of Engineering",
-    code: "RCOEM",
+    id: "RCOEM",
     logo: "",
     admins: 0,
     status: "Active",
   },
   {
-    id: "2",
+    
     collegeId: "mcoet",
     name: "Mauli College Of Engineering And Technology",
-    code: "MCOET",
+    id: "MCOET",
     logo: "",
     admins: 0,
     status: "Active",
   },
   {
-    id: "3",
+    
     collegeId: "pdea",
     name: "PDEA College Of Engineering",
-    code: "PDEA",
+    id: "PDEA",
     logo: "",
     admins: 0,
     status: "Inactive",
   },
   {
-    id: "4",
+    
     collegeId: "iua",
     name: "Indira University - Pune",
-    code: "IUA",
+    id: "IUA",
     logo: "",
     admins: 0,
     status: "Active",
