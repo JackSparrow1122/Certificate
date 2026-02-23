@@ -1,5 +1,6 @@
-import { db, auth } from "../src/firebase/config";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { db, firebaseConfig } from "../src/firebase/config";
+import { createUserWithEmailAndPassword, getAuth, signOut } from "firebase/auth";
+import { getApps, initializeApp } from "firebase/app";
 import {
   collection,
   doc,
@@ -13,13 +14,23 @@ import {
 } from "firebase/firestore";
 
 const USERS_COLLECTION = "users";
+const SECONDARY_APP_NAME = "secondary-user-creation";
+
+const getSecondaryAuth = () => {
+  const existingApp = getApps().find((app) => app.name === SECONDARY_APP_NAME);
+  const secondaryApp =
+    existingApp || initializeApp(firebaseConfig, SECONDARY_APP_NAME);
+  return getAuth(secondaryApp);
+};
 
 // Create a college admin user in both Firebase Auth and Firestore
 export const createCollegeAdmin = async (adminData, collegeCode) => {
   try {
+    const secondaryAuth = getSecondaryAuth();
+
     // 1. Create user in Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(
-      auth,
+      secondaryAuth,
       adminData.email,
       adminData.password,
     );
@@ -36,6 +47,7 @@ export const createCollegeAdmin = async (adminData, collegeCode) => {
       createdAt: new Date(),
     });
 
+    await signOut(secondaryAuth);
     console.log("College admin created:", uid);
     return uid;
   } catch (error) {
@@ -47,9 +59,11 @@ export const createCollegeAdmin = async (adminData, collegeCode) => {
 // Create a super admin user in both Firebase Auth and Firestore
 export const createSuperAdmin = async (adminData) => {
   try {
+    const secondaryAuth = getSecondaryAuth();
+
     // 1. Create user in Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(
-      auth,
+      secondaryAuth,
       adminData.email,
       adminData.password,
     );
@@ -65,6 +79,7 @@ export const createSuperAdmin = async (adminData) => {
       createdAt: new Date(),
     });
 
+    await signOut(secondaryAuth);
     console.log("Super admin created:", uid);
     return uid;
   } catch (error) {

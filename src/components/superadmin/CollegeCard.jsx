@@ -16,12 +16,12 @@ export default function CollegeCard({ college, onEdit, onDelete, onOpen }) {
         <CollegeActionsMenu onEdit={onEdit} onDelete={onDelete} />
       </div>
 
-      <div className="bg-gray-600 text-white rounded-lg py-4 text-center text-lg mb-4 h-32 flex items-center justify-center">
+      <div className="bg-white rounded-lg p-2 text-center text-lg mb-4 h-32 flex items-center justify-center overflow-hidden">
         {college.college_logo ? (
           <img
             src={college.college_logo}
             alt={college.college_name}
-            className="w-full h-full object-cover rounded-lg"
+            className="w-full h-full object-contain rounded-lg"
           />
         ) : (
           "College Logo"
