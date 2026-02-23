@@ -1,6 +1,7 @@
 export const colleges = [
   {
-    id: "1",
+    id: "1",                 // internal DB id (optional)
+    collegeId: "icem",       // 🔴 USED FOR ROUTING & FILTERING
     name: "Indira College of Engineering & Management",
     code: "ICEM",
     logo: "",
@@ -9,6 +10,7 @@ export const colleges = [
   },
   {
     id: "2",
+    collegeId: "igsb",
     name: "Indira Global School of Business",
     code: "IGSB",
     logo: "",
@@ -17,6 +19,7 @@ export const colleges = [
   },
   {
     id: "3",
+    collegeId: "sud",
     name: "Sharda University",
     code: "SUD",
     logo: "",

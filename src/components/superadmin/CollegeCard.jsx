@@ -1,10 +1,16 @@
 import CollegeActionsMenu from "./CollegeActionsMenu";
 
-export default function CollegeCard({ college, onEdit }) {
+export default function CollegeCard({ college, onEdit, onOpen }) {
   return (
-    <div className="relative bg-gray-200 rounded-2xl shadow p-5">
-      {/* Actions (3 dots) */}
-      <div className="absolute top-3 right-3 z-20">
+    <div
+      onClick={onOpen}
+      className="relative bg-gray-200 rounded-2xl shadow p-5 cursor-pointer hover:shadow-md transition"
+    >
+      {/* Actions */}
+      <div
+        className="absolute top-3 right-3 z-20"
+        onClick={(e) => e.stopPropagation()} // ⛔ prevent navigation
+      >
         <CollegeActionsMenu onEdit={onEdit} />
       </div>
 

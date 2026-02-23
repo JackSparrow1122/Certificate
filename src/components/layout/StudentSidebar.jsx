@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, User } from "lucide-react";
 import logo from "../../assets/logo.png";
+import { useState } from "react";
 
 const links = [
   {
@@ -16,27 +17,26 @@ const links = [
   },
 ];
 
-export default function StudentSidebar({ collapsed, setCollapsed }) {
+export default function StudentSidebar() {
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <aside
-      className={`h-screen bg-[#062a4d] text-white flex flex-col transition-all duration-300 ${
-        collapsed ? "w-20" : "w-64"
-      }`}
+      onMouseEnter={() => setCollapsed(false)}
+      onMouseLeave={() => setCollapsed(true)}
+      className={`h-screen bg-[#062a4d] text-white flex flex-col
+        transition-all duration-300 ease-in-out
+        ${collapsed ? "w-20" : "w-64"}`}
     >
-      {/* LOGO + TOGGLE */}
-      <div className="h-20 flex items-center justify-between px-4 border-b border-white/10">
-        {!collapsed && (
-          <img src={logo} alt="ERP Logo" className="h-10 object-contain" />
-        )}
-
-        <button
-          onClick={() => setCollapsed((v) => !v)}
-          className="text-xl p-2 rounded hover:bg-white/10"
-        >
-          ☰
-        </button>
+      {/* LOGO */}
+      <div className="h-20 flex items-center justify-center px-4 border-b border-white/10">
+        <img
+          src={logo}
+          alt="ERP Logo"
+          className={`object-contain transition-all duration-300
+            ${collapsed ? "h-8" : "h-10"}`}
+        />
       </div>
 
       {/* NAV LINKS */}
@@ -47,16 +47,18 @@ export default function StudentSidebar({ collapsed, setCollapsed }) {
             to={path}
             end={end}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition
-               ${
-                 isActive
-                   ? "bg-blue-600 text-white"
-                   : "text-gray-300 hover:bg-white/10"
-               }`
+              `flex items-center gap-4 px-4 py-3 rounded-lg transition
+              ${
+                isActive
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-300 hover:bg-white/10"
+              }`
             }
           >
             <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span>{name}</span>}
+            {!collapsed && (
+              <span className="whitespace-nowrap">{name}</span>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -65,7 +67,7 @@ export default function StudentSidebar({ collapsed, setCollapsed }) {
       <div className="px-2 pb-6">
         <button
           onClick={() => navigate("/login")}
-          className="flex items-center gap-3 w-full px-4 py-3 rounded-lg
+          className="flex items-center gap-4 w-full px-4 py-3 rounded-lg
                      text-red-400 hover:bg-red-500/10 hover:text-red-300 transition"
         >
           <span className="text-lg">⎋</span>

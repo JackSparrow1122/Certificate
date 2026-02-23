@@ -19,6 +19,9 @@ import SuperAdminColleges from "../src/pages/superadmin/Colleges";
 import SuperAdminCertificationConfig from "../src/pages/superadmin/CertificateConfig"
 import SuperAdminAdmins from "../src/pages/superadmin/Admins"
 import SuperAdminProjectCodes from "../src/pages/superadmin/ProjectCodes"
+import CollegeProjectCodes from "./pages/superadmin/CollegeProjectCodes";
+import ProjectCodeStudents from "./pages/superadmin/ProjectCodeStudents";
+
 /* ================= COLLEGE ADMIN ================= */
 import CollegeAdminSidebar from "./components/collegeadmin/CollegeAdminSidebar";
 import CollegeAdminNavbar from "./components/collegeadmin/CollegeAdminNavbar";
@@ -37,15 +40,14 @@ import StudentDashboard from "./pages/student/Dashboard";
 import StudentProfile from "./pages/student/Profile";
 
 /* ================= COLLEGE ADMIN LAYOUT ================= */
-function CollegeAdminLayout() {
+ function CollegeAdminLayout() {
   return (
-    <div className="flex">
+    <div className="flex min-h-screen">
       <CollegeAdminSidebar />
 
-      <div className="ml-64 flex-1 min-h-screen bg-gray-100 flex flex-col">
+      <div className="flex-1 bg-gray-100 flex flex-col">
         <CollegeAdminNavbar />
-
-        <main className="p-8 w-full flex-1">
+        <main className="p-8 flex-1">
           <Outlet />
         </main>
       </div>
@@ -77,6 +79,15 @@ export default function App() {
 >
   <Route path="dashboard" element={<SuperAdminDashboard />} />
   <Route path="colleges" element={<SuperAdminColleges />} />
+   <Route
+    path="colleges/:collegeId/project-codes"
+    element={<CollegeProjectCodes />}
+  />
+
+  <Route
+    path="project-codes/:projectCode/students"
+    element={<ProjectCodeStudents />}
+  />
   <Route
     path="certificationconfig"
     element={<SuperAdminCertificationConfig />}

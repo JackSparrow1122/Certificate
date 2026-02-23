@@ -100,10 +100,11 @@ export default function AdminDashboard() {
         }}
       />
       <Bar
-        dataKey="count"
-        radius={[12, 12, 0, 0]}
-        fill="url(#colorGradient)"
-      />
+  dataKey="count"
+  radius={[12, 12, 0, 0]}
+  fill="url(#colorGradient)"
+  isAnimationActive={false}
+/>
       <defs>
         <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#3b82f6" />
