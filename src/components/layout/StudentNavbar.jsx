@@ -18,19 +18,22 @@ export default function StudentNavbar({ onMenuClick }) {
 
   return (
     <header className="sticky top-0 z-20 bg-white px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between">
-      <div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onMenuClick}
-            className="md:hidden inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-gray-700"
-            aria-label="Open menu"
-          >
-            <Menu size={18} />
-          </button>
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-900">{heading}</h1>
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="md:hidden inline-flex items-center justify-center rounded-lg border border-gray-300 p-2 text-gray-700"
+          aria-label="Open menu"
+        >
+          <Menu size={18} />
+        </button>
+
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
+            {heading}
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-500">Welcome back, {studentName}</p>
         </div>
-        <p className="text-xs sm:text-sm text-gray-500">Welcome back, {studentName}</p>
       </div>
 
       <div className="hidden sm:flex items-center gap-3">

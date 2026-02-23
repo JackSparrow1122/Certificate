@@ -11,6 +11,7 @@ import {
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
 import logo from "../../assets/logo.png";
+import profileImage from "../../assets/image.jpg";
 import { useAuth } from "../../context/AuthContext";
 
 export default function CollegeAdminSidebar() {
@@ -71,27 +72,31 @@ export default function CollegeAdminSidebar() {
         {/* Logo */}
         <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
           <img
-            src={logo}
+            src={expanded ? logo : profileImage}
             alt="ERP Logo"
-            className={`object-contain transition-all duration-300 ${
-              expanded ? "h-16" : "h-10"
+            className={`object-contain rounded-xl transition-all duration-300 ${
+              expanded ? "h-20" : "h-12 w-12 bg-white"
             }`}
           />
         </div>
 
         {/* Profile */}
         <div
-          className={`mx-3 mt-6 p-4 rounded-xl bg-white/10 flex items-center gap-3 transition-all ${
-            expanded ? "opacity-100" : "opacity-0 pointer-events-none"
+          className={`mx-3 mt-6 flex items-center transition-all ${
+            expanded
+              ? "rounded-xl bg-white/10 p-4 gap-3 justify-start"
+              : "p-2 justify-center"
           }`}
         >
-          <div className="h-12 w-12 rounded-full bg-gray-300 text-[#0B2A4A] font-semibold flex items-center justify-center">
+          <div className="h-12 w-12 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] font-semibold leading-none flex items-center justify-center">
             {adminInitial}
           </div>
-          <div>
-            <p className="font-semibold leading-tight">{adminName}</p>
-            <span className="text-sm opacity-70">{roleLabel}</span>
-          </div>
+          {expanded && (
+            <div>
+              <p className="font-semibold leading-tight">{adminName}</p>
+              <span className="text-sm opacity-70">{roleLabel}</span>
+            </div>
+          )}
         </div>
 
         {/* Nav Links */}
