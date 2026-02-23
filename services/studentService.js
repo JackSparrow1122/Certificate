@@ -28,6 +28,7 @@ export const addStudent = async (studentData) => {
       semesterLabel: studentData.semesterLabel || "",
       trainingType: studentData.trainingType || "",
       currentSession: studentData.currentSession || "",
+      certificateIds: studentData.certificateIds || [],
       certificate: studentData.certificate || "",
       progress: studentData.progress || "0%",
       exams: studentData.exams || "0 / 0",
