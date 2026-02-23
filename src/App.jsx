@@ -85,7 +85,7 @@ export default function App() {
   element={<CollegeProjectCodes />}
 />
   <Route
-    path="project-codes/:projectCode/students"
+    path="project-codes/:projectId/students"
     element={<ProjectCodeStudents />}
 />
   <Route path="certificationconfig" element={<SuperAdminCertificationConfig />} />
