@@ -23,6 +23,9 @@ export default function CollegeProjectCodes() {
     type: "",
   });
 
+  const getProjectCodePrefix = (projectCode) =>
+    String(projectCode || "").split("/")[0]?.trim().toUpperCase();
+
   const filterOptions = useMemo(() => {
     const uniqueSorted = (items) =>
       [...new Set(items.filter(Boolean).map((item) => String(item).trim()))].sort(
@@ -48,7 +51,24 @@ export default function CollegeProjectCodes() {
         getProjectCodesByCollege(collegeId),
         getCollegeByCode(collegeId)
       ]);
-      setProjectCodes(projectCodesData);
+
+      const expectedCollegeCode = String(
+        collegeData?.college_code || collegeData?.collegeCode || collegeId,
+      )
+        .trim()
+        .toUpperCase();
+
+      const normalizedCollegeId = String(collegeId || "").trim().toUpperCase();
+
+      const strictCollegeProjectCodes = projectCodesData.filter((projectCode) => {
+        const projectCollegeId = String(projectCode.collegeId || "").trim().toUpperCase();
+        const codePrefix = getProjectCodePrefix(projectCode.code);
+        const matchesCollegeRecord = projectCollegeId === normalizedCollegeId;
+        const matchesCodePrefix = !expectedCollegeCode || codePrefix === expectedCollegeCode;
+        return matchesCollegeRecord && matchesCodePrefix;
+      });
+
+      setProjectCodes(strictCollegeProjectCodes);
       setCollege(collegeData);
     } catch (error) {
       setError("Failed to load data");
@@ -118,6 +138,13 @@ export default function CollegeProjectCodes() {
         <div className="w-full space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
+              <button
+                type="button"
+                onClick={() => navigate("/superadmin/colleges")}
+                className="mb-2 rounded-md bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
+              >
+                ← Back to Colleges
+              </button>
               <h1 className="text-[2.15rem] leading-tight font-medium text-gray-900">
                 {college?.college_name || collegeId}
               </h1>
@@ -262,6 +289,7 @@ export default function CollegeProjectCodes() {
       {showAddProjectModal && (
         <AddProjectCodeModal
           collegeId={collegeId}
+          collegeCode={college?.college_code || college?.collegeCode || collegeId}
           collegeName={college?.college_name || ""}
           onClose={() => setShowAddProjectModal(false)}
           onProjectCodeAdded={handleProjectCodeAdded}

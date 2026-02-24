@@ -4,6 +4,7 @@ import {
   deleteDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
@@ -37,6 +38,30 @@ export const getAllCertificates = async () => {
     });
   } catch (error) {
     console.error("Error getting certificates:", error);
+    throw error;
+  }
+};
+
+export const getCertificatesByIds = async (certificateIds) => {
+  try {
+    if (!Array.isArray(certificateIds) || certificateIds.length === 0) {
+      return [];
+    }
+
+    const certificateDocs = await Promise.all(
+      certificateIds.map((certificateId) =>
+        getDoc(doc(db, CERTIFICATES_COLLECTION, certificateId)),
+      ),
+    );
+
+    return certificateDocs
+      .filter((certificateDoc) => certificateDoc.exists())
+      .map((certificateDoc) => ({
+        id: certificateDoc.id,
+        ...certificateDoc.data(),
+      }));
+  } catch (error) {
+    console.error("Error getting certificates by IDs:", error);
     throw error;
   }
 };

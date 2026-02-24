@@ -94,10 +94,10 @@ export const getAllStudents = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, STUDENTS_COLLECTION));
     const students = [];
-    querySnapshot.forEach((doc) => {
+    querySnapshot.forEach((studentDoc) => {
       students.push({
-        id: doc.id,
-        ...doc.data(),
+        docId: studentDoc.id,
+        ...studentDoc.data(),
       });
     });
     return students;
@@ -116,15 +116,32 @@ export const getStudentsByProject = async (projectId) => {
     );
     const querySnapshot = await getDocs(q);
     const students = [];
-    querySnapshot.forEach((doc) => {
+    querySnapshot.forEach((studentDoc) => {
       students.push({
-        id: doc.id,
-        ...doc.data(),
+        docId: studentDoc.id,
+        ...studentDoc.data(),
       });
     });
     return students;
   } catch (error) {
     console.error("Error getting students by project:", error);
+    throw error;
+  }
+};
+
+export const getStudentByDocId = async (studentDocId) => {
+  try {
+    const studentRef = doc(db, STUDENTS_COLLECTION, studentDocId);
+    const studentSnap = await getDoc(studentRef);
+    if (!studentSnap.exists()) {
+      return null;
+    }
+    return {
+      docId: studentSnap.id,
+      ...studentSnap.data(),
+    };
+  } catch (error) {
+    console.error("Error getting student by document ID:", error);
     throw error;
   }
 };

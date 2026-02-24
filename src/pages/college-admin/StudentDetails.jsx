@@ -16,7 +16,7 @@ export default function StudentDetails() {
       {/* BACK */}
       <button
         onClick={() => navigate(-1)}
-        className="text-blue-600 text-sm mb-4"
+        className="mb-4 rounded-md bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
       >
         ← Back
       </button>

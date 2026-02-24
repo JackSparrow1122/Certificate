@@ -21,6 +21,7 @@ import SuperAdminAdmins from "../src/pages/superadmin/Admins"
 import SuperAdminProjectCodes from "../src/pages/superadmin/ProjectCodes"
 import CollegeProjectCodes from "./pages/superadmin/CollegeProjectCodes";
 import ProjectCodeStudents from "./pages/superadmin/ProjectCodeStudents";
+import StudentCertificateProgress from "./pages/superadmin/StudentCertificateProgress";
 
 /* ================= COLLEGE ADMIN ================= */
 import CollegeAdminSidebar from "./components/collegeadmin/CollegeAdminSidebar";
@@ -87,6 +88,10 @@ export default function App() {
   <Route
     path="project-codes/:projectId/students"
     element={<ProjectCodeStudents />}
+/>
+  <Route
+    path="students/:studentDocId/certificate-progress"
+    element={<StudentCertificateProgress />}
 />
   <Route path="certificationconfig" element={<SuperAdminCertificationConfig />} />
   <Route path="admins" element={<SuperAdminAdmins />} />

@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { addProjectCode } from "../../../services/projectCodeService";
 
-export default function AddProjectCodeModal({ collegeId, collegeName, onClose, onProjectCodeAdded }) {
+export default function AddProjectCodeModal({
+  collegeId,
+  collegeCode,
+  collegeName,
+  onClose,
+  onProjectCodeAdded,
+}) {
   const [form, setForm] = useState({
     code: "",
     course: "",
@@ -37,6 +43,20 @@ export default function AddProjectCodeModal({ collegeId, collegeName, onClose, o
       setError("Academic year is required");
       return false;
     }
+
+    const expectedCodePrefix = String(collegeCode || collegeId || "")
+      .trim()
+      .toUpperCase();
+    const enteredCodePrefix = String(form.code || "")
+      .split("/")[0]
+      ?.trim()
+      .toUpperCase();
+
+    if (!enteredCodePrefix || enteredCodePrefix !== expectedCodePrefix) {
+      setError(`Project code must start with ${expectedCodePrefix}/`);
+      return false;
+    }
+
     setError(null);
     return true;
   };
