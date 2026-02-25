@@ -4,6 +4,7 @@ import {
   GraduationCap,
   BookOpen,
   UserPlus,
+  Barcode,
   LogOut,
 } from "lucide-react";
 import { signOut } from "firebase/auth";
@@ -48,6 +49,11 @@ export default function Sidebar() {
       icon: BookOpen,
     },
     { label: "Admins", path: "/superadmin/admins", icon: UserPlus },
+    {
+      label: "Project Codes",
+      path: "/superadmin/projectcodes",
+      icon: Barcode,
+    },
   ];
 
   return (
