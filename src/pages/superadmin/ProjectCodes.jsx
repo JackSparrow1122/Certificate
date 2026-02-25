@@ -6,6 +6,7 @@ import { RefreshCcw, Upload } from "lucide-react";
 import {
   addProjectCode,
   getAllProjectCodes,
+  rerunProjectCodeMatching,
 } from "../../../services/projectCodeService";
 import { getAllColleges } from "../../../services/collegeService";
 
@@ -84,6 +85,7 @@ export default function ProjectCodes() {
   const [selectedCollegeCode, setSelectedCollegeCode] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [rerunningMatch, setRerunningMatch] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const selectedCollege = colleges.find(
@@ -236,131 +238,175 @@ export default function ProjectCodes() {
     }
   };
 
+  const handleRerunMatching = async () => {
+    try {
+      setRerunningMatch(true);
+      const result = await rerunProjectCodeMatching();
+      await fetchProjectCodes();
+      alert(
+        `Matching completed. Total: ${result.total}, Matched: ${result.matched}, Unmatched: ${result.unmatched}, Updated: ${result.updated}.`,
+      );
+    } catch (error) {
+      console.error("Failed to rerun matching:", error);
+      alert("Failed to rerun matching.");
+    } finally {
+      setRerunningMatch(false);
+    }
+  };
+
   return (
     <SuperAdminLayout>
-      <div className="p-2 sm:p-2 md:p-3 lg:p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold">Project Codes</h1>
-            <p className="text-gray-500 text-sm">Manage your feedback system</p>
+      <div className="mx-auto w-full max-w-[1400px] space-y-4 px-4 py-5 sm:px-5 sm:py-6 lg:px-6">
+        <section className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-[#0B2A4A]">Project Codes</h1>
+              <p className="mt-1 text-sm text-gray-600">Manage, search, and import project codes</p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-xl border border-[#D7E2F1] bg-[#F7FAFF] px-3 py-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#0B2A4A]/70">
+                Total
+              </span>
+              <span className="text-lg font-semibold text-[#0B2A4A]">{filtered.length}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm sm:p-5">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#0B2A4A]/70">
+                Search Project Code
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. ICEM/ENGG/3rd/TP/26-27"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-[#D7E2F1] bg-[#F9FBFF] px-4 py-2.5 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#0B2A4A]/70">
+                Manual Add College
+              </label>
+              <select
+                value={selectedCollegeCode}
+                onChange={(event) => setSelectedCollegeCode(event.target.value)}
+                className="w-full rounded-lg border border-[#D7E2F1] bg-[#F9FBFF] px-3 py-2.5 text-sm outline-none"
+              >
+                <option value="">Select college for manual add</option>
+                {colleges.map((college) => {
+                  const collegeCode = String(
+                    college.college_code || college.collegeCode,
+                  );
+                  return (
+                    <option key={collegeCode} value={collegeCode}>
+                      {collegeCode} - {college.college_name}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={fetchProjectCodes}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#D7E2F1] bg-white px-3.5 py-2.5 text-sm font-medium text-[#0B2A4A]"
+              >
+                <RefreshCcw size={15} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!selectedCollegeCode || !selectedCollege) {
+                    alert("Please select a college first.");
+                    return;
+                  }
+                  setShowAddModal(true);
+                }}
+                className="rounded-lg border border-[#D7E2F1] bg-white px-3.5 py-2.5 text-sm font-medium text-[#0B2A4A]"
+              >
+                Add Project Code
+              </button>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0B2A4A] px-3.5 py-2.5 text-sm font-semibold text-white">
+                <Upload size={15} />
+                {importing ? "Importing..." : "Import JSON"}
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleJsonImport}
+                  className="hidden"
+                  disabled={importing}
+                />
+              </label>
+            </div>
           </div>
 
-          <button
-            onClick={fetchProjectCodes}
-            className="flex items-center gap-2 px-4 py-2 bg-[#0B2A4A] text-white rounded-lg"
-          >
-            <RefreshCcw size={16} />
-            Refresh
-          </button>
-        </div>
-
-        {/* Search + Actions */}
-        <div className="flex items-center justify-between mb-4">
-          <input
-            type="text"
-            placeholder="Search project codes..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-[420px] px-4 py-2 rounded-lg border focus:outline-none"
-          />
-
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">
-              {filtered.length} Codes
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-xs text-gray-500">
+              {filtered.length} result{filtered.length === 1 ? "" : "s"}
             </span>
-
-            <select
-              value={selectedCollegeCode}
-              onChange={(event) => setSelectedCollegeCode(event.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm bg-white"
-            >
-              <option value="">Select college for manual add</option>
-              {colleges.map((college) => {
-                const collegeCode = String(
-                  college.college_code || college.collegeCode,
-                );
-                return (
-                  <option key={collegeCode} value={collegeCode}>
-                    {collegeCode} - {college.college_name}
-                  </option>
-                );
-              })}
-            </select>
-
             <button
               type="button"
-              onClick={async () => {
-                if (!selectedCollegeCode || !selectedCollege) {
-                  alert("Please select a college first.");
-                  return;
-                }
-                setShowAddModal(true);
-              }}
-              className="px-4 py-2 border rounded-lg"
+              onClick={handleRerunMatching}
+              disabled={rerunningMatch}
+              className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Add Project Code
+              {rerunningMatch ? "Matching..." : "Rerun Matching"}
             </button>
-
-            <button className="px-4 py-2 border rounded-lg">
-              Rerun Matching
-            </button>
-
-            <label className="flex items-center gap-2 px-4 py-2 bg-[#0B2A4A] text-white rounded-lg cursor-pointer">
-              <Upload size={16} />
-              {importing ? "Importing..." : "Import JSON"}
-              <input
-                type="file"
-                accept="application/json,.json"
-                onChange={handleJsonImport}
-                className="hidden"
-                disabled={importing}
-              />
-            </label>
           </div>
-        </div>
+        </section>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-sm text-gray-600">
-              <tr>
-                <th className="px-6 py-3">Project Code</th>
-                <th className="px-6 py-3">College</th>
-                <th className="px-6 py-3">Course</th>
-                <th className="px-6 py-3">Metadata</th>
-                <th className="px-6 py-3"></th>
-              </tr>
-            </thead>
+        <section className="overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white shadow-sm">
+          <div className="border-b border-[#E6EDF6] bg-[#F7FAFF] px-6 py-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0B2A4A]/80">
+              Project Code List
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left">
+              <thead className="bg-[#F7FAFF] text-xs uppercase tracking-wide text-[#0B2A4A]/70">
+                <tr>
+                  <th className="px-6 py-3">Project Code</th>
+                  <th className="px-6 py-3">College</th>
+                  <th className="px-6 py-3">Course</th>
+                  <th className="px-6 py-3">Metadata</th>
+                  <th className="px-6 py-3 text-right">Action</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {!loading &&
-                mappedRows.map((row) => (
-                  <ProjectCodeRow key={row.id} row={row} />
-                ))}
-              {loading && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-6 text-center text-sm text-gray-500"
-                  >
-                    Loading project codes...
-                  </td>
-                </tr>
-              )}
-              {!loading && mappedRows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-6 text-center text-sm text-gray-500"
-                  >
-                    No project codes found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              <tbody>
+                {!loading &&
+                  mappedRows.map((row) => (
+                    <ProjectCodeRow key={row.id} row={row} />
+                  ))}
+                {loading && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm text-gray-500"
+                    >
+                      Loading project codes...
+                    </td>
+                  </tr>
+                )}
+                {!loading && mappedRows.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-sm text-gray-500"
+                    >
+                      No project codes found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {showAddModal && selectedCollege && (
           <AddProjectCodeModal

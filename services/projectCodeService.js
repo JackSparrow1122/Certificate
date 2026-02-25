@@ -30,6 +30,10 @@ const normalizeValue = (value) =>
   String(value || "")
     .trim()
     .toLowerCase();
+const normalizeCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
 
 const setStudentsProjectActiveStatus = async (projectCode, isActive) => {
   if (!projectCode) {
@@ -282,6 +286,81 @@ export const softDeleteProjectCode = async (id, projectCode) => {
     return true;
   } catch (error) {
     console.error("Error soft deleting project code:", error);
+    throw error;
+  }
+};
+
+// Re-run matching for all active project codes against current colleges in DB.
+export const rerunProjectCodeMatching = async () => {
+  try {
+    const [projectCodesSnapshot, collegesSnapshot] = await Promise.all([
+      getDocs(collection(db, PROJECT_CODES_COLLECTION)),
+      getDocs(collection(db, "college")),
+    ]);
+
+    const collegesMap = new Map();
+    collegesSnapshot.forEach((collegeDoc) => {
+      const data = collegeDoc.data() || {};
+      const code = normalizeCode(data.college_code || collegeDoc.id);
+      if (code) collegesMap.set(code, data);
+    });
+
+    const activeProjectDocs = projectCodesSnapshot.docs.filter(
+      (projectDoc) => (projectDoc.data() || {}).isActive !== false,
+    );
+
+    let updatedCount = 0;
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+
+    for (let index = 0; index < activeProjectDocs.length; index += 400) {
+      const chunk = activeProjectDocs.slice(index, index + 400);
+      const batch = writeBatch(db);
+      let chunkHasUpdates = false;
+
+      chunk.forEach((projectDoc) => {
+        const projectData = projectDoc.data() || {};
+        const codePrefix = normalizeCode(
+          String(projectData.code || "").split("/")[0],
+        );
+        const lookupCode = normalizeCode(projectData.collegeId || codePrefix);
+        const mappedCollege = collegesMap.get(lookupCode);
+
+        const nextMatched = Boolean(mappedCollege);
+        const nextCollegeName =
+          mappedCollege?.college_name ||
+          String(projectData.college || lookupCode || "").trim();
+
+        if (nextMatched) matchedCount += 1;
+        else unmatchedCount += 1;
+
+        if (
+          Boolean(projectData.matched) !== nextMatched ||
+          String(projectData.college || "").trim() !== nextCollegeName
+        ) {
+          batch.update(projectDoc.ref, {
+            matched: nextMatched,
+            college: nextCollegeName,
+            updatedAt: new Date(),
+          });
+          updatedCount += 1;
+          chunkHasUpdates = true;
+        }
+      });
+
+      if (chunkHasUpdates) {
+        await batch.commit();
+      }
+    }
+
+    return {
+      total: activeProjectDocs.length,
+      updated: updatedCount,
+      matched: matchedCount,
+      unmatched: unmatchedCount,
+    };
+  } catch (error) {
+    console.error("Error rerunning project code matching:", error);
     throw error;
   }
 };

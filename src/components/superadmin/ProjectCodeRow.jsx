@@ -2,19 +2,19 @@ import { Trash2 } from "lucide-react";
 
 export default function ProjectCodeRow({ row }) {
   return (
-    <tr className="border-b last:border-none">
+    <tr className="border-b border-[#E6EDF6] transition hover:bg-[#FAFCFF] last:border-none">
       {/* Project Code */}
-      <td className="px-6 py-4 text-sm font-medium">{row.code}</td>
+      <td className="px-6 py-4 text-sm font-semibold text-[#0B2A4A]">{row.code}</td>
 
       {/* College */}
       <td className="px-6 py-4">
         {row.matched ? (
-          <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          <span className="rounded-full bg-[#E8F7F0] px-3 py-1 text-xs font-semibold text-[#0B6E4F]">
             {row.college}
           </span>
         ) : (
           <div>
-            <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-yellow-800 text-xs font-semibold">
+            <span className="inline-flex items-center rounded-full bg-[#FFF4D8] px-2.5 py-1 text-xs font-semibold text-[#946000]">
               ⚠ Unmapped
             </span>
             <p className="text-xs text-gray-500">{row.college}</p>
@@ -23,18 +23,18 @@ export default function ProjectCodeRow({ row }) {
       </td>
 
       {/* Course */}
-      <td className="px-6 py-4 text-sm">
-        <p>{row.course}</p>
+      <td className="px-6 py-4 text-sm text-[#0B2A4A]">
+        <p className="font-medium">{row.course}</p>
         <p className="text-xs text-gray-500">{row.year}</p>
       </td>
 
       {/* Metadata */}
       <td className="px-6 py-4">
         <div className="flex gap-2">
-          <span className="px-3 py-1 rounded-full bg-gray-100 text-xs">
+          <span className="rounded-full bg-[#EEF3FA] px-3 py-1 text-xs text-[#0B2A4A]">
             Type: {row.type}
           </span>
-          <span className="px-3 py-1 rounded-full bg-gray-100 text-xs">
+          <span className="rounded-full bg-[#EEF3FA] px-3 py-1 text-xs text-[#0B2A4A]">
             {row.academicYear}
           </span>
         </div>
