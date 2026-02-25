@@ -121,8 +121,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
       });
 
       let authError = null;
+      let authResult = null;
       try {
-        await createStudentAuthUser({
+        authResult = await createStudentAuthUser({
           studentId: form.id,
           name: form.name,
           email: form.email,
@@ -135,6 +136,13 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
       }
 
       onStudentAdded();
+
+      if (authResult?.skippedExisting) {
+        setError(
+          "Student added to DB. student_users already had this email, so duplicate auth entry was skipped and duplicates were cleaned.",
+        );
+        return;
+      }
 
       if (authError) {
         setError(

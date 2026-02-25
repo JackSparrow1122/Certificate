@@ -114,8 +114,12 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
 
-      // Read as raw arrays first to detect header row
-      const rowsArr = xlsxModule.utils.sheet_to_json(sheet, { header: 1, defval: null });
+      // Read formatted cell text so Excel dates stay as displayed (e.g., 24-May-02).
+      const rowsArr = xlsxModule.utils.sheet_to_json(sheet, {
+        header: 1,
+        defval: null,
+        raw: false,
+      });
       if (!rowsArr || rowsArr.length === 0) {
         throw new Error("Excel is empty");
       }
@@ -137,7 +141,10 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
 
       // If no header row found in first 5 rows, try using first row as before
       if (bestIdx === -1 || bestMatches === 0) {
-        const rows = xlsxModule.utils.sheet_to_json(sheet, { defval: null });
+        const rows = xlsxModule.utils.sheet_to_json(sheet, {
+          defval: null,
+          raw: false,
+        });
         if (!rows || rows.length === 0) {
           throw new Error("Excel is empty");
         }
@@ -575,6 +582,7 @@ async function processRows(
     let successCount = 0;
     let failedCount = 0;
     let authCreatedCount = 0;
+    let authSkippedExistingCount = 0;
     const authFailures = [];
 
     // Convert project code to document ID (replace "/" with "-")
@@ -701,8 +709,12 @@ async function processRows(
 
     for (const student of authCandidates) {
       try {
-        await createStudentAuthUser(student);
-        authCreatedCount++;
+        const authResult = await createStudentAuthUser(student);
+        if (authResult?.skippedExisting) {
+          authSkippedExistingCount++;
+        } else {
+          authCreatedCount++;
+        }
       } catch (authError) {
         authFailures.push({
           studentId: student.studentId || "-",
@@ -716,6 +728,10 @@ async function processRows(
       `✅ Imported ${successCount} students${
         failedCount ? `, ${failedCount} failed` : ""
       }. Auth created for ${authCreatedCount}${
+        authSkippedExistingCount
+          ? `, ${authSkippedExistingCount} skipped (email already in student_users)`
+          : ""
+      }${
         authFailures.length ? `, ${authFailures.length} auth failed` : ""
       }`,
     );

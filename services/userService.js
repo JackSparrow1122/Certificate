@@ -60,6 +60,47 @@ export const createStudentAuthUser = async (studentData) => {
   const secondaryAuth = getSecondaryAuth();
 
   try {
+    const existingStudentUsersQuery = query(
+      collection(db, STUDENT_USERS_COLLECTION),
+      where("email", "==", email),
+    );
+    const existingStudentUsersSnapshot = await getDocs(existingStudentUsersQuery);
+
+    if (!existingStudentUsersSnapshot.empty) {
+      // Keep one entry for the email and remove any duplicate docs.
+      const existingDocs = existingStudentUsersSnapshot.docs;
+      const docToKeep = existingDocs[0];
+
+      if (existingDocs.length > 1) {
+        await Promise.all(
+          existingDocs
+            .slice(1)
+            .map((duplicateDoc) => deleteDoc(duplicateDoc.ref)),
+        );
+      }
+
+      await setDoc(
+        doc(db, STUDENT_USERS_COLLECTION, docToKeep.id),
+        {
+          uid: docToKeep.id,
+          email,
+          name,
+          role: "student",
+          projectCode,
+          collegeCode,
+          studentId,
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      );
+
+      return {
+        uid: docToKeep.id,
+        email,
+        skippedExisting: true,
+      };
+    }
+
     const userCredential = await createUserWithEmailAndPassword(
       secondaryAuth,
       email,
