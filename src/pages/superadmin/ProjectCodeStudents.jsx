@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { getProjectCodeById } from "../../../services/projectCodeService";
 import { getStudentsByProject } from "../../../services/studentService";
 import { Pencil, RotateCcw } from "lucide-react";
-import Sidebar from "../../components/layout/Sidebar";
+import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 
@@ -66,23 +66,21 @@ export default function ProjectCodeStudents() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-100">
-        <Sidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center p-8">
           <div className="text-gray-500">Loading...</div>
         </div>
-      </div>
+      </SuperAdminLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen bg-gray-100">
-        <Sidebar />
-        <div className="flex-1 p-8 flex items-center justify-center">
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center p-8">
           <div className="text-red-500">{error}</div>
         </div>
-      </div>
+      </SuperAdminLayout>
     );
   }
 
@@ -109,9 +107,8 @@ export default function ProjectCodeStudents() {
     });
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Sidebar />
-      <div className="flex-1 px-5 py-8 lg:px-6">
+    <SuperAdminLayout>
+      <div className="px-5 py-8 lg:px-6">
         <div className="w-full space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -278,6 +275,6 @@ export default function ProjectCodeStudents() {
           </div>
         </div>
       )}
-    </div>
+    </SuperAdminLayout>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Sidebar from "../../components/layout/Sidebar";
+import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { getStudentByDocId } from "../../../services/studentService";
 import { getCertificatesByIds } from "../../../services/certificateService";
 
@@ -44,10 +44,8 @@ export default function StudentCertificateProgress() {
   }, [fetchStudentData]);
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Sidebar />
-
-      <div className="flex-1 px-5 py-8 lg:px-6">
+    <SuperAdminLayout>
+      <div className="px-5 py-8 lg:px-6">
         <div className="w-full space-y-6">
           <button
             type="button"
@@ -127,6 +125,6 @@ export default function StudentCertificateProgress() {
           )}
         </div>
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 }

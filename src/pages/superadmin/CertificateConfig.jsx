@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import Sidebar from "../../components/layout/Sidebar";
+import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { Pencil } from "lucide-react";
 import { certifications as defaultCertifications } from "../../data/certifications";
 import AddCertificateModal from "../../components/superadmin/AddCertificateModal";
@@ -99,10 +99,8 @@ export default function CertificateConfig() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-200">
-      <Sidebar />
-
-      <div className="flex-1 p-8 space-y-6">
+    <SuperAdminLayout>
+      <div className="space-y-6 p-2 sm:p-2 md:p-3 lg:p-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">
@@ -261,8 +259,8 @@ export default function CertificateConfig() {
                     🏆 Enroll Project Code
                   </button>
                 </div>
-              )}
-            </div>
+        )}
+      </div>
           ))}
         </div>
       </div>
@@ -304,6 +302,6 @@ export default function CertificateConfig() {
           }}
         />
       )}
-    </div>
+    </SuperAdminLayout>
   );
 }

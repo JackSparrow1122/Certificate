@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import Sidebar from "../../components/layout/Sidebar";
+import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AdminCard from "../../components/superadmin/AdminCard";
 import AddAdminModal from "../../components/superadmin/AddAdminModal";
 import { getAllAdmins } from "../../../services/userService";
@@ -131,12 +131,8 @@ export default function Admins() {
   const sortedAdmins = getSortedAdmins();
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <Sidebar />
-
-      {/* Content */}
-      <div className="flex-1 p-8">
+    <SuperAdminLayout>
+      <div className="p-2 sm:p-2 md:p-3 lg:p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -220,6 +216,6 @@ export default function Admins() {
           onAdminAdded={fetchAdmins}
         />
       )}
-    </div>
+    </SuperAdminLayout>
   );
 }

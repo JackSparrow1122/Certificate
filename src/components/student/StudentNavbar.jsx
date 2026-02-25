@@ -19,6 +19,8 @@ export default function StudentNavbar({ onMenuClick }) {
     name: "",
     logo: "",
   });
+
+
   const heading = titleByPath[location.pathname] || "Student Portal";
   const studentName = profile?.name || user?.displayName || user?.email?.split("@")[0] || "Student";
 

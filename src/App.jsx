@@ -22,6 +22,7 @@ import SuperAdminProjectCodes from "../src/pages/superadmin/ProjectCodes"
 import CollegeProjectCodes from "./pages/superadmin/CollegeProjectCodes";
 import ProjectCodeStudents from "./pages/superadmin/ProjectCodeStudents";
 import StudentCertificateProgress from "./pages/superadmin/StudentCertificateProgress";
+import SuperAdminProfile from "./pages/superadmin/Profile";
 
 /* ================= COLLEGE ADMIN ================= */
 import CollegeAdminSidebar from "./components/collegeadmin/CollegeAdminSidebar";
@@ -34,6 +35,7 @@ import ProjectStudents from "./pages/college-admin/ProjectStudents";
 import Certificates from "./pages/college-admin/Certificates";
 import Exams from "./pages/college-admin/Exams";
 import Help from "./pages/college-admin/Help";
+import CollegeAdminProfile from "./pages/college-admin/Profile";
 
 /* ================= STUDENT ================= */
 import StudentLayout from "./components/student/StudentLayout";
@@ -93,6 +95,7 @@ export default function App() {
     path="students/:studentDocId/certificate-progress"
     element={<StudentCertificateProgress />}
 />
+  <Route path="profile" element={<SuperAdminProfile />} />
   <Route path="certificationconfig" element={<SuperAdminCertificationConfig />} />
   <Route path="admins" element={<SuperAdminAdmins />} />
   <Route path="projectcodes" element={<SuperAdminProjectCodes />} />
@@ -132,6 +135,7 @@ export default function App() {
           <Route path="certificates" element={<Certificates />} />
           <Route path="exams" element={<Exams />} />
           <Route path="help" element={<Help />} />
+          <Route path="profile" element={<CollegeAdminProfile />} />
         </Route>
 
         {/* ================= FALLBACK ================= */}

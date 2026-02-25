@@ -209,17 +209,25 @@ export const getCertificatesByProjectCode = async (projectCode) => {
     const normalizedProjectCode = String(projectCode || "").trim();
     if (!normalizedProjectCode) return [];
 
-    const enrollmentsQuery = query(
+    const normalizeForCompare = (value) =>
+      String(value || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+
+    const targetCode = normalizeForCompare(normalizedProjectCode);
+    const enrollmentsSnapshot = await getDocs(
       collection(db, CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION),
-      where("projectCode", "==", normalizedProjectCode),
     );
-    const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
     if (enrollmentsSnapshot.empty) return [];
 
-    const enrollmentRows = enrollmentsSnapshot.docs.map((enrollmentDoc) => ({
-      certificateId: enrollmentDoc.data()?.certificateId || "",
-      certificateName: enrollmentDoc.data()?.certificateName || "",
-    }));
+    const enrollmentRows = enrollmentsSnapshot.docs
+      .map((enrollmentDoc) => ({
+        certificateId: enrollmentDoc.data()?.certificateId || "",
+        certificateName: enrollmentDoc.data()?.certificateName || "",
+        projectCode: enrollmentDoc.data()?.projectCode || "",
+      }))
+      .filter((row) => normalizeForCompare(row.projectCode) === targetCode);
 
     const certificateIds = [
       ...new Set(enrollmentRows.map((row) => row.certificateId).filter(Boolean)),

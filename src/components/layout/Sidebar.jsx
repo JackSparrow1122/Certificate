@@ -36,6 +36,10 @@ export default function Sidebar() {
     navigate("/login", { replace: true });
   };
 
+  const handleProfileClick = () => {
+    navigate("/superadmin/profile");
+  };
+
   const menu = [
     { label: "Dashboard", path: "/superadmin/dashboard", icon: LayoutGrid },
     { label: "Colleges", path: "/superadmin/colleges", icon: GraduationCap },
@@ -75,23 +79,26 @@ export default function Sidebar() {
         </div>
 
         {/* Profile */}
-        <div
+        <button
+          type="button"
+          onClick={handleProfileClick}
           className={`mx-3 mt-6 flex items-center transition-all ${
             expanded
-              ? "rounded-xl bg-white/10 p-4 gap-3 justify-start"
-              : "p-2 justify-center"
+              ? "rounded-xl bg-white/10 p-3 gap-3 justify-start hover:bg-white/20"
+              : "rounded-xl p-2 justify-center hover:bg-white/10"
           }`}
+          title="Open Profile"
         >
-          <div className="h-12 w-12 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] font-semibold leading-none flex items-center justify-center">
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] text-lg font-semibold leading-none flex items-center justify-center">
             {adminInitial}
           </div>
           {expanded && (
             <div>
-              <p className="font-semibold leading-tight">{adminName}</p>
-              <span className="text-sm opacity-70">{adminRoleLabel}</span>
+              <p className="text-lg font-semibold leading-tight">{adminName}</p>
+              <span className="text-xs opacity-70">{adminRoleLabel}</span>
             </div>
           )}
-        </div>
+        </button>
 
         {/* Menu */}
         <nav className="mt-8 space-y-2 px-3">

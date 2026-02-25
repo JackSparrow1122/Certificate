@@ -10,7 +10,7 @@ export default function Topbar() {
     <div className="border-b border-white/60 bg-white/70 px-4 py-4 backdrop-blur sm:px-6">
       <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-[#0B2A4A] via-[#1D5FA8] to-[#6BC7A7] px-5 py-4 text-white shadow-sm">
         <div>
-          <h1 className="text-xl font-semibold sm:text-2xl">Superadmin Dashboard</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Superadmin</h1>
           <p className="text-xs text-white/90 sm:text-sm">Welcome back, {adminName}</p>
         </div>
         <div className="hidden items-center gap-3 sm:flex">

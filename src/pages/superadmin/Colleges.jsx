@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import CollegeCard from "../../components/superadmin/CollegeCard";
-import Sidebar from "../../components/layout/Sidebar";
+import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddEditCollegeModal from "../../components/superadmin/AddEditCollegeModal";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import {
@@ -94,12 +94,8 @@ export default function Colleges() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <Sidebar />
-
-      {/* Main Content */}
-      <div className="flex-1 p-8 space-y-6">
+    <SuperAdminLayout>
+      <div className="space-y-6 p-2 sm:p-2 md:p-3 lg:p-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Colleges</h1>
@@ -158,6 +154,6 @@ export default function Colleges() {
         onCancel={cancelDelete}
         loading={deleteConfirm.loading}
       />
-    </div>
+    </SuperAdminLayout>
   );
 }
