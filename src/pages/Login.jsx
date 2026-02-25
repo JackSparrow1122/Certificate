@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 
-import { auth, db } from "../firebase/config";
+import { auth } from "../firebase/config";
 import { getDashboardByRole } from "../utils/roleRedirect";
+import { getAuthUserProfile } from "../utils/authProfileLookup";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -29,17 +29,11 @@ export default function Login() {
 
       const uid = userCredential.user.uid;
 
-      // Fetch role from users; fallback to student_users.
-      let role = null;
-      const userDoc = await getDoc(doc(db, "users", uid));
-      if (userDoc.exists()) {
-        role = userDoc.data().role || null;
-      } else {
-        const studentUserDoc = await getDoc(doc(db, "student_users", uid));
-        if (studentUserDoc.exists()) {
-          role = studentUserDoc.data().role || null;
-        }
-      }
+      const profile = await getAuthUserProfile({
+        uid,
+        email: userCredential.user.email,
+      });
+      const role = profile?.role || null;
 
       if (!role) {
         throw new Error("User role not found in users/student_users");

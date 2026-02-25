@@ -70,6 +70,8 @@ export const createStudentAuthUser = async (studentData) => {
       // Keep one entry for the email and remove any duplicate docs.
       const existingDocs = existingStudentUsersSnapshot.docs;
       const docToKeep = existingDocs[0];
+      const existingData = docToKeep.data() || {};
+      const resolvedUid = String(existingData.uid || docToKeep.id).trim();
 
       if (existingDocs.length > 1) {
         await Promise.all(
@@ -82,7 +84,7 @@ export const createStudentAuthUser = async (studentData) => {
       await setDoc(
         doc(db, STUDENT_USERS_COLLECTION, docToKeep.id),
         {
-          uid: docToKeep.id,
+          uid: resolvedUid,
           email,
           name,
           role: "student",
@@ -95,7 +97,7 @@ export const createStudentAuthUser = async (studentData) => {
       );
 
       return {
-        uid: docToKeep.id,
+        uid: resolvedUid,
         email,
         skippedExisting: true,
       };

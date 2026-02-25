@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../firebase/config";
+import { auth } from "../firebase/config";
+import { getAuthUserProfile } from "../utils/authProfileLookup";
 
 const AuthContext = createContext();
 
@@ -16,14 +16,12 @@ export function AuthProvider({ children }) {
       if (firebaseUser) {
         setUser(firebaseUser);
 
-        // Fetch role/profile from users; fallback to student_users.
-        let snap = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (!snap.exists()) {
-          snap = await getDoc(doc(db, "student_users", firebaseUser.uid));
-        }
+        const userData = await getAuthUserProfile({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+        });
 
-        if (snap.exists()) {
-          const userData = snap.data() || {};
+        if (userData) {
           setRole(userData.role || null);
           setProfile(userData);
         } else {
