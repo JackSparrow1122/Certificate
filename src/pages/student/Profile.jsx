@@ -1,11 +1,39 @@
 import { useEffect, useState } from "react";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase/config";
 import { getStudentForAuthUser } from "../../../services/studentService";
+
+const getCurrentYearFromProjectCode = (projectCodeValue) => {
+  const parts = String(projectCodeValue || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 3) {
+    return parts[2];
+  }
+
+  return "";
+};
 
 export default function StudentProfile() {
   const { user, profile } = useAuth();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -51,13 +79,102 @@ export default function StudentProfile() {
     student?.passingYear ||
     student?.admissionYear ||
     "-";
-  const currentSemester = student?.currentSemester || "-";
+  const structuredProjectCode = student?.projectCode || student?.projectId || "";
+  const currentYearFromCode = getCurrentYearFromProjectCode(structuredProjectCode);
+  const currentYear = currentYearFromCode || student?.currentSemester || "-";
   const tenthPercentage = student?.tenthPercentage ?? tenthDetails["10th OVERALL MARKS %"] ?? "-";
   const twelfthPercentage = student?.twelfthPercentage ?? twelfthDetails["12th OVERALL MARKS %"] ?? "-";
 
-  const currentCertificate = student?.certificate || "-";
-  const progress = student?.progress || "0%";
-  const exams = student?.exams || "0 / 0";
+  const handlePasswordFieldChange = (event) => {
+    const { name, value } = event.target;
+    setPasswordForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    const currentPassword = String(passwordForm.currentPassword || "").trim();
+    const newPassword = String(passwordForm.newPassword || "").trim();
+    const confirmPassword = String(passwordForm.confirmPassword || "").trim();
+
+    if (!user || !user.email) {
+      setPasswordError("Authenticated user not found.");
+      return;
+    }
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("Please fill all password fields.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New password and confirm password do not match.");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setPasswordError("New password must be different from current password.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+
+      const studentUsersRef = doc(db, "student_users", user.uid);
+      const usersRef = doc(db, "users", user.uid);
+      const [studentUsersSnap, usersSnap] = await Promise.all([
+        getDoc(studentUsersRef),
+        getDoc(usersRef),
+      ]);
+
+      const targetRef = studentUsersSnap.exists()
+        ? studentUsersRef
+        : usersSnap.exists()
+          ? usersRef
+          : studentUsersRef;
+
+      await setDoc(
+        targetRef,
+        {
+          passwordLastUpdatedAt: new Date(),
+          passwordUpdatedBy: "student",
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      );
+
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setPasswordSuccess("Password updated successfully.");
+    } catch (error) {
+      console.error("Failed to update password:", error);
+      const code = error?.code || "";
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        setPasswordError("Current password is incorrect.");
+      } else if (code === "auth/weak-password") {
+        setPasswordError("New password is too weak.");
+      } else if (code === "auth/too-many-requests") {
+        setPasswordError("Too many attempts. Please try again later.");
+      } else {
+        setPasswordError("Failed to update password. Please try again.");
+      }
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -84,20 +201,75 @@ export default function StudentProfile() {
           <ProfileItem label="Email" value={email} />
           <ProfileItem label="Phone" value={phone} />
           <ProfileItem label="Passing Year" value={passingYear} />
-          <ProfileItem label="Current Semester" value={currentSemester} />
+          <ProfileItem label="Current Year" value={currentYear} />
           <ProfileItem label="10th Percentage" value={tenthPercentage === "-" ? "-" : `${tenthPercentage}%`} />
           <ProfileItem label="12th Percentage" value={twelfthPercentage === "-" ? "-" : `${twelfthPercentage}%`} />
         </div>
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Certification Progress</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <ProfileItem label="Current Certificate" value={currentCertificate} />
-          <ProfileItem label="Progress" value={progress} />
-          <ProfileItem label="Exams" value={exams} />
-        </div>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Change Password</h2>
+
+        {passwordError && (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {passwordError}
+          </p>
+        )}
+        {passwordSuccess && (
+          <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+            {passwordSuccess}
+          </p>
+        )}
+
+        <form onSubmit={handlePasswordChange} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-700">Current Password</span>
+            <input
+              type="password"
+              name="currentPassword"
+              value={passwordForm.currentPassword}
+              onChange={handlePasswordFieldChange}
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D5FA8]"
+              autoComplete="current-password"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-700">New Password</span>
+            <input
+              type="password"
+              name="newPassword"
+              value={passwordForm.newPassword}
+              onChange={handlePasswordFieldChange}
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D5FA8]"
+              autoComplete="new-password"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-gray-700">Confirm New Password</span>
+            <input
+              type="password"
+              name="confirmPassword"
+              value={passwordForm.confirmPassword}
+              onChange={handlePasswordFieldChange}
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D5FA8]"
+              autoComplete="new-password"
+            />
+          </label>
+
+          <div className="md:col-span-3">
+            <button
+              type="submit"
+              disabled={passwordLoading}
+              className="rounded-xl bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#113A63] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {passwordLoading ? "Updating..." : "Update Password"}
+            </button>
+          </div>
+        </form>
       </section>
+
     </div>
   );
 }

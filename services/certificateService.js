@@ -204,6 +204,43 @@ export const getAssignedProjectCodesForCertificate = async (certificateId) => {
   }
 };
 
+export const getCertificatesByProjectCode = async (projectCode) => {
+  try {
+    const normalizedProjectCode = String(projectCode || "").trim();
+    if (!normalizedProjectCode) return [];
+
+    const enrollmentsQuery = query(
+      collection(db, CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION),
+      where("projectCode", "==", normalizedProjectCode),
+    );
+    const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+    if (enrollmentsSnapshot.empty) return [];
+
+    const enrollmentRows = enrollmentsSnapshot.docs.map((enrollmentDoc) => ({
+      certificateId: enrollmentDoc.data()?.certificateId || "",
+      certificateName: enrollmentDoc.data()?.certificateName || "",
+    }));
+
+    const certificateIds = [
+      ...new Set(enrollmentRows.map((row) => row.certificateId).filter(Boolean)),
+    ];
+    if (certificateIds.length === 0) return [];
+
+    const certificates = await getCertificatesByIds(certificateIds);
+    const nameFallbackById = new Map(
+      enrollmentRows.map((row) => [row.certificateId, row.certificateName]),
+    );
+
+    return certificates.map((certificate) => ({
+      ...certificate,
+      name: certificate.name || nameFallbackById.get(certificate.id) || "Certificate",
+    }));
+  } catch (error) {
+    console.error("Error getting certificates by project code:", error);
+    throw error;
+  }
+};
+
 export const unassignProjectCodeFromCertificate = async ({
   certificateId,
   certificateName,

@@ -98,22 +98,19 @@ export default function StudentNavbar({ onMenuClick }) {
         </div>
       </div>
 
-      <div className="hidden sm:flex items-center">
-        <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5">
+      <div className="flex items-center">
+        <div className="inline-flex items-center">
           {collegeInfo.logo ? (
             <img
               src={collegeInfo.logo}
               alt={collegeInfo.name || "College"}
-              className="h-8 w-8 rounded-lg object-cover"
+              className="h-24 w-56 object-contain md:h-28 md:w-80"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0B2A4A] text-xs font-bold text-white">
+            <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-[#0B2A4A] text-xl font-bold text-white md:h-28 md:w-28">
               {collegeInitials}
             </div>
           )}
-          <span className="text-xs font-medium text-gray-700">
-            {collegeInfo.name || "College"}
-          </span>
         </div>
       </div>
     </header>

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutGrid, User, LogOut, X } from "lucide-react";
+import { LayoutGrid, LogOut, X } from "lucide-react";
 import logo from "../../assets/logo.png";
 import profileImage from "../../assets/image.jpg";
 import { useState } from "react";
@@ -13,11 +13,6 @@ const links = [
     path: "/student/dashboard",
     end: true,
     icon: LayoutGrid,
-  },
-  {
-    name: "Profile",
-    path: "/student/profile",
-    icon: User,
   },
 ];
 
@@ -37,6 +32,11 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
     localStorage.clear();
     setMobileMenuOpen(false);
     navigate("/login", { replace: true });
+  };
+
+  const handleProfileClick = () => {
+    setMobileMenuOpen(false);
+    navigate("/student/profile");
   };
 
   return (
@@ -73,23 +73,28 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
         </div>
 
         {/* Profile */}
-        <div
-          className={`mx-3 mt-6 flex items-center transition-all ${
+        <button
+          type="button"
+          onClick={handleProfileClick}
+          className={`mt-6 mx-auto flex w-[calc(100%-1.5rem)] items-center transition-all duration-200 ${
             isExpanded
-              ? "rounded-xl bg-white/10 p-4 gap-3 justify-start"
-              : "p-2 justify-center"
+              ? "justify-center gap-3 rounded-xl border border-white/15 bg-white/12 p-3 shadow-sm backdrop-blur-sm hover:bg-white/20"
+              : "justify-center rounded-xl p-2 hover:bg-white/10"
           }`}
+          title="Open Profile"
         >
-          <div className="h-12 w-12 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] font-semibold leading-none flex items-center justify-center">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-xl font-bold leading-none text-[#0B2A4A]">
             {studentInitial}
           </div>
           {isExpanded && (
-            <div>
-              <p className="font-semibold leading-tight">{studentName}</p>
-              <span className="text-sm opacity-70">{roleLabel}</span>
+            <div className="text-left min-w-0">
+              <p className="truncate text-lg font-semibold leading-tight tracking-tight">
+                {studentName}
+              </p>
+              <span className="text-sm text-white/75">{roleLabel}</span>
             </div>
           )}
-        </div>
+        </button>
 
         {/* Nav Links */}
         <nav className="mt-8 space-y-2 px-3">
