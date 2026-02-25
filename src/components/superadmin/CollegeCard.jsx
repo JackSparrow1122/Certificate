@@ -4,9 +4,13 @@ export default function CollegeCard({ college, onEdit, onDelete, onOpen }) {
   return (
     <div
       onClick={() => {
-        onOpen();
+        if (onOpen) onOpen();
       }}
-      className="relative cursor-pointer rounded-2xl border border-transparent bg-gray-200 p-5 shadow transition-all duration-200 hover:-translate-y-1 hover:border-[#0B2A4A]/20 hover:shadow-lg"
+      className={`relative rounded-2xl border border-transparent bg-gray-200 p-5 shadow transition-all duration-200 ${
+        onOpen
+          ? "cursor-pointer hover:-translate-y-1 hover:border-[#0B2A4A]/20 hover:shadow-lg"
+          : ""
+      }`}
     >
       <div
         className="absolute top-3 right-3 z-20"

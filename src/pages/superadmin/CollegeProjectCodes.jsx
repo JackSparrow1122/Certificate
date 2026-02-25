@@ -6,7 +6,6 @@ import {
 } from "../../../services/projectCodeService";
 import { getCollegeByCode } from "../../../services/collegeService";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
-import AddProjectCodeModal from "../../components/superadmin/AddProjectCodeModal";
 import { Paperclip, RotateCcw, Trash2 } from "lucide-react";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
@@ -18,7 +17,6 @@ export default function CollegeProjectCodes() {
   const [college, setCollege] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [selectedProjectCode, setSelectedProjectCode] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -94,10 +92,6 @@ export default function CollegeProjectCodes() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleProjectCodeAdded = () => {
-    fetchData();
-  };
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -189,14 +183,6 @@ export default function CollegeProjectCodes() {
               <h2 className="text-[2.15rem] leading-tight font-medium text-gray-900">
                 Project Code List
               </h2>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowAddProjectModal(true)}
-                className="rounded-lg bg-gray-300 px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-400"
-              >
-                + Add New Project Code
-              </button>
             </div>
           </div>
 
@@ -335,17 +321,6 @@ export default function CollegeProjectCodes() {
         </div>
       </div>
 
-      {showAddProjectModal && (
-        <AddProjectCodeModal
-          collegeId={collegeId}
-          collegeCode={
-            college?.college_code || college?.collegeCode || collegeId
-          }
-          collegeName={college?.college_name || ""}
-          onClose={() => setShowAddProjectModal(false)}
-          onProjectCodeAdded={handleProjectCodeAdded}
-        />
-      )}
       <ConfirmDialog
         isOpen={confirmOpen}
         title="Confirm Deletion"

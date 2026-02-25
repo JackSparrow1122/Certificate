@@ -4,9 +4,7 @@ export default function ProjectCodeRow({ row }) {
   return (
     <tr className="border-b last:border-none">
       {/* Project Code */}
-      <td className="px-6 py-4 text-sm font-medium">
-        {row.code}
-      </td>
+      <td className="px-6 py-4 text-sm font-medium">{row.code}</td>
 
       {/* College */}
       <td className="px-6 py-4">
@@ -16,8 +14,8 @@ export default function ProjectCodeRow({ row }) {
           </span>
         ) : (
           <div>
-            <span className="text-orange-600 text-xs font-semibold">
-              Unmatched
+            <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-1 text-yellow-800 text-xs font-semibold">
+              ⚠ Unmapped
             </span>
             <p className="text-xs text-gray-500">{row.college}</p>
           </div>
