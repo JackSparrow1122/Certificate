@@ -1,6 +1,6 @@
-import { certifications } from "../../data/certifications";
 import { useEffect, useState } from "react";
 import { getAllStudents } from "../../../services/studentService";
+import { getAllCertificates } from "../../../services/certificateService";
 
 const parseProgress = (value) => {
   const parsed = Number(String(value || "").replace("%", "").trim());
@@ -9,16 +9,18 @@ const parseProgress = (value) => {
 
 export default function Certificates() {
   const [students, setStudents] = useState([]);
+  const [certifications, setCertifications] = useState([]);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
-        const s = await getAllStudents();
+        const [s, c] = await Promise.all([getAllStudents(), getAllCertificates()]);
         if (!mounted) return;
         setStudents(s || []);
+        setCertifications(c || []);
       } catch (error) {
-        console.error("Failed to load students:", error);
+        console.error("Failed to load certificate data:", error);
       }
     };
     load();

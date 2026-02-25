@@ -13,12 +13,12 @@ import {
 } from "recharts";
 import { BookOpenCheck, Building2, GraduationCap, Users } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
-import { admins } from "../../data/admins";
-import { certifications } from "../../data/certifications";
-import { colleges } from "../../data/colleges";
-import { projectCodes } from "../../data/projectCodes";
 import { useEffect, useState } from "react";
 import { getAllStudents } from "../../../services/studentService";
+import { getAllAdmins } from "../../../services/userService";
+import { getAllCertificates } from "../../../services/certificateService";
+import { getAllColleges } from "../../../services/collegeService";
+import { getAllProjectCodes } from "../../../services/projectCodeService";
 
 const SIDEBAR_BLUE = "#0B2A4A";
 const ACCENT_BLUE = "#1D5FA8";
@@ -34,16 +34,30 @@ const parseProgress = (progressValue) => {
 
 export default function Dashboard() {
   const [students, setStudents] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [certifications, setCertifications] = useState([]);
+  const [colleges, setColleges] = useState([]);
+  const [projectCodes, setProjectCodes] = useState([]);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
-        const s = await getAllStudents();
+        const [s, a, c, clg, pc] = await Promise.all([
+          getAllStudents(),
+          getAllAdmins(),
+          getAllCertificates(),
+          getAllColleges(),
+          getAllProjectCodes(),
+        ]);
         if (!mounted) return;
         setStudents(s || []);
+        setAdmins(a || []);
+        setCertifications(c || []);
+        setColleges(clg || []);
+        setProjectCodes(pc || []);
       } catch (error) {
-        console.error("Failed to load students:", error);
+        console.error("Failed to load dashboard data:", error);
       }
     };
     load();
@@ -54,14 +68,14 @@ export default function Dashboard() {
 
   const totalStudents = students.length;
   const totalColleges = colleges.length;
-  const activeColleges = colleges.filter((college) => college.status === "Active").length;
+  const activeColleges = colleges.filter((college) => String(college.status || "Active") === "Active").length;
   const totalProjectCodes = projectCodes.length;
   const totalCertificates = certifications.length;
   const totalCollegeAdmins = admins.filter((admin) => admin.role === "College Admin").length;
 
   const studentsByProject = Object.entries(
     students.reduce((accumulator, student) => {
-      const key = student.projectId || "Unknown";
+      const key = student.projectId || student.projectCode || "Unknown";
       accumulator[key] = (accumulator[key] || 0) + 1;
       return accumulator;
     }, {}),

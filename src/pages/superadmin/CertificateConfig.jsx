@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { Pencil } from "lucide-react";
-import { certifications as defaultCertifications } from "../../data/certifications";
 import AddCertificateModal from "../../components/superadmin/AddCertificateModal";
 import EnrollProjectCodeModal from "../../components/superadmin/EnrollProjectCodeModal";
 import DeclareResultModal from "../../components/superadmin/DeclareResultModal";
@@ -38,16 +37,7 @@ export default function CertificateConfig() {
         getAllProjectCodesFromStudents(),
       ]);
 
-      if (certificateData.length === 0) {
-        setCertifications(
-          defaultCertifications.map((item) => ({
-            ...item,
-            enrolledCount: 0,
-          })),
-        );
-      } else {
-        setCertifications(certificateData);
-      }
+      setCertifications(certificateData || []);
       console.log("Project codes loaded:", projectCodeData);
       setProjectCodes(projectCodeData);
     } catch (fetchError) {

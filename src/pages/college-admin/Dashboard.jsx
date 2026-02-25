@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { projects } from "../../data/projects";
-import { certifications } from "../../data/certifications";
 import { getAllStudents } from "../../../services/studentService";
+import { getAllProjectCodes } from "../../../services/projectCodeService";
+import { getAllCertificates } from "../../../services/certificateService";
 import {
   BarChart,
   Bar,
@@ -26,28 +26,45 @@ export default function AdminDashboard() {
   };
 
   const [students, setStudents] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [certifications, setCertifications] = useState([]);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
-        const s = await getAllStudents();
+        const [s, p, c] = await Promise.all([
+          getAllStudents(),
+          getAllProjectCodes(),
+          getAllCertificates(),
+        ]);
         if (!mounted) return;
         setStudents(s || []);
+        setProjects(p || []);
+        setCertifications(c || []);
       } catch (error) {
-        console.error("Failed to load students:", error);
+        console.error("Failed to load dashboard data:", error);
       }
     };
     load();
     return () => {
       mounted = false;
     };
-  }, [students, projects, certifications]);
+  }, []);
 
   const data = useMemo(() => {
+    const studentCountByProject = students.reduce((acc, student) => {
+      const key = student.projectId || student.projectCode || "";
+      if (!key) return acc;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
     const byCourse = {};
     projects.forEach((p) => {
-      byCourse[p.courseCode] = (byCourse[p.courseCode] || 0) + p.totalStudents;
+      const courseKey = p.course || p.courseCode || "Unknown";
+      byCourse[courseKey] =
+        (byCourse[courseKey] || 0) + (studentCountByProject[p.code] || 0);
     });
 
     const barData = Object.keys(byCourse).map((k) => ({
@@ -81,7 +98,11 @@ export default function AdminDashboard() {
           )
         : 0;
 
-    const topProjects = [...projects]
+    const topProjects = projects
+      .map((project) => ({
+        ...project,
+        totalStudents: studentCountByProject[project.code] || 0,
+      }))
       .sort((a, b) => b.totalStudents - a.totalStudents)
       .slice(0, 5);
 
@@ -95,7 +116,7 @@ export default function AdminDashboard() {
       progressBands,
       topProjects,
     };
-  }, []);
+  }, [students, projects, certifications]);
 
   return (
     <div className="space-y-6">
@@ -160,10 +181,10 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             {data.topProjects.map((project) => (
               <div
-                key={project.id}
+                key={project.id || project.code}
                 className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
               >
-                <p className="text-sm font-semibold text-gray-900">{project.id}</p>
+                <p className="text-sm font-semibold text-gray-900">{project.code || project.id}</p>
                 <p className="text-xs text-gray-600">{project.course}</p>
                 <p className="mt-1 text-xs text-[#0B2A4A]">{project.totalStudents} students</p>
               </div>
@@ -184,11 +205,11 @@ export default function AdminDashboard() {
           </thead>
           <tbody>
             {projects.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="py-2">{p.id}</td>
-                <td>{p.college}</td>
-                <td>{p.course}</td>
-                <td>{p.year}</td>
+              <tr key={p.id || p.code} className="border-t">
+                <td className="py-2">{p.code || p.id}</td>
+                <td>{p.college || "-"}</td>
+                <td>{p.course || p.courseCode || "-"}</td>
+                <td>{p.year || "-"}</td>
               </tr>
             ))}
           </tbody>

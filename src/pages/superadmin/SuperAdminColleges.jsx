@@ -1,9 +1,28 @@
-import { colleges } from "../../data/colleges";
+import { useEffect, useState } from "react";
 import CollegeCard from "../../components/superadmin/CollegeCard";
 import { useNavigate } from "react-router-dom";
+import { getAllColleges } from "../../../services/collegeService";
 
 export default function SuperAdminColleges() {
   const navigate = useNavigate();
+  const [colleges, setColleges] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const data = await getAllColleges();
+        if (!mounted) return;
+        setColleges(data || []);
+      } catch (error) {
+        console.error("Failed to load colleges:", error);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className="p-6">

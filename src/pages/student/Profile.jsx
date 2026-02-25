@@ -70,7 +70,6 @@ export default function StudentProfile() {
     String(student?.collegeCode || "").trim() ||
     String(student?.projectId || "").split(/[-/]/)[0]?.trim() ||
     "-";
-  const courseYear = student?.projectId || student?.courseYear || "-";
 
   const email = officialDetails["EMAIL ID"] || student?.email || "-";
   const phone = officialDetails["MOBILE NO."] || student?.phone || "-";
@@ -191,7 +190,6 @@ export default function StudentProfile() {
           <ProfileItem label="Gender" value={gender} />
           <ProfileItem label="Date of Birth" value={dob} />
           <ProfileItem label="College" value={collegeCode} />
-          <ProfileItem label="Course / Year" value={courseYear} />
         </div>
       </section>
 
