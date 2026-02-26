@@ -189,6 +189,7 @@ export default function DeclareResultModal({
               certificateId: certificate.id,
               certificateName: certificate.name,
               status,
+              isDeleted: false,
               declaredAt: new Date(),
             },
             certificateResults: {
@@ -200,6 +201,7 @@ export default function DeclareResultModal({
                 certificateId: certificate.id,
                 certificateName: certificate.name,
                 status,
+                isDeleted: false,
                 declaredAt: new Date(),
               },
             },

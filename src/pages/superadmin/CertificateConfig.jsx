@@ -2,21 +2,35 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { Pencil } from "lucide-react";
 import AddCertificateModal from "../../components/superadmin/AddCertificateModal";
+import AddOrganizationModal from "../../components/superadmin/AddOrganizationModal";
 import EnrollProjectCodeModal from "../../components/superadmin/EnrollProjectCodeModal";
 import DeclareResultModal from "../../components/superadmin/DeclareResultModal";
-import { getAllCertificates } from "../../../services/certificateService";
+import {
+  getAllCertificates,
+  getCertificateEnrollmentCounts,
+  softDeleteCertificate,
+} from "../../../services/certificateService";
 import { getAllProjectCodesFromStudents } from "../../../services/studentService";
+import { getAllOrganizations } from "../../../services/organizationService";
 
 export default function CertificateConfig() {
   const [certifications, setCertifications] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
   const [projectCodes, setProjectCodes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingCounts, setRefreshingCounts] = useState(false);
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingCertificate, setEditingCertificate] = useState(null);
+  const [showAddOrganizationModal, setShowAddOrganizationModal] =
+    useState(false);
+  const [showEditOrganizationModal, setShowEditOrganizationModal] =
+    useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [showDeclareResultModal, setShowDeclareResultModal] = useState(false);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [deletingCertificateId, setDeletingCertificateId] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [filters, setFilters] = useState({
     platform: "All",
@@ -32,14 +46,17 @@ export default function CertificateConfig() {
     try {
       setLoading(true);
       setError("");
-      const [certificateData, projectCodeData] = await Promise.all([
-        getAllCertificates(),
-        getAllProjectCodesFromStudents(),
-      ]);
+      const [certificateData, projectCodeData, organizationData] =
+        await Promise.all([
+          getAllCertificates(),
+          getAllProjectCodesFromStudents(),
+          getAllOrganizations(),
+        ]);
 
       setCertifications(certificateData || []);
       console.log("Project codes loaded:", projectCodeData);
-      setProjectCodes(projectCodeData);
+      setProjectCodes(projectCodeData || []);
+      setOrganizations(organizationData || []);
     } catch (fetchError) {
       setError("Failed to load certificate data");
       console.error("Fetch error:", fetchError);
@@ -50,7 +67,11 @@ export default function CertificateConfig() {
 
   const platforms = [
     "All",
-    ...new Set(certifications.map((c) => c.platform).filter(Boolean)),
+    ...new Set(
+      (organizations || [])
+        .map((organization) => organization?.name)
+        .filter(Boolean),
+    ),
   ];
   const levels = [
     "All",
@@ -58,18 +79,31 @@ export default function CertificateConfig() {
   ];
   const domains = [
     "All",
-    ...new Set(certifications.map((c) => c.domain).filter(Boolean)),
+    ...new Set(certifications.map((c) => c.platform).filter(Boolean)),
   ];
 
   const filteredCertifications = useMemo(() => {
     return certifications.filter((c) => {
       return (
-        (filters.platform === "All" || c.platform === filters.platform) &&
+        (filters.platform === "All" || c.domain === filters.platform) &&
         (filters.level === "All" || c.level === filters.level) &&
-        (filters.domain === "All" || c.domain === filters.domain)
+        (filters.domain === "All" || c.platform === filters.domain)
       );
     });
   }, [certifications, filters]);
+
+  const organizationByName = useMemo(() => {
+    const map = new Map();
+    (organizations || []).forEach((organization) => {
+      const key = String(organization?.name || "")
+        .trim()
+        .toLowerCase();
+      if (key) {
+        map.set(key, organization);
+      }
+    });
+    return map;
+  }, [organizations]);
 
   const resetFilters = () =>
     setFilters({ platform: "All", level: "All", domain: "All" });
@@ -88,6 +122,86 @@ export default function CertificateConfig() {
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
+  const handleOrganizationAdded = async () => {
+    await fetchData();
+    setSuccessMessage("Organisation created successfully.");
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
+
+  const handleOrganizationUpdated = async () => {
+    await fetchData();
+    setSuccessMessage("Organisation updated successfully.");
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
+
+  const handleCertificateUpdated = async () => {
+    await fetchData();
+    setSuccessMessage("Certificate updated successfully.");
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
+
+  const handleSoftDeleteCertificate = async (certificate) => {
+    const confirmed = window.confirm(
+      `Soft delete certificate \"${certificate?.name || ""}\"?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingCertificateId(certificate?.id || "");
+      setOpenMenuId(null);
+
+      const result = await softDeleteCertificate({
+        certificateId: certificate.id,
+      });
+
+      await fetchData();
+
+      const affectedCount = Number(result?.affectedStudents || 0);
+      setSuccessMessage(
+        `Certificate soft deleted. Updated isDeleted=true for ${affectedCount} student records.`,
+      );
+      setTimeout(() => setSuccessMessage(""), 4000);
+    } catch (deleteError) {
+      setError("Failed to soft delete certificate");
+      console.error("Soft delete error:", deleteError);
+    } finally {
+      setDeletingCertificateId("");
+    }
+  };
+
+  const handleRefreshEnrolledCounts = async () => {
+    try {
+      setRefreshingCounts(true);
+      setError("");
+
+      const certificateIds = certifications
+        .map((certificate) => certificate?.id)
+        .filter(Boolean);
+
+      if (certificateIds.length === 0) {
+        return;
+      }
+
+      const liveEnrollmentCounts =
+        await getCertificateEnrollmentCounts(certificateIds);
+
+      setCertifications((prev) =>
+        prev.map((certificate) => ({
+          ...certificate,
+          enrolledCount: Number(liveEnrollmentCounts?.[certificate.id] ?? 0),
+        })),
+      );
+
+      setSuccessMessage("Enrolled counts refreshed from live student data.");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (refreshError) {
+      setError("Failed to refresh enrolled counts");
+      console.error("Refresh counts error:", refreshError);
+    } finally {
+      setRefreshingCounts(false);
+    }
+  };
+
   return (
     <SuperAdminLayout>
       <div className="space-y-6 p-2 sm:p-2 md:p-3 lg:p-4">
@@ -97,12 +211,37 @@ export default function CertificateConfig() {
             Certifications Configuration
           </h1>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
-          >
-            + Add New Certificate
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefreshEnrolledCounts}
+              disabled={
+                loading || refreshingCounts || certifications.length === 0
+              }
+              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm disabled:opacity-60"
+            >
+              {refreshingCounts
+                ? "Refreshing counts..."
+                : "Refresh Enrolled Counts"}
+            </button>
+            <button
+              onClick={() => setShowAddOrganizationModal(true)}
+              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
+            >
+              + Add New Organisation
+            </button>
+            <button
+              onClick={() => setShowEditOrganizationModal(true)}
+              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
+            >
+              ✏️ Edit Organisation
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
+            >
+              + Add New Certificate
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -118,11 +257,9 @@ export default function CertificateConfig() {
 
         {/* Filters */}
         <div className="bg-gray-300 rounded-2xl p-6 flex items-end gap-6">
-          {/* Platform */}
+          {/* Organisation */}
           <div className="flex-1">
-            <label className="text-sm font-medium">
-              Platform / Organisation
-            </label>
+            <label className="text-sm font-medium">Organisation</label>
             <select
               value={filters.platform}
               onChange={(e) =>
@@ -177,9 +314,9 @@ export default function CertificateConfig() {
 
         {/* Table Header */}
         <div className="grid grid-cols-6 text-sm font-semibold px-6">
-          <span>Domain</span>
+          <span>Organisation</span>
           <span>Certificate Name</span>
-          <span>Platform / Organisation</span>
+          <span>Domain</span>
           <span>Exam Code</span>
           <span>Level</span>
           <span className="text-right">Enrolled</span>
@@ -202,7 +339,26 @@ export default function CertificateConfig() {
               className="bg-white rounded-xl px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 relative"
             >
               <div className="grid grid-cols-6 w-full text-sm">
-                <span>{c.domain}</span>
+                <span className="flex items-center gap-2">
+                  {organizationByName.get(
+                    String(c.domain || "")
+                      .trim()
+                      .toLowerCase(),
+                  )?.logoUrl ? (
+                    <img
+                      src={
+                        organizationByName.get(
+                          String(c.domain || "")
+                            .trim()
+                            .toLowerCase(),
+                        )?.logoUrl
+                      }
+                      alt={`${c.domain || "Organisation"} logo`}
+                      className="h-6 w-6 rounded object-contain bg-gray-50 border"
+                    />
+                  ) : null}
+                  <span>{c.domain}</span>
+                </span>
                 <span>{c.name}</span>
                 <span>{c.platform}</span>
                 <span>{c.examCode}</span>
@@ -229,6 +385,17 @@ export default function CertificateConfig() {
                   <button
                     onClick={(event) => {
                       event.stopPropagation();
+                      setEditingCertificate(c);
+                      setShowAddModal(true);
+                      setOpenMenuId(null);
+                    }}
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 border-b"
+                  >
+                    ✏️ Edit Certificate
+                  </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setSelectedCertificate(c);
                       setShowDeclareResultModal(true);
                       setOpenMenuId(null);
@@ -244,21 +411,65 @@ export default function CertificateConfig() {
                       setShowEnrollModal(true);
                       setOpenMenuId(null);
                     }}
-                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 border-b"
                   >
                     🏆 Enroll Project Code
                   </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleSoftDeleteCertificate(c);
+                    }}
+                    disabled={deletingCertificateId === c.id}
+                    className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {deletingCertificateId === c.id
+                      ? "Deleting..."
+                      : "🗑️ Soft Delete"}
+                  </button>
                 </div>
-        )}
-      </div>
+              )}
+            </div>
           ))}
         </div>
       </div>
 
       {showAddModal && (
         <AddCertificateModal
-          onClose={() => setShowAddModal(false)}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingCertificate(null);
+          }}
           onCertificateAdded={handleCertificateAdded}
+          onCertificateUpdated={() => {
+            setShowAddModal(false);
+            setEditingCertificate(null);
+            handleCertificateUpdated();
+          }}
+          initialCertificate={editingCertificate}
+          organizations={organizations}
+        />
+      )}
+
+      {showAddOrganizationModal && (
+        <AddOrganizationModal
+          onClose={() => setShowAddOrganizationModal(false)}
+          onOrganizationAdded={() => {
+            setShowAddOrganizationModal(false);
+            handleOrganizationAdded();
+          }}
+        />
+      )}
+
+      {showEditOrganizationModal && (
+        <AddOrganizationModal
+          mode="edit"
+          organizations={organizations}
+          onClose={() => setShowEditOrganizationModal(false)}
+          onOrganizationUpdated={() => {
+            setShowEditOrganizationModal(false);
+            handleOrganizationUpdated();
+          }}
         />
       )}
 

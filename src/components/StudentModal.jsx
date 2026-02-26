@@ -7,13 +7,22 @@ export default function StudentModal({ student, onClose }) {
 
   const PRIMARY_KEYS = [
     ["Roll No", student.id || student.docId],
-    ["Name", student.name || student?.OFFICIAL_DETAILS?.["FULL NAME OF STUDENT"]],
+    [
+      "Name",
+      student.name || student?.OFFICIAL_DETAILS?.["FULL NAME OF STUDENT"],
+    ],
     ["Gender", student.gender || student?.OFFICIAL_DETAILS?.GENDER],
     ["Date of Birth", student.dob || student?.OFFICIAL_DETAILS?.["BIRTH DATE"]],
     ["Project Code", projectCode],
     ["Email", student.email || student?.OFFICIAL_DETAILS?.["EMAIL ID"]],
     ["Phone", student.phone || student?.OFFICIAL_DETAILS?.["MOBILE NO."]],
-    ["Current Year", currentYearFromCode || student.currentYear || student.currentSemester || student.semesterLabel],
+    [
+      "Current Year",
+      currentYearFromCode ||
+        student.currentYear ||
+        student.currentSemester ||
+        student.semesterLabel,
+    ],
     ["Passing Year", student.passingYear],
   ];
 
@@ -30,7 +39,9 @@ export default function StudentModal({ student, onClose }) {
     return true;
   };
 
-  const primaryEntries = PRIMARY_KEYS.filter(([label, value]) => dedupeEntry(label, value));
+  const primaryEntries = PRIMARY_KEYS.filter(([label, value]) =>
+    dedupeEntry(label, value),
+  );
   const nestedSectionEntries = nestedSections
     .map(([sectionKey, sectionValue]) => ({
       sectionKey,
@@ -43,14 +54,10 @@ export default function StudentModal({ student, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* BACKDROP */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* MODAL */}
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-3xl p-8 z-10 overflow-y-auto max-h-[90vh]">
-        
         {/* CLOSE */}
         <button
           onClick={onClose}
@@ -60,9 +67,7 @@ export default function StudentModal({ student, onClose }) {
         </button>
 
         {/* TITLE */}
-        <h2 className="text-2xl font-semibold mb-6">
-          Student Details
-        </h2>
+        <h2 className="text-2xl font-semibold mb-6">Student Details</h2>
 
         <Section title="Primary Information">
           {primaryEntries.map(([label, value]) => (
@@ -85,7 +90,11 @@ export default function StudentModal({ student, onClose }) {
         {nestedSectionEntries.map(({ sectionKey, entries }) => (
           <Section key={sectionKey} title={toLabel(sectionKey)}>
             {entries.map(([label, value]) => (
-              <Detail key={`${sectionKey}-${label}`} label={toLabel(label)} value={value} />
+              <Detail
+                key={`${sectionKey}-${label}`}
+                label={toLabel(label)}
+                value={value}
+              />
             ))}
           </Section>
         ))}
@@ -102,9 +111,7 @@ function Section({ title, children }) {
       <h3 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">
         {title}
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {children}
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{children}</div>
     </div>
   );
 }
@@ -113,15 +120,18 @@ function Detail({ label, value }) {
   return (
     <div>
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-1 font-medium text-gray-900">
-        {toDisplayValue(value)}
-      </p>
+      <p className="mt-1 font-medium text-gray-900">{toDisplayValue(value)}</p>
     </div>
   );
 }
 
 function isPlainObject(value) {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value) && typeof value?.toDate !== "function");
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof value?.toDate !== "function",
+  );
 }
 
 function isDisplayableValue(value) {
@@ -191,7 +201,9 @@ function getCurrentYearFromProjectCode(projectCode) {
 }
 
 function normalizeStatus(status) {
-  const value = String(status || "").trim().toLowerCase();
+  const value = String(status || "")
+    .trim()
+    .toLowerCase();
   if (["passed", "completed", "certified"].includes(value)) return "Passed";
   if (["failed"].includes(value)) return "Failed";
   return "Enrolled";
@@ -199,7 +211,8 @@ function normalizeStatus(status) {
 
 function getCertificateItems(student) {
   const resultMap =
-    student?.certificateResults && typeof student.certificateResults === "object"
+    student?.certificateResults &&
+    typeof student.certificateResults === "object"
       ? Object.values(student.certificateResults)
       : [];
 
@@ -207,6 +220,7 @@ function getCertificateItems(student) {
     .map((result) => ({
       name: String(result?.certificateName || "").trim(),
       status: normalizeStatus(result?.status || result?.result || "enrolled"),
+      isDeleted: Boolean(result?.isDeleted),
     }))
     .filter((item) => item.name);
 
@@ -214,8 +228,12 @@ function getCertificateItems(student) {
     items.push({
       name: String(student.certificate).trim(),
       status: normalizeStatus(student?.certificateStatus || "enrolled"),
+      isDeleted: false,
     });
   }
 
-  return items;
+  return items.map((item) => ({
+    ...item,
+    status: `${item.status} (isDeleted: ${item.isDeleted ? "true" : "false"})`,
+  }));
 }

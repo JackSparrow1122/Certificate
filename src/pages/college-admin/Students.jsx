@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentsByProject } from "../../../services/studentService";
 import { getAllProjectCodes } from "../../../services/projectCodeService";
-import { getCertificatesByProjectCode } from "../../../services/certificateService";
 import StudentModal from "../../components/StudentModal";
 
 const normalizeStatus = (status) => {
-  const value = String(status || "").trim().toLowerCase();
+  const value = String(status || "")
+    .trim()
+    .toLowerCase();
   if (["passed", "completed", "certified"].includes(value)) return "Passed";
   if (["failed"].includes(value)) return "Failed";
   return "Enrolled";
@@ -23,7 +24,8 @@ const getCurrentYearFromProjectCode = (projectCode) => {
 const toDisplayStudent = (student) => {
   const official = student?.OFFICIAL_DETAILS || {};
   const certificateResults =
-    student?.certificateResults && typeof student.certificateResults === "object"
+    student?.certificateResults &&
+    typeof student.certificateResults === "object"
       ? Object.values(student.certificateResults)
       : [];
 
@@ -55,10 +57,7 @@ const toDisplayStudent = (student) => {
       student?.fullName ||
       "-",
     email:
-      student?.email ||
-      official["EMAIL ID"] ||
-      official["EMAIL ID."] ||
-      "-",
+      student?.email || official["EMAIL ID"] || official["EMAIL ID."] || "-",
     currentYear:
       currentYearFromCode ||
       student?.currentYear ||
@@ -72,10 +71,42 @@ const toDisplayStudent = (student) => {
         : "-",
     certificateStatusSummary:
       normalizedCertificates.length > 0
-        ? normalizedCertificates.map((item) => `${item.name}: ${item.status}`).join(" | ")
+        ? normalizedCertificates
+            .map((item) => `${item.name}: ${item.status}`)
+            .join(" | ")
         : "-",
     certificateItems: normalizedCertificates,
   };
+};
+
+const getCertificateOptionsFromStudents = (students) => {
+  const optionsByKey = new Map();
+
+  (students || []).forEach((student) => {
+    const certificateItems = Array.isArray(student?.certificateItems)
+      ? student.certificateItems
+      : [];
+
+    certificateItems.forEach((certificateItem) => {
+      const certificateName = String(certificateItem?.name || "").trim();
+      if (!certificateName) return;
+
+      const certificateId = String(certificateItem?.id || "").trim();
+      const optionId = certificateId || `name:${certificateName.toLowerCase()}`;
+
+      if (!optionsByKey.has(optionId)) {
+        optionsByKey.set(optionId, {
+          id: optionId,
+          actualId: certificateId,
+          name: certificateName,
+        });
+      }
+    });
+  });
+
+  return Array.from(optionsByKey.values()).sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || "")),
+  );
 };
 
 const matchesCertificate = (student, certificate) => {
@@ -96,7 +127,8 @@ const matchesCertificate = (student, certificate) => {
   }
 
   const resultMap =
-    student?.certificateResults && typeof student.certificateResults === "object"
+    student?.certificateResults &&
+    typeof student.certificateResults === "object"
       ? student.certificateResults
       : {};
 
@@ -119,7 +151,10 @@ const matchesCertificate = (student, certificate) => {
     : [];
   if (
     enrolledNames.some(
-      (name) => String(name || "").trim().toLowerCase() === targetName,
+      (name) =>
+        String(name || "")
+          .trim()
+          .toLowerCase() === targetName,
     )
   ) {
     return true;
@@ -216,13 +251,14 @@ export default function Students() {
       try {
         setLoadingStudents(true);
         setSelectedCertificateId("");
-        const [studentsByProject, certificatesByProject] = await Promise.all([
-          getStudentsByProject(selectedProjectCode),
-          getCertificatesByProjectCode(selectedProjectCode),
-        ]);
+        const studentsByProject =
+          await getStudentsByProject(selectedProjectCode);
         if (!mounted) return;
-        setProjectStudents((studentsByProject || []).map(toDisplayStudent));
-        setCertificateOptions(certificatesByProject || []);
+        const mappedStudents = (studentsByProject || []).map(toDisplayStudent);
+        setProjectStudents(mappedStudents);
+        setCertificateOptions(
+          getCertificateOptionsFromStudents(mappedStudents),
+        );
       } catch (error) {
         console.error("Failed to load selected project data:", error);
         if (!mounted) return;
@@ -265,7 +301,9 @@ export default function Students() {
 
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-700">Project Code</span>
+          <span className="mb-1 block text-sm font-medium text-gray-700">
+            Project Code
+          </span>
           <select
             value={selectedProjectCode}
             onChange={(event) => setSelectedProjectCode(event.target.value)}
@@ -273,10 +311,15 @@ export default function Students() {
             disabled={loadingProjects}
           >
             <option value="">
-              {loadingProjects ? "Loading project codes..." : "Select project code"}
+              {loadingProjects
+                ? "Loading project codes..."
+                : "Select project code"}
             </option>
             {projectOptions.map((projectOption) => (
-              <option key={projectOption.id} value={String(projectOption.code || "")}>
+              <option
+                key={projectOption.id}
+                value={String(projectOption.code || "")}
+              >
                 {projectOption.code}
               </option>
             ))}
@@ -284,7 +327,9 @@ export default function Students() {
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-700">Certificate</span>
+          <span className="mb-1 block text-sm font-medium text-gray-700">
+            Certificate
+          </span>
           <select
             value={selectedCertificateId}
             onChange={(event) => setSelectedCertificateId(event.target.value)}
@@ -329,14 +374,20 @@ export default function Students() {
             <tbody>
               {(loadingProjects || loadingStudents) && (
                 <tr className="bg-gray-50">
-                  <td className="px-3 py-6 text-center text-sm text-gray-500" colSpan={7}>
+                  <td
+                    className="px-3 py-6 text-center text-sm text-gray-500"
+                    colSpan={7}
+                  >
                     Loading students...
                   </td>
                 </tr>
               )}
               {!loadingProjects && !loadingStudents && !selectedProjectCode && (
                 <tr className="bg-gray-50">
-                  <td className="px-3 py-6 text-center text-sm text-gray-500" colSpan={7}>
+                  <td
+                    className="px-3 py-6 text-center text-sm text-gray-500"
+                    colSpan={7}
+                  >
                     Select a project code to continue.
                   </td>
                 </tr>
@@ -346,7 +397,10 @@ export default function Students() {
                 selectedProjectCode &&
                 !selectedCertificateId && (
                   <tr className="bg-gray-50">
-                    <td className="px-3 py-6 text-center text-sm text-gray-500" colSpan={7}>
+                    <td
+                      className="px-3 py-6 text-center text-sm text-gray-500"
+                      colSpan={7}
+                    >
                       Select a certificate to view students.
                     </td>
                   </tr>
@@ -357,8 +411,12 @@ export default function Students() {
                 selectedCertificateId &&
                 students.length === 0 && (
                   <tr className="bg-gray-50">
-                    <td className="px-3 py-6 text-center text-sm text-gray-500" colSpan={7}>
-                      No students found for selected project code and certificate.
+                    <td
+                      className="px-3 py-6 text-center text-sm text-gray-500"
+                      colSpan={7}
+                    >
+                      No students found for selected project code and
+                      certificate.
                     </td>
                   </tr>
                 )}
@@ -370,15 +428,21 @@ export default function Students() {
                 >
                   <td className="px-3 py-3 font-medium">{student.id}</td>
                   <td className="px-3">{student.name}</td>
-                  <td className="px-3 text-blue-600">{student.projectCode || "-"}</td>
+                  <td className="px-3 text-blue-600">
+                    {student.projectCode || "-"}
+                  </td>
                   <td className="px-3">{student.email}</td>
                   <td className="px-3">
                     <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
                       {student.currentYear || "-"}
                     </span>
                   </td>
-                  <td className="px-3">{student.enrolledCertificates || "-"}</td>
-                  <td className="px-3">{student.certificateStatusSummary || "-"}</td>
+                  <td className="px-3">
+                    {student.enrolledCertificates || "-"}
+                  </td>
+                  <td className="px-3">
+                    {student.certificateStatusSummary || "-"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -386,7 +450,10 @@ export default function Students() {
         </div>
       </div>
 
-      <StudentModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />
+      <StudentModal
+        student={selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+      />
     </div>
   );
 }

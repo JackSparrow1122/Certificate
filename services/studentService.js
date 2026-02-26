@@ -297,19 +297,37 @@ export const getAllProjectCodesFromStudents = async () => {
     return localGetAllProjectCodesFromStudents();
   }
   try {
-    // Use collectionGroup to get all students_list subcollections
-    const allStudentsQuery = collectionGroup(db, "students_list");
-    const querySnapshot = await getDocs(allStudentsQuery);
+    // Primary source: top-level students collection document IDs
+    const studentsProjectsSnapshot = await getDocs(
+      collection(db, STUDENTS_COLLECTION),
+    );
+
     const projectCodesSet = new Set();
 
-    querySnapshot.forEach((studentDoc) => {
-      const pathSegments = studentDoc.ref.path.split("/");
-      if (pathSegments.length >= 2) {
-        const projectDocId = pathSegments[1];
-        const projectCode = docIdToCode(projectDocId);
+    studentsProjectsSnapshot.forEach((projectDoc) => {
+      const projectDocId = String(projectDoc.id || "").trim();
+      if (!projectDocId) return;
+      const projectCode = docIdToCode(projectDocId);
+      if (projectCode) {
         projectCodesSet.add(projectCode);
       }
     });
+
+    // Fallback: if no top-level docs found, infer from students_list collection group
+    if (projectCodesSet.size === 0) {
+      const allStudentsQuery = collectionGroup(db, "students_list");
+      const querySnapshot = await getDocs(allStudentsQuery);
+      querySnapshot.forEach((studentDoc) => {
+        const pathSegments = studentDoc.ref.path.split("/");
+        if (pathSegments.length >= 2) {
+          const projectDocId = pathSegments[1];
+          const projectCode = docIdToCode(projectDocId);
+          if (projectCode) {
+            projectCodesSet.add(projectCode);
+          }
+        }
+      });
+    }
 
     const projectCodes = Array.from(projectCodesSet)
       .map((code) => ({

@@ -6,12 +6,14 @@ const defaultStore = () => ({
   counters: {
     projectCode: 0,
     certificate: 0,
+    organization: 0,
     user: 0,
   },
   colleges: {},
   projectCodes: {},
   students: {},
   certificates: {},
+  organizations: {},
   certificateProjectEnrollments: {},
   users: {},
   student_users: {},
@@ -40,6 +42,7 @@ const readStore = () => {
       projectCodes: parsed?.projectCodes || {},
       students: parsed?.students || {},
       certificates: parsed?.certificates || {},
+      organizations: parsed?.organizations || {},
       certificateProjectEnrollments:
         parsed?.certificateProjectEnrollments || {},
       users: parsed?.users || {},
@@ -582,11 +585,13 @@ export const localGetStudentForAuthUser = async ({ profile, user } = {}) => {
 // Certificates
 export const localGetAllCertificates = async () => {
   const store = readStore();
-  return Object.values(store.certificates).sort((a, b) => {
-    const aTime = new Date(a.createdAt || 0).getTime();
-    const bTime = new Date(b.createdAt || 0).getTime();
-    return bTime - aTime;
-  });
+  return Object.values(store.certificates)
+    .filter((certificate) => (certificate?.isActive ?? true) !== false)
+    .sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
 };
 
 export const localGetCertificatesByIds = async (certificateIds) => {
@@ -596,6 +601,38 @@ export const localGetCertificatesByIds = async (certificateIds) => {
     .map((id) => store.certificates[id])
     .filter(Boolean)
     .map((certificate) => ({ ...certificate }));
+};
+
+export const localGetCertificateEnrollmentCounts = async (certificateIds) => {
+  const ids = Array.isArray(certificateIds)
+    ? [
+        ...new Set(
+          certificateIds.map((id) => String(id || "").trim()).filter(Boolean),
+        ),
+      ]
+    : [];
+
+  const counts = Object.fromEntries(ids.map((id) => [id, 0]));
+  if (ids.length === 0) return counts;
+
+  const idSet = new Set(ids);
+  const store = readStore();
+
+  Object.values(store.students || {}).forEach((projectNode) => {
+    Object.values(projectNode?.students_list || {}).forEach((student) => {
+      const studentCertificateIds = Array.isArray(student?.certificateIds)
+        ? student.certificateIds
+        : [];
+
+      studentCertificateIds.forEach((certificateId) => {
+        const normalizedId = String(certificateId || "").trim();
+        if (!idSet.has(normalizedId)) return;
+        counts[normalizedId] = Number(counts[normalizedId] || 0) + 1;
+      });
+    });
+  });
+
+  return counts;
 };
 
 export const localCreateCertificateAndEnrollStudents = async (
@@ -611,10 +648,207 @@ export const localCreateCertificateAndEnrollStudents = async (
       examCode: certificateData.examCode,
       level: certificateData.level,
       enrolledCount: 0,
+      isActive: true,
+      deletedAt: null,
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
     return { id, enrolledCount: 0 };
+  });
+
+export const localUpdateCertificate = async (certificateId, updateData) =>
+  withStore((store) => {
+    const id = String(certificateId || "").trim();
+    if (!id || !store.certificates[id]) {
+      throw new Error("Certificate not found.");
+    }
+
+    store.certificates[id] = {
+      ...store.certificates[id],
+      ...(updateData?.domain !== undefined
+        ? { domain: updateData.domain }
+        : {}),
+      ...(updateData?.name !== undefined ? { name: updateData.name } : {}),
+      ...(updateData?.platform !== undefined
+        ? { platform: updateData.platform }
+        : {}),
+      ...(updateData?.examCode !== undefined
+        ? { examCode: updateData.examCode }
+        : {}),
+      ...(updateData?.level !== undefined ? { level: updateData.level } : {}),
+      updatedAt: nowIso(),
+    };
+
+    return { ...store.certificates[id] };
+  });
+
+export const localSoftDeleteCertificate = async (certificateId) =>
+  withStore((store) => {
+    const id = String(certificateId || "").trim();
+    const certificate = store.certificates[id];
+    if (!id || !certificate) {
+      throw new Error("Certificate not found.");
+    }
+
+    let affectedStudents = 0;
+
+    Object.values(store.students || {}).forEach((projectNode) => {
+      Object.values(projectNode?.students_list || {}).forEach((student) => {
+        const certificateIds = Array.isArray(student?.certificateIds)
+          ? student.certificateIds
+          : [];
+        const hasCertificateId = certificateIds.includes(id);
+
+        const resultMap =
+          student?.certificateResults &&
+          typeof student.certificateResults === "object"
+            ? student.certificateResults
+            : {};
+
+        const existingResultEntry = resultMap[id];
+
+        const legacyMatch =
+          student?.certificateResult?.certificateId === id ||
+          String(student?.certificate || "") ===
+            String(certificate?.name || "");
+
+        if (!hasCertificateId && !existingResultEntry && !legacyMatch) {
+          return;
+        }
+
+        affectedStudents += 1;
+
+        student.certificateResults = {
+          ...resultMap,
+          [id]: {
+            ...(existingResultEntry || {}),
+            certificateId: id,
+            certificateName:
+              existingResultEntry?.certificateName ||
+              certificate?.name ||
+              student?.certificate ||
+              "",
+            status:
+              existingResultEntry?.status ||
+              existingResultEntry?.result ||
+              "enrolled",
+            isDeleted: true,
+            updatedAt: nowIso(),
+          },
+        };
+
+        if (student?.certificateResult?.certificateId === id) {
+          student.certificateResult = {
+            ...student.certificateResult,
+            isDeleted: true,
+            updatedAt: nowIso(),
+          };
+        }
+
+        student.updatedAt = nowIso();
+      });
+    });
+
+    Object.keys(store.certificateProjectEnrollments || {}).forEach(
+      (enrollmentId) => {
+        const enrollment = store.certificateProjectEnrollments[enrollmentId];
+        if (String(enrollment?.certificateId || "") === id) {
+          delete store.certificateProjectEnrollments[enrollmentId];
+        }
+      },
+    );
+
+    store.certificates[id] = {
+      ...certificate,
+      isActive: false,
+      deletedAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+
+    return {
+      deleted: true,
+      affectedStudents,
+      certificateId: id,
+    };
+  });
+
+export const localGetAllOrganizations = async () => {
+  const store = readStore();
+  return Object.values(store.organizations).sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || "")),
+  );
+};
+
+export const localCreateOrganization = async ({ name, logoUrl = "" }) =>
+  withStore((store) => {
+    const normalizedName = String(name || "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedName) {
+      throw new Error("Organisation name is required.");
+    }
+
+    const existing = Object.values(store.organizations).find(
+      (organization) =>
+        String(organization?.normalizedName || "") === normalizedName,
+    );
+
+    if (existing) {
+      throw new Error("Organisation already exists.");
+    }
+
+    const id = generateId(store, "organization", "org");
+    const organization = {
+      id,
+      name: String(name || "").trim(),
+      logoUrl: String(logoUrl || "").trim(),
+      normalizedName,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+
+    store.organizations[id] = organization;
+    return organization;
+  });
+
+export const localUpdateOrganization = async (
+  organizationId,
+  { name, logoUrl },
+) =>
+  withStore((store) => {
+    const id = String(organizationId || "").trim();
+    if (!id || !store.organizations[id]) {
+      throw new Error("Organisation not found.");
+    }
+
+    const normalizedName = String(name || "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedName) {
+      throw new Error("Organisation name is required.");
+    }
+
+    const duplicate = Object.values(store.organizations).find(
+      (organization) =>
+        String(organization?.id || "") !== id &&
+        String(organization?.normalizedName || "") === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new Error("Organisation already exists.");
+    }
+
+    store.organizations[id] = {
+      ...store.organizations[id],
+      name: String(name || "").trim(),
+      logoUrl: String(logoUrl || "").trim(),
+      normalizedName,
+      updatedAt: nowIso(),
+    };
+
+    return { ...store.organizations[id] };
   });
 
 export const localEnrollProjectCodeIntoCertificate = async ({
@@ -673,6 +907,7 @@ export const localEnrollProjectCodeIntoCertificate = async ({
           certificateId,
           certificateName,
           status: "enrolled",
+          isDeleted: false,
           updatedAt: nowIso(),
         },
       };
@@ -727,6 +962,7 @@ export const localGetCertificatesByProjectCode = async (projectCode) => {
 
   return certificateIds
     .map((certificateId) => store.certificates[certificateId])
+    .filter((certificate) => (certificate?.isActive ?? true) !== false)
     .filter(Boolean)
     .map((certificate) => ({ ...certificate }));
 };
