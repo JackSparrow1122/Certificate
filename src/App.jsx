@@ -122,7 +122,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<StudentDashboard />} />
+          <Route index element={<Navigate to="dashboard" replace />} />
 
           <Route path="dashboard" element={<StudentDashboard />} />
 
@@ -138,7 +138,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<AdminDashboard />} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="students" element={<Students />} />
           <Route path="students/:studentId" element={<StudentDetails />} />
           <Route path="projects/:projectId" element={<ProjectStudents />} />

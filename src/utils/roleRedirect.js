@@ -4,7 +4,7 @@ export const getDashboardByRole = (role) => {
     case "superAdmin":
       return "/superadmin/dashboard";
     case "collegeAdmin":
-      return "/college-admin/";
+      return "/college-admin/dashboard";
     case "student":
       return "/student/dashboard";
     default:

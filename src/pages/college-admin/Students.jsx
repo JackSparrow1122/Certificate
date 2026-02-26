@@ -146,13 +146,13 @@ const matchesCertificate = (student, certificate) => {
     return true;
   }
 
-  const enrolledNames = Array.isArray(student?.enrolledCertificates)
-    ? student.enrolledCertificates
+  const certificateItems = Array.isArray(student?.certificateItems)
+    ? student.certificateItems
     : [];
   if (
-    enrolledNames.some(
-      (name) =>
-        String(name || "")
+    certificateItems.some(
+      (item) =>
+        String(item.name || "")
           .trim()
           .toLowerCase() === targetName,
     )
@@ -283,7 +283,9 @@ export default function Students() {
           <select
             value={selectedProjectCode}
             onChange={(event) => setSelectedProjectCode(event.target.value)}
-            className="h-10 w-full rounded-lg border border-[#D7E2F1] bg-white px-3 text-sm outline-none"
+            className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors
+              ${loadingProjects ? "border-[#D7E2F1]" : "border-[#D7E2F1]"}
+              ${!selectedProjectCode && !loadingProjects ? "ring-2 ring-yellow-300 border-yellow-500" : ""}`}
             disabled={loadingProjects}
           >
             <option value="">
@@ -300,6 +302,11 @@ export default function Students() {
               </option>
             ))}
           </select>
+          {!selectedProjectCode && !loadingProjects && (
+            <p className="mt-1 text-xs text-yellow-600">
+              <em>Choose a project code to populate the student list.</em>
+            </p>
+          )}
         </label>
 
         <label className="block">
@@ -309,7 +316,8 @@ export default function Students() {
           <select
             value={selectedCertificateId}
             onChange={(event) => setSelectedCertificateId(event.target.value)}
-            className="h-10 w-full rounded-lg border border-[#D7E2F1] bg-white px-3 text-sm outline-none"
+            className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors border-[#D7E2F1]
+              ${selectedProjectCode && !selectedCertificateId && !loadingStudents ? "ring-2 ring-yellow-300 border-yellow-500" : ""}`}
             disabled={!selectedProjectCode || loadingStudents}
           >
             <option value="">
@@ -325,62 +333,59 @@ export default function Students() {
               </option>
             ))}
           </select>
+          {selectedProjectCode && !selectedCertificateId && !loadingStudents && (
+            <p className="mt-1 text-xs text-yellow-600">
+              <em>Select a certificate to view the student master list.</em>
+            </p>
+          )}
         </label>
       </div>
 
-      <div className="bg-white rounded-xl shadow border">
-        <div className="p-6 border-b">
-          <h2 className="text-lg font-semibold">Student Master List</h2>
-        </div>
+      {selectedProjectCode && selectedCertificateId && (
+        <div className="bg-white rounded-xl shadow border">
+          <div className="p-6 border-b">
+            <h2 className="text-lg font-semibold">Student Master List</h2>
+          </div>
 
-        <div className="p-6 overflow-x-auto">
-          <table className="w-full border-separate border-spacing-y-3">
-            <thead className="text-sm text-gray-500">
+          <div className="p-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="text-left px-3">Student ID</th>
-                <th className="text-left px-3">Name</th>
-                <th className="text-left px-3">Project Code</th>
-                <th className="text-left px-3">Email Id</th>
-                <th className="text-left px-3">Current Year</th>
-                <th className="text-left px-3">Certificates</th>
-                <th className="text-left px-3">Result Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Student ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Project Code
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Email Id
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Current Year
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Certificates
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Result Status
+                </th>
               </tr>
             </thead>
 
-            <tbody>
+            <tbody className="bg-white divide-y divide-gray-200">
               {(loadingProjects || loadingStudents) && (
                 <tr className="bg-gray-50">
                   <td
-                    className="px-3 py-6 text-center text-sm text-gray-500"
+                    className="px-6 py-6 text-center text-sm text-gray-500"
                     colSpan={7}
                   >
                     Loading students...
                   </td>
                 </tr>
               )}
-              {!loadingProjects && !loadingStudents && !selectedProjectCode && (
-                <tr className="bg-gray-50">
-                  <td
-                    className="px-3 py-6 text-center text-sm text-gray-500"
-                    colSpan={7}
-                  >
-                    Select a project code to continue.
-                  </td>
-                </tr>
-              )}
-              {!loadingProjects &&
-                !loadingStudents &&
-                selectedProjectCode &&
-                !selectedCertificateId && (
-                  <tr className="bg-gray-50">
-                    <td
-                      className="px-3 py-6 text-center text-sm text-gray-500"
-                      colSpan={7}
-                    >
-                      Select a certificate to view students.
-                    </td>
-                  </tr>
-                )}
               {!loadingProjects &&
                 !loadingStudents &&
                 selectedProjectCode &&
@@ -388,7 +393,7 @@ export default function Students() {
                 students.length === 0 && (
                   <tr className="bg-gray-50">
                     <td
-                      className="px-3 py-6 text-center text-sm text-gray-500"
+                      className="px-6 py-6 text-center text-sm text-gray-500"
                       colSpan={7}
                     >
                       No students found for selected project code and
@@ -400,23 +405,33 @@ export default function Students() {
                 <tr
                   key={`${student.projectCode || student.projectId || "NA"}-${student.id || student.docId || student.email || student.name}`}
                   onClick={() => setSelectedStudent(student)}
-                  className="bg-gray-50 hover:bg-gray-100 cursor-pointer transition"
+                  className="hover:bg-gray-100 cursor-pointer transition" style={{pageBreakInside: 'avoid', breakInside: 'avoid'}}
                 >
-                  <td className="px-3 py-3 font-medium">{student.id}</td>
-                  <td className="px-3">{student.name}</td>
-                  <td className="px-3 text-blue-600">
+                  <td className="px-6 py-4 break-words font-medium text-sm text-gray-900">
+                    {student.id}
+                  </td>
+                  <td className="px-6 py-4 break-words text-sm text-gray-900">
+                    {student.name}
+                  </td>
+                  <td className={`px-6 py-4 break-words text-sm text-blue-600 transition-colors ${
+                      student.projectCode === selectedProjectCode
+                        ? "font-semibold"
+                        : ""
+                    }`}>
                     {student.projectCode || "-"}
                   </td>
-                  <td className="px-3">{student.email}</td>
-                  <td className="px-3">
+                  <td className="px-6 py-4 break-words text-sm text-gray-900">
+                    {student.email}
+                  </td>
+                  <td className="px-6 py-4 break-words">
                     <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
                       {student.currentYear || "-"}
                     </span>
                   </td>
-                  <td className="px-3">
+                  <td className="px-6 py-4 break-words text-sm text-gray-900">
                     {student.enrolledCertificates || "-"}
                   </td>
-                  <td className="px-3">
+                  <td className="px-6 py-4 break-words text-sm text-gray-900">
                     {student.certificateStatusSummary || "-"}
                   </td>
                 </tr>
@@ -425,6 +440,7 @@ export default function Students() {
           </table>
         </div>
       </div>
+      )}
 
       <StudentModal
         student={selectedStudent}
