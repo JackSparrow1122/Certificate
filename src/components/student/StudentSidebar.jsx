@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutGrid, LogOut, X } from "lucide-react";
 import logo from "../../assets/logo.png";
-import profileImage from "../../assets/image.jpg";
 import { useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
@@ -64,10 +63,10 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
         {/* Logo */}
         <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
           <img
-            src={isExpanded ? logo : profileImage}
+            src={logo}
             alt="ERP Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              isExpanded ? "h-20" : "h-12 w-12 bg-white"
+              isExpanded ? "h-20" : "h-10 w-10 bg-white"
             }`}
           />
         </div>
