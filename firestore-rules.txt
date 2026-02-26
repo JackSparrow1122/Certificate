@@ -35,6 +35,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function sameAuthEmail(resourceEmail) {
+      return isSignedIn() &&
+        request.auth.token.email is string &&
+        resourceEmail is string &&
+        request.auth.token.email.lower() == resourceEmail.lower();
+    }
+
     function projectDocBelongsToRequester(projectDocId) {
       return ("" + projectDocId).lower().split("-")[0] == requesterCollegeCode();
     }
@@ -61,13 +68,10 @@ service cloud.firestore {
         (isSignedIn() &&
           (
             (resource.data.uid is string && resource.data.uid == request.auth.uid) ||
-            (
-              request.auth.token.email is string &&
-              resource.data.email is string &&
-              resource.data.email == request.auth.token.email
-            )
+            sameAuthEmail(resource.data.email)
           ));
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if isSuperAdmin() || sameUser(userId);
+      allow delete: if isSuperAdmin();
     }
 
     match /projectCodes/{projectCodeId} {
@@ -97,7 +101,8 @@ service cloud.firestore {
       match /students_list/{studentId} {
         allow read: if isSuperAdmin() ||
           (isCollegeAdmin() &&
-            studentBelongsToRequester(resource.data, projectDocId));
+            studentBelongsToRequester(resource.data, projectDocId)) ||
+          sameAuthEmail(resource.data.email);
         allow create, update, delete: if isSuperAdmin();
       }
     }
