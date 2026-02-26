@@ -2,7 +2,7 @@ import { Award, BookOpenCheck, Clock3, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentForAuthUser } from "../../../services/studentService";
-import { getCertificatesByProjectCode } from "../../../services/certificateService";
+import { getCertificatesByIds } from "../../../services/certificateService";
 
 const getCurrentYearFromProjectCode = (projectCodeValue) => {
   const parts = String(projectCodeValue || "")
@@ -18,8 +18,11 @@ const getCurrentYearFromProjectCode = (projectCodeValue) => {
 };
 
 const normalizeCertificateStatus = (status) => {
-  const normalized = String(status || "").trim().toLowerCase();
-  if (["passed", "completed", "certified"].includes(normalized)) return "passed";
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (["passed", "completed", "certified"].includes(normalized))
+    return "passed";
   if (["failed"].includes(normalized)) return "failed";
   return "enrolled";
 };
@@ -53,7 +56,8 @@ export default function StudentDashboard() {
   const twelfthDetails = currentStudent?.TWELFTH_DETAILS || {};
   const diplomaDetails = currentStudent?.DIPLOMA_DETAILS || {};
   const graduationDetails = currentStudent?.GRADUATION_DETAILS || {};
-  const fullName = officialDetails["FULL NAME OF STUDENT"] || currentStudent?.name || "-";
+  const fullName =
+    officialDetails["FULL NAME OF STUDENT"] || currentStudent?.name || "-";
   const rollNo = officialDetails.SN || currentStudent?.id || "-";
   const gender = currentStudent?.gender || officialDetails.GENDER || "-";
   const dob = currentStudent?.dob || officialDetails["BIRTH DATE"] || "-";
@@ -66,10 +70,15 @@ export default function StudentDashboard() {
     "-";
   const structuredProjectCode =
     currentStudent?.projectCode || currentStudent?.projectId || "";
-  const currentYearFromCode = getCurrentYearFromProjectCode(structuredProjectCode);
-  const currentYear = currentYearFromCode || currentStudent?.currentSemester || "-";
+  const currentYearFromCode = getCurrentYearFromProjectCode(
+    structuredProjectCode,
+  );
+  const currentYear =
+    currentYearFromCode || currentStudent?.currentSemester || "-";
   const tenthPercentage =
-    currentStudent?.tenthPercentage ?? tenthDetails["10th OVERALL MARKS %"] ?? "-";
+    currentStudent?.tenthPercentage ??
+    tenthDetails["10th OVERALL MARKS %"] ??
+    "-";
   const twelfthPercentage =
     currentStudent?.twelfthPercentage ??
     twelfthDetails["12th OVERALL MARKS %"] ??
@@ -85,39 +94,127 @@ export default function StudentDashboard() {
         return;
       }
 
-      const studentProjectCode = String(
-        currentStudent.projectCode || currentStudent.projectId || "",
-      ).trim();
       const resultMap =
         currentStudent.certificateResults &&
         typeof currentStudent.certificateResults === "object"
           ? currentStudent.certificateResults
           : {};
+
+      const certificateResultEntries = Object.entries(resultMap).filter(
+        ([, entry]) => entry && typeof entry === "object",
+      );
+
+      const legacyCertificateResult =
+        currentStudent.certificateResult &&
+        typeof currentStudent.certificateResult === "object"
+          ? currentStudent.certificateResult
+          : null;
+
+      const certificateIdSet = new Set(
+        Array.isArray(currentStudent.certificateIds)
+          ? currentStudent.certificateIds.filter(Boolean)
+          : [],
+      );
+
+      certificateResultEntries.forEach(([mapKey, entry]) => {
+        const resolvedId = String(entry.certificateId || mapKey || "").trim();
+        if (resolvedId) {
+          certificateIdSet.add(resolvedId);
+        }
+      });
+
+      if (legacyCertificateResult?.certificateId) {
+        certificateIdSet.add(String(legacyCertificateResult.certificateId));
+      }
+
       setCertLoading(true);
       try {
-        const linkedCertificates = await getCertificatesByProjectCode(studentProjectCode);
-        const finalList = linkedCertificates.map((certificate, index) => {
-          const result = resultMap[certificate.id] || {};
-          const matchedByName = Object.values(resultMap).find(
-            (entry) =>
-              String(entry?.certificateName || "").trim().toLowerCase() ===
-              String(certificate.name || "").trim().toLowerCase(),
-          );
-          const resolvedStatus =
-            result.status ||
-            result.result ||
-            matchedByName?.status ||
-            matchedByName?.result ||
-            "enrolled";
+        const certificateIds = Array.from(certificateIdSet);
+        const linkedCertificates =
+          certificateIds.length > 0
+            ? await getCertificatesByIds(certificateIds)
+            : [];
 
-          return {
-            id: certificate.id || `cert-${index}`,
-            name: certificate.name || `Certificate ${index + 1}`,
-            platform: certificate.platform || "Certification",
-            level: certificate.level || "Beginner",
-            status: normalizeCertificateStatus(resolvedStatus),
-          };
+        const certificateById = new Map(
+          linkedCertificates
+            .filter((certificate) => certificate?.id)
+            .map((certificate) => [certificate.id, certificate]),
+        );
+
+        const finalById = new Map();
+
+        certificateIds.forEach((certificateId, index) => {
+          const certificateDoc = certificateById.get(certificateId);
+          finalById.set(certificateId, {
+            id: certificateId || `cert-${index}`,
+            name: certificateDoc?.name || `Certificate ${index + 1}`,
+            platform: certificateDoc?.platform || "Certification",
+            level: certificateDoc?.level || "Beginner",
+            status: "enrolled",
+          });
         });
+
+        certificateResultEntries.forEach(([mapKey, entry], index) => {
+          const resolvedId = String(entry.certificateId || mapKey || "").trim();
+          const fallbackId = resolvedId || `result-cert-${index}`;
+          const certificateDoc = certificateById.get(resolvedId);
+          const existing = finalById.get(fallbackId);
+          const resolvedStatus = entry.status || entry.result || "enrolled";
+
+          finalById.set(fallbackId, {
+            id: fallbackId,
+            name:
+              entry.certificateName ||
+              certificateDoc?.name ||
+              existing?.name ||
+              `Certificate ${index + 1}`,
+            platform:
+              certificateDoc?.platform || existing?.platform || "Certification",
+            level: certificateDoc?.level || existing?.level || "Beginner",
+            status: normalizeCertificateStatus(resolvedStatus),
+          });
+        });
+
+        if (legacyCertificateResult) {
+          const legacyId = String(
+            legacyCertificateResult.certificateId || "",
+          ).trim();
+          const resolvedId =
+            legacyId ||
+            Array.from(finalById.values()).find(
+              (certificate) =>
+                String(certificate.name || "")
+                  .trim()
+                  .toLowerCase() ===
+                String(legacyCertificateResult.certificateName || "")
+                  .trim()
+                  .toLowerCase(),
+            )?.id ||
+            "legacy-certificate-result";
+
+          const existing = finalById.get(resolvedId);
+          const certificateDoc = certificateById.get(legacyId);
+
+          finalById.set(resolvedId, {
+            id: resolvedId,
+            name:
+              legacyCertificateResult.certificateName ||
+              certificateDoc?.name ||
+              existing?.name ||
+              "Certificate",
+            platform:
+              certificateDoc?.platform || existing?.platform || "Certification",
+            level: certificateDoc?.level || existing?.level || "Beginner",
+            status: normalizeCertificateStatus(
+              legacyCertificateResult.status ||
+                legacyCertificateResult.result ||
+                existing?.status ||
+                "enrolled",
+            ),
+          });
+        }
+
+        const finalList = Array.from(finalById.values());
 
         if (mounted) {
           setEnrolledCertificates(finalList);
@@ -152,27 +249,49 @@ export default function StudentDashboard() {
       <section className="rounded-3xl border border-[#D7E2F1] bg-white p-5 shadow-sm sm:p-6">
         <div>
           <div>
-            <h1 className="text-2xl font-semibold text-[#0B2A4A] sm:text-3xl">Student Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-[#0B2A4A] sm:text-3xl">
+              Student Dashboard
+            </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Track your enrolled certificates and academic snapshot in one place.
+              Track your enrolled certificates and academic snapshot in one
+              place.
             </p>
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Enrolled" value={statusSummary.enrolled} icon={<Award size={18} />} />
-        <StatCard label="Passed" value={statusSummary.passed} icon={<BookOpenCheck size={18} />} />
-        <StatCard label="Failed" value={statusSummary.failed} icon={<Target size={18} />} />
-        <StatCard label="Current Year" value={currentYear} icon={<Clock3 size={18} />} />
+        <StatCard
+          label="Enrolled"
+          value={statusSummary.enrolled}
+          icon={<Award size={18} />}
+        />
+        <StatCard
+          label="Passed"
+          value={statusSummary.passed}
+          icon={<BookOpenCheck size={18} />}
+        />
+        <StatCard
+          label="Failed"
+          value={statusSummary.failed}
+          icon={<Target size={18} />}
+        />
+        <StatCard
+          label="Current Year"
+          value={currentYear}
+          icon={<Clock3 size={18} />}
+        />
       </section>
 
       <section className="rounded-3xl border border-[#D7E2F1] bg-[#EEF3FA] p-5 shadow-sm sm:p-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
           <div className="space-y-3">
-            <h3 className="text-2xl font-semibold text-[#0B2A4A]">Learning that drives results</h3>
+            <h3 className="text-2xl font-semibold text-[#0B2A4A]">
+              Learning that drives results
+            </h3>
             <p className="text-sm text-[#0B2A4A]/80">
-              View all certificates you are enrolled in and their completion status.
+              View all certificates you are enrolled in and their completion
+              status.
             </p>
             <button
               type="button"
@@ -210,10 +329,14 @@ export default function StudentDashboard() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-lg font-bold text-[#0B2A4A]">
-                    {String(fullName || "S").charAt(0).toUpperCase()}
+                    {String(fullName || "S")
+                      .charAt(0)
+                      .toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-lg font-semibold leading-tight">{fullName}</p>
+                    <p className="text-lg font-semibold leading-tight">
+                      {fullName}
+                    </p>
                     <p className="text-xs text-white/85">Roll No: {rollNo}</p>
                   </div>
                 </div>
@@ -262,7 +385,9 @@ function StatCard({ label, value, icon }) {
     <div className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-[#0B2A4A]/70">{label}</p>
-        <span className="rounded-lg bg-[#EEF3FA] p-2 text-[#0B2A4A]">{icon}</span>
+        <span className="rounded-lg bg-[#EEF3FA] p-2 text-[#0B2A4A]">
+          {icon}
+        </span>
       </div>
       <p className="mt-2 text-2xl font-semibold text-[#0B2A4A]">{value}</p>
     </div>
@@ -281,14 +406,20 @@ function Panel({ title, children }) {
 function SnapshotItem({ label, value }) {
   return (
     <div className="rounded-xl border border-[#D7E2F1] bg-[#F7FAFF] p-3 shadow-sm">
-      <p className="text-[11px] uppercase tracking-wide text-[#0B2A4A]/60">{label}</p>
-      <p className="mt-1 text-base font-semibold text-[#0B2A4A]">{value || "-"}</p>
+      <p className="text-[11px] uppercase tracking-wide text-[#0B2A4A]/60">
+        {label}
+      </p>
+      <p className="mt-1 text-base font-semibold text-[#0B2A4A]">
+        {value || "-"}
+      </p>
     </div>
   );
 }
 
 function CertificateCard({ certificate }) {
-  const statusLabel = normalizeCertificateStatus(certificate.status || "enrolled");
+  const statusLabel = normalizeCertificateStatus(
+    certificate.status || "enrolled",
+  );
   const statusBadgeClass =
     statusLabel === "passed"
       ? "bg-[#6BC7A7]/30 text-[#0B2A4A]"
@@ -299,17 +430,23 @@ function CertificateCard({ certificate }) {
   return (
     <article className="min-w-[270px] max-w-[300px] flex-1 overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white shadow-sm">
       <div className="h-24 bg-[#0B2A4A] px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-white/80">Certificate</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-white/80">
+          Certificate
+        </p>
       </div>
       <div className="space-y-3 p-4">
         <div>
           <p className="text-xs text-[#0B2A4A]/70">{certificate.platform}</p>
-          <h4 className="mt-1 text-lg font-semibold text-[#0B2A4A]">{certificate.name}</h4>
+          <h4 className="mt-1 text-lg font-semibold text-[#0B2A4A]">
+            {certificate.name}
+          </h4>
           <p className="mt-1 text-xs text-gray-600">{certificate.level}</p>
         </div>
 
         <div className="flex items-center justify-between text-xs">
-          <span className={`rounded-full px-2 py-1 font-medium capitalize ${statusBadgeClass}`}>
+          <span
+            className={`rounded-full px-2 py-1 font-medium capitalize ${statusBadgeClass}`}
+          >
             {statusLabel}
           </span>
         </div>
