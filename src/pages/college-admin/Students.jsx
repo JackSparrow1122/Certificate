@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentsByProject } from "../../../services/studentService";
-import { getAllProjectCodes } from "../../../services/projectCodeService";
+import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import StudentModal from "../../components/StudentModal";
 
 const normalizeStatus = (status) => {
@@ -183,41 +183,17 @@ export default function Students() {
     const loadProjectOptions = async () => {
       try {
         setLoadingProjects(true);
-        const profileCollegeCode = String(
-          profile?.collegeCode || profile?.college_code || "",
-        )
+        const profileCollegeCode = String(profile?.collegeCode || profile?.college_code || "")
           .trim()
           .toUpperCase();
-        const profileProjectPrefix = String(
-          profile?.projectCode || profile?.projectId || "",
-        )
-          .split(/[/-]/)[0]
-          ?.trim()
-          .toUpperCase();
-        const collegeCodeCandidates = new Set(
-          [profileCollegeCode, profileProjectPrefix].filter(Boolean),
-        );
-
-        if (collegeCodeCandidates.size === 0) {
+        if (!profileCollegeCode) {
           if (mounted) setProjectOptions([]);
           return;
         }
 
-        const allProjectCodes = await getAllProjectCodes();
+        const allProjectCodes = await getProjectCodesByCollege(profileCollegeCode);
         const filteredProjectOptions = (allProjectCodes || [])
-          .filter((projectCode) => {
-            const projectCollegeId = String(projectCode.collegeId || "")
-              .trim()
-              .toUpperCase();
-            const codePrefix = String(projectCode.code || "")
-              .split(/[/-]/)[0]
-              ?.trim()
-              .toUpperCase();
-            return (
-              collegeCodeCandidates.has(projectCollegeId) ||
-              collegeCodeCandidates.has(codePrefix)
-            );
-          })
+          .filter((projectCode) => String(projectCode?.code || "").trim())
           .sort((a, b) =>
             String(a.code || "").localeCompare(String(b.code || "")),
           );

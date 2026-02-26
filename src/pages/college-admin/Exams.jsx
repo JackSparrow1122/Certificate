@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { getAllStudents } from "../../../services/studentService";
-import { getAllCertificates } from "../../../services/certificateService";
+import { useAuth } from "../../context/AuthContext";
+import { getStudentsByProject } from "../../../services/studentService";
+import { getProjectCodesByCollege } from "../../../services/projectCodeService";
+import { getCertificatesByIds } from "../../../services/certificateService";
 
 const parseExamNumbers = (examsText) => {
   const [attemptedRaw, totalRaw] = String(examsText || "0 / 0")
@@ -12,6 +14,10 @@ const parseExamNumbers = (examsText) => {
 };
 
 export default function Exams() {
+  const { profile } = useAuth();
+  const collegeCode = String(profile?.collegeCode || profile?.college_code || "")
+    .trim()
+    .toUpperCase();
   const [students, setStudents] = useState([]);
   const [certifications, setCertifications] = useState([]);
 
@@ -19,7 +25,96 @@ export default function Exams() {
     let mounted = true;
     const load = async () => {
       try {
-        const [s, c] = await Promise.all([getAllStudents(), getAllCertificates()]);
+        if (!collegeCode) {
+          if (!mounted) return;
+          setStudents([]);
+          setCertifications([]);
+          return;
+        }
+
+        const projects = await getProjectCodesByCollege(collegeCode);
+        const studentGroups = await Promise.all(
+          (projects || []).map((project) =>
+            getStudentsByProject(String(project?.code || "").trim()),
+          ),
+        );
+        const s = studentGroups.flatMap((group) => group || []);
+        const certificateIds = [
+          ...new Set(
+            (s || []).flatMap((student) => {
+              const fromArray = Array.isArray(student?.certificateIds)
+                ? student.certificateIds
+                : [];
+              const fromResults =
+                student?.certificateResults &&
+                typeof student.certificateResults === "object"
+                  ? Object.keys(student.certificateResults)
+                  : [];
+              return [...fromArray, ...fromResults]
+                .map((id) => String(id || "").trim())
+                .filter(Boolean);
+            }),
+          ),
+        ];
+        const certificateMeta =
+          certificateIds.length > 0 ? await getCertificatesByIds(certificateIds) : [];
+        const metaById = new Map(
+          (certificateMeta || []).map((certificate) => [
+            String(certificate?.id || "").trim(),
+            certificate,
+          ]),
+        );
+        const metaByName = new Map(
+          (certificateMeta || []).map((certificate) => [
+            String(certificate?.name || "")
+              .trim()
+              .toLowerCase(),
+            certificate,
+          ]),
+        );
+        const certificatesMap = new Map();
+
+        (s || []).forEach((student) => {
+          const results =
+            student?.certificateResults &&
+            typeof student.certificateResults === "object"
+              ? Object.values(student.certificateResults)
+              : [];
+          results.forEach((result) => {
+            const name = String(result?.certificateName || "").trim();
+            if (name) {
+              const resultId = String(result?.certificateId || "").trim();
+              const key = resultId || `name:${name.toLowerCase()}`;
+              const metadata =
+                (resultId && metaById.get(resultId)) || metaByName.get(name.toLowerCase()) || null;
+              if (!certificatesMap.has(key)) {
+                certificatesMap.set(key, {
+                  id: key,
+                  name,
+                  examCode: String(metadata?.examCode || "").trim() || "-",
+                });
+              }
+            }
+          });
+          const legacyName = String(student?.certificate || "").trim();
+          if (legacyName) {
+            const key = `name:${legacyName.toLowerCase()}`;
+            const metadata = metaByName.get(legacyName.toLowerCase()) || null;
+            if (!certificatesMap.has(key)) {
+              certificatesMap.set(key, {
+                id: key,
+                name: legacyName,
+                examCode: String(metadata?.examCode || "").trim() || "-",
+              });
+            }
+          }
+        });
+
+        const c = Array.from(certificatesMap.values()).map((certificate, index) => ({
+          ...certificate,
+          date: `2026-0${(index % 3) + 3}-${10 + index}`,
+          slot: index % 2 === 0 ? "10:00 AM - 12:00 PM" : "2:00 PM - 4:00 PM",
+        }));
         if (!mounted) return;
         setStudents(s || []);
         setCertifications(c || []);
@@ -31,7 +126,7 @@ export default function Exams() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [collegeCode]);
 
   const examSummary = students.reduce(
     (summary, student) => {
@@ -48,11 +143,7 @@ export default function Exams() {
       ? Math.round((examSummary.attempted / examSummary.total) * 100)
       : 0;
 
-  const examSchedule = certifications.map((certificate, index) => ({
-    ...certificate,
-    date: `2026-0${(index % 3) + 3}-${10 + index}`,
-    slot: index % 2 === 0 ? "10:00 AM - 12:00 PM" : "2:00 PM - 4:00 PM",
-  }));
+  const examSchedule = certifications;
 
   const topAttempted = [...students]
     .map((student) => ({

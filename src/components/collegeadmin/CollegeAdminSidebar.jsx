@@ -4,7 +4,6 @@ import {
   LayoutGrid,
   Users,
   Award,
-  FileText,
   CircleHelp,
   LogOut,
 } from "lucide-react";
@@ -42,11 +41,11 @@ export default function CollegeAdminSidebar() {
       path: "/college-admin/certificates",
       icon: Award,
     },
-    {
-      name: "Exams",
-      path: "/college-admin/exams",
-      icon: FileText,
-    },
+    // {
+    //   name: "Exams",
+    //   path: "/college-admin/exams",
+    //   icon: FileText,
+    // },
     {
       name: "Help",
       path: "/college-admin/help",

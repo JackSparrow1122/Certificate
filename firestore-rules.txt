@@ -1,26 +1,112 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-    // TEMP: allow authenticated users to read users collection
+    function requesterUser() {
+      return isSignedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
+    }
+
+    function requesterRole() {
+      return requesterUser() != null && requesterUser().role is string
+        ? requesterUser().role.lower()
+        : "";
+    }
+
+    function requesterCollegeCode() {
+      return requesterUser() != null && requesterUser().collegeCode is string
+        ? requesterUser().collegeCode.lower()
+        : "";
+    }
+
+    function isSuperAdmin() {
+      return requesterRole() == "superadmin";
+    }
+
+    function isCollegeAdmin() {
+      return requesterRole() == "collegeadmin";
+    }
+
+    function sameUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function projectDocBelongsToRequester(projectDocId) {
+      return ("" + projectDocId).lower().split("-")[0] == requesterCollegeCode();
+    }
+
+    function projectCodeBelongsToRequester(projectCode) {
+      return ("" + projectCode).lower().split("/")[0] == requesterCollegeCode();
+    }
+
+    function studentBelongsToRequester(studentData, projectDocId) {
+      return ("" + studentData.collegeCode).lower() == requesterCollegeCode() ||
+        projectDocBelongsToRequester(projectDocId);
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null;
+      allow read: if sameUser(userId) || isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update: if sameUser(userId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
 
-    // allow student data later
-    match /students/{studentId} {
-      allow read: if request.auth != null;
+    match /student_users/{userId} {
+      allow read: if isSuperAdmin() ||
+        sameUser(userId) ||
+        (isSignedIn() &&
+          (
+            (resource.data.uid is string && resource.data.uid == request.auth.uid) ||
+            (
+              request.auth.token.email is string &&
+              resource.data.email is string &&
+              resource.data.email == request.auth.token.email
+            )
+          ));
+      allow create, update, delete: if isSuperAdmin();
     }
 
-    // Allow authenticated users to read and write colleges
+    match /projectCodes/{projectCodeId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          ("" + resource.data.collegeId).lower() == requesterCollegeCode());
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /certificateProjectEnrollments/{enrollmentId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          projectCodeBelongsToRequester(resource.data.projectCode));
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /certificates/{certificateId} {
+      allow read: if isSuperAdmin() || isCollegeAdmin();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /students/{projectDocId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() && projectDocBelongsToRequester(projectDocId));
+      allow create, update, delete: if isSuperAdmin();
+
+      match /students_list/{studentId} {
+        allow read: if isSuperAdmin() ||
+          (isCollegeAdmin() &&
+            studentBelongsToRequester(resource.data, projectDocId));
+        allow create, update, delete: if isSuperAdmin();
+      }
+    }
+
     match /college/{collegeCode} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          ("" + collegeCode).lower() == requesterCollegeCode());
+      allow create, update, delete: if isSuperAdmin();
     }
   }
 }

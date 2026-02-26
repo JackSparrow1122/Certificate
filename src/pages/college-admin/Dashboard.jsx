@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAllStudents } from "../../../services/studentService";
-import { getAllProjectCodes } from "../../../services/projectCodeService";
-import { getAllCertificates } from "../../../services/certificateService";
+import { useAuth } from "../../context/AuthContext";
+import { getStudentsByProject } from "../../../services/studentService";
+import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import {
   BarChart,
   Bar,
@@ -18,7 +18,11 @@ import {
 import { Award, BookOpenCheck, Layers3, Users } from "lucide-react";
 
 export default function AdminDashboard() {
+  const { profile } = useAuth();
   const COLORS = ["#0B2A4A", "#1D5FA8", "#6BC7A7", "#D29A2D"];
+  const collegeCode = String(profile?.collegeCode || profile?.college_code || "")
+    .trim()
+    .toUpperCase();
 
   const parseProgress = (progressValue) => {
     const parsed = Number(String(progressValue || "").replace("%", "").trim());
@@ -33,15 +37,53 @@ export default function AdminDashboard() {
     let mounted = true;
     const load = async () => {
       try {
-        const [s, p, c] = await Promise.all([
-          getAllStudents(),
-          getAllProjectCodes(),
-          getAllCertificates(),
-        ]);
+        if (!collegeCode) {
+          if (!mounted) return;
+          setStudents([]);
+          setProjects([]);
+          setCertifications([]);
+          return;
+        }
+
+        const projectRows = await getProjectCodesByCollege(collegeCode);
+        const normalizedProjects = (projectRows || [])
+          .filter((project) => String(project?.code || "").trim())
+          .sort((a, b) =>
+            String(a.code || "").localeCompare(String(b.code || "")),
+          );
+
+        const studentGroups = await Promise.all(
+          normalizedProjects.map((project) =>
+            getStudentsByProject(String(project.code || "").trim()),
+          ),
+        );
+        const studentsForCollege = studentGroups.flatMap((group) => group || []);
+        const certificateNames = new Set();
+
+        studentsForCollege.forEach((student) => {
+          const certificateResults =
+            student?.certificateResults &&
+            typeof student.certificateResults === "object"
+              ? Object.values(student.certificateResults)
+              : [];
+
+          certificateResults.forEach((result) => {
+            const name = String(result?.certificateName || "").trim();
+            if (name) {
+              certificateNames.add(name);
+            }
+          });
+
+          const legacyName = String(student?.certificate || "").trim();
+          if (legacyName) {
+            certificateNames.add(legacyName);
+          }
+        });
+
         if (!mounted) return;
-        setStudents(s || []);
-        setProjects(p || []);
-        setCertifications(c || []);
+        setStudents(studentsForCollege);
+        setProjects(normalizedProjects);
+        setCertifications(Array.from(certificateNames));
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       }
@@ -50,7 +92,7 @@ export default function AdminDashboard() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [collegeCode]);
 
   const data = useMemo(() => {
     const studentCountByProject = students.reduce((acc, student) => {
