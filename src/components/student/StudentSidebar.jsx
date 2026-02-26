@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutGrid, LogOut, X } from "lucide-react";
 import logo from "../../assets/logo.png";
+import compactLogo from "../../assets/image.jpg";
 import { useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
@@ -63,10 +64,10 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
         {/* Logo */}
         <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
           <img
-            src={logo}
+            src={isExpanded ? logo : compactLogo}
             alt="ERP Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              isExpanded ? "h-20" : "h-10 w-10 bg-white"
+              isExpanded ? "h-20" : "h-12 w-12 bg-white p-1"
             }`}
           />
         </div>
@@ -97,24 +98,27 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
 
         {/* Nav Links */}
         <nav className="mt-8 space-y-2 px-3">
-          {links.map(({ path, end, name, icon: Icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              end={end}
-              onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-4 px-4 py-3 rounded-xl transition ${
-                  isActive
-                    ? "bg-white text-[#0B2A4A] font-semibold shadow"
-                    : "text-white/90 hover:bg-white/10"
-                }`
-              }
-            >
-              <Icon size={22} />
-              {isExpanded && <span className="whitespace-nowrap">{name}</span>}
-            </NavLink>
-          ))}
+          {links.map((link) => {
+            const IconComponent = link.icon;
+            return (
+              <NavLink
+                key={link.path}
+                to={link.path}
+                end={link.end}
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-4 px-4 py-3 rounded-xl transition ${
+                    isActive
+                      ? "bg-white text-[#0B2A4A] font-semibold shadow"
+                      : "text-white/90 hover:bg-white/10"
+                  }`
+                }
+              >
+                <IconComponent size={22} />
+                {isExpanded && <span className="whitespace-nowrap">{link.name}</span>}
+              </NavLink>
+            );
+          })}
         </nav>
       </div>
 

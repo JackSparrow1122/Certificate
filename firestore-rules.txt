@@ -130,9 +130,7 @@ service cloud.firestore {
     }
 
     match /college/{collegeCode} {
-      allow read: if isStudent() || isSuperAdmin() ||
-        (isCollegeAdmin() &&
-          ("" + collegeCode).lower() == requesterCollegeCode());
+      allow read: if isSignedIn();
       allow create, update, delete: if isSuperAdmin();
     }
 

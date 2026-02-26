@@ -7,7 +7,7 @@ import {
 import { getCollegeByCode } from "../../../services/collegeService";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddProjectCodeModal from "../../components/superadmin/AddProjectCodeModal";
-import { Paperclip, RotateCcw, Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
 export default function CollegeProjectCodes() {
@@ -277,11 +277,10 @@ export default function CollegeProjectCodes() {
           </section>
 
           <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
-            <div className="mb-2 grid grid-cols-[2fr_1.2fr_1fr_40px_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
+            <div className="mb-2 grid grid-cols-[2fr_1.2fr_1fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
               <p>Project Code</p>
               <p>Course</p>
               <p>Type</p>
-              <p />
               <p />
             </div>
 
@@ -293,7 +292,7 @@ export default function CollegeProjectCodes() {
                     setSelectedProjectCode(row.id);
                     openStudentList(row.id);
                   }}
-                  className={`grid w-full cursor-pointer grid-cols-[2fr_1.2fr_1fr_40px_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition hover:border-[#BCD0E7] ${
+                  className={`grid w-full cursor-pointer grid-cols-[2fr_1.2fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition hover:border-[#BCD0E7] ${
                     selectedProjectCode === row.id
                       ? "ring-2 ring-[#003B7A]/20"
                       : ""
@@ -302,9 +301,6 @@ export default function CollegeProjectCodes() {
                   <p className="truncate font-medium text-left">{row.code}</p>
                   <p className="text-left">{row.course || "-"}</p>
                   <p className="text-left">{row.type || "-"}</p>
-                  <span className="justify-self-center text-gray-600">
-                    <Paperclip size={16} />
-                  </span>
                   <button
                     type="button"
                     onClick={(event) => {
@@ -333,7 +329,9 @@ export default function CollegeProjectCodes() {
       {showAddProjectModal && (
         <AddProjectCodeModal
           collegeId={collegeId}
-          collegeCode={String(college?.college_code || college?.collegeCode || collegeId)}
+          collegeCode={String(
+            college?.college_code || college?.collegeCode || collegeId,
+          )}
           collegeName={String(college?.college_name || "")}
           onClose={() => setShowAddProjectModal(false)}
           onProjectCodeAdded={fetchData}

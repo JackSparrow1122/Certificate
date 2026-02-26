@@ -11,7 +11,6 @@ export default function EnrollProjectCodeModal({
   onClose,
   onEnrolled,
 }) {
-  const [search, setSearch] = useState("");
   const [selectedProjectCode, setSelectedProjectCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [removingCode, setRemovingCode] = useState("");
@@ -36,19 +35,28 @@ export default function EnrollProjectCodeModal({
     loadAssignedProjectCodes();
   }, [certificate.id]);
 
-  const filteredProjectCodes = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return projectCodes;
-    return projectCodes.filter((projectCode) =>
-      String(projectCode.code || "")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [projectCodes, search]);
+  const projectCodeOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          (projectCodes || [])
+            .map((projectCode) => String(projectCode?.code || "").trim())
+            .filter(Boolean),
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    [projectCodes],
+  );
 
   const handleEnroll = async () => {
-    if (!selectedProjectCode) {
+    const normalizedSelectedCode = String(selectedProjectCode || "").trim();
+
+    if (!normalizedSelectedCode) {
       setError("Select a project code");
+      return;
+    }
+
+    if (!projectCodeOptions.includes(normalizedSelectedCode)) {
+      setError("Select a valid project code from the list");
       return;
     }
 
@@ -59,7 +67,7 @@ export default function EnrollProjectCodeModal({
       const result = await enrollProjectCodeIntoCertificate({
         certificateId: certificate.id,
         certificateName: certificate.name,
-        projectCode: selectedProjectCode,
+        projectCode: normalizedSelectedCode,
       });
 
       const assignedCodes = await getAssignedProjectCodesForCertificate(
@@ -70,6 +78,7 @@ export default function EnrollProjectCodeModal({
       setResultMessage(
         `${result.newlyEnrolledCount} students enrolled (${result.matchedStudentsCount} matched).`,
       );
+      setSelectedProjectCode("");
       await onEnrolled();
     } catch (enrollError) {
       setError("Failed to enroll students for selected project code");
@@ -161,35 +170,20 @@ export default function EnrollProjectCodeModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Search Project Code
-            </label>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Type to search project codes"
-              className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
               Select Project Code
             </label>
-            <select
+            <input
+              list="project-code-options"
               value={selectedProjectCode}
               onChange={(event) => setSelectedProjectCode(event.target.value)}
+              placeholder="Type or select project code"
               className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm outline-none"
-            >
-              <option value="">Select project code</option>
-              {filteredProjectCodes.map((projectCode) => (
-                <option
-                  key={projectCode.docId || projectCode.id}
-                  value={projectCode.code}
-                >
-                  {projectCode.code}
-                </option>
+            />
+            <datalist id="project-code-options">
+              {projectCodeOptions.map((projectCodeValue) => (
+                <option key={projectCodeValue} value={projectCodeValue} />
               ))}
-            </select>
+            </datalist>
           </div>
         </div>
 

@@ -332,20 +332,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-7">
-      <section className="rounded-3xl border border-[#D7E2F1] bg-white p-5 shadow-sm sm:p-6">
-        <div>
-          <div>
-            <h1 className="text-2xl font-semibold text-[#0B2A4A] sm:text-3xl">
-              Student Dashboard
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Track your enrolled certificates and academic snapshot in one
-              place.
-            </p>
-          </div>
-        </div>
-      </section>
-
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Enrolled"

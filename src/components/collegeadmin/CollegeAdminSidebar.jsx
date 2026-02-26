@@ -1,27 +1,29 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import {
-  LayoutGrid,
-  Users,
-  Award,
-  CircleHelp,
-  LogOut,
-} from "lucide-react";
+import { LayoutGrid, Users, Award, CircleHelp, LogOut, X } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
 import logo from "../../assets/logo.png";
 import profileImage from "../../assets/image.jpg";
 import { useAuth } from "../../context/AuthContext";
 
-export default function CollegeAdminSidebar() {
+export default function CollegeAdminSidebar({
+  mobileMenuOpen,
+  setMobileMenuOpen,
+}) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const { user, role, profile } = useAuth();
+  const isExpanded = mobileMenuOpen || expanded;
 
   const adminName =
     profile?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
   const roleLabel =
-    role === "collegeAdmin" ? "College Admin" : role === "superAdmin" ? "Super Admin" : "Admin";
+    role === "collegeAdmin"
+      ? "College Admin"
+      : role === "superAdmin"
+        ? "Super Admin"
+        : "Admin";
   const adminInitial = adminName.charAt(0).toUpperCase();
 
   const links = [
@@ -56,10 +58,12 @@ export default function CollegeAdminSidebar() {
   const handleSignOut = async () => {
     await signOut(auth);
     localStorage.clear();
+    setMobileMenuOpen(false);
     navigate("/login", { replace: true });
   };
 
   const handleProfileClick = () => {
+    setMobileMenuOpen(false);
     navigate("/college-admin/profile");
   };
 
@@ -67,18 +71,30 @@ export default function CollegeAdminSidebar() {
     <aside
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
-      className={`${
-        expanded ? "w-72" : "w-20"
-      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#0B2A4A] text-white flex flex-col justify-between transition-all duration-300 ease-in-out`}
+      className={`fixed inset-y-0 left-0 z-40 bg-[#0B2A4A] text-white flex flex-col justify-between transition-all duration-300 ease-in-out
+        w-72 -translate-x-full md:translate-x-0 md:sticky md:top-0 md:h-screen md:shrink-0 md:overflow-hidden
+        ${mobileMenuOpen ? "translate-x-0" : ""}
+        ${isExpanded ? "md:w-72" : "md:w-20"}`}
     >
       <div>
+        <div className="flex md:hidden justify-end px-3 pt-3">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            className="rounded-lg border border-white/20 p-2"
+            aria-label="Close menu"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
         {/* Logo */}
         <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
           <img
-            src={expanded ? logo : profileImage}
+            src={isExpanded ? logo : profileImage}
             alt="ERP Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              expanded ? "h-20" : "h-12 w-12 bg-white"
+              isExpanded ? "h-20" : "h-12 w-12 bg-white"
             }`}
           />
         </div>
@@ -88,7 +104,7 @@ export default function CollegeAdminSidebar() {
           type="button"
           onClick={handleProfileClick}
           className={`mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
-            expanded
+            isExpanded
               ? "rounded-2xl bg-white/12 p-3.5 gap-3 justify-center hover:bg-white/20"
               : "rounded-xl p-2 justify-center hover:bg-white/10"
           }`}
@@ -97,10 +113,14 @@ export default function CollegeAdminSidebar() {
           <div className="h-11 w-11 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] text-lg font-semibold leading-none flex items-center justify-center">
             {adminInitial}
           </div>
-          {expanded && (
+          {isExpanded && (
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-xl font-semibold leading-tight">{adminName}</p>
-              <span className="block truncate text-sm opacity-80">{roleLabel}</span>
+              <p className="truncate text-xl font-semibold leading-tight">
+                {adminName}
+              </p>
+              <span className="block truncate text-sm opacity-80">
+                {roleLabel}
+              </span>
             </div>
           )}
         </button>
@@ -112,6 +132,7 @@ export default function CollegeAdminSidebar() {
               key={path}
               to={path}
               end={end}
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-4 px-4 py-3 rounded-xl transition ${
                   isActive
@@ -121,7 +142,7 @@ export default function CollegeAdminSidebar() {
               }
             >
               <Icon size={22} />
-              {expanded && <span className="whitespace-nowrap">{name}</span>}
+              {isExpanded && <span className="whitespace-nowrap">{name}</span>}
             </NavLink>
           ))}
         </nav>
@@ -134,7 +155,7 @@ export default function CollegeAdminSidebar() {
           className="flex items-center gap-4 px-4 py-3 rounded-xl text-white/80 hover:bg-white/10 hover:text-red-400 transition w-full"
         >
           <LogOut size={22} />
-          {expanded && <span>Sign Out</span>}
+          {isExpanded && <span>Sign Out</span>}
         </button>
       </div>
     </aside>

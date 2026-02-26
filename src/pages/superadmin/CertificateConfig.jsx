@@ -482,8 +482,6 @@ export default function CertificateConfig() {
             setSelectedCertificate(null);
           }}
           onEnrolled={() => {
-            setShowEnrollModal(false);
-            setSelectedCertificate(null);
             handleEnrolled();
           }}
         />

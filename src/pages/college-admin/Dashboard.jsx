@@ -3,6 +3,10 @@ import { useAuth } from "../../context/AuthContext";
 import { getStudentsByProject } from "../../../services/studentService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import {
+  getAllColleges,
+  getCollegeByCode,
+} from "../../../services/collegeService";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -17,21 +21,44 @@ import {
 } from "recharts";
 import { Award, BookOpenCheck, Layers3, Users } from "lucide-react";
 
+const normalizeCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const normalizeCollegeLogoUrl = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const lowerRaw = raw.toLowerCase();
+  if (lowerRaw.startsWith("http://") || lowerRaw.startsWith("https://"))
+    return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  return "";
+};
+
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const COLORS = ["#0B2A4A", "#1D5FA8", "#6BC7A7", "#D29A2D"];
-  const collegeCode = String(profile?.collegeCode || profile?.college_code || "")
+  const collegeCode = String(
+    profile?.collegeCode || profile?.college_code || "",
+  )
     .trim()
     .toUpperCase();
 
   const parseProgress = (progressValue) => {
-    const parsed = Number(String(progressValue || "").replace("%", "").trim());
+    const parsed = Number(
+      String(progressValue || "")
+        .replace("%", "")
+        .trim(),
+    );
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
   const [students, setStudents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [certifications, setCertifications] = useState([]);
+  const [collegeInfo, setCollegeInfo] = useState({ name: "", logo: "" });
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -42,7 +69,32 @@ export default function AdminDashboard() {
           setStudents([]);
           setProjects([]);
           setCertifications([]);
+          setCollegeInfo({ name: "", logo: "" });
           return;
+        }
+
+        let college = null;
+        try {
+          college = await getCollegeByCode(collegeCode);
+        } catch (error) {
+          console.warn("Failed to fetch college by code:", error);
+        }
+        if (!college) {
+          try {
+            const allColleges = await getAllColleges();
+            college =
+              (allColleges || []).find((row) => {
+                const byDocId =
+                  normalizeCode(row?.collegeCode) ===
+                  normalizeCode(collegeCode);
+                const byField =
+                  normalizeCode(row?.college_code) ===
+                  normalizeCode(collegeCode);
+                return byDocId || byField;
+              }) || null;
+          } catch (error) {
+            console.warn("Failed to fetch colleges list:", error);
+          }
         }
 
         const projectRows = await getProjectCodesByCollege(collegeCode);
@@ -57,7 +109,9 @@ export default function AdminDashboard() {
             getStudentsByProject(String(project.code || "").trim()),
           ),
         );
-        const studentsForCollege = studentGroups.flatMap((group) => group || []);
+        const studentsForCollege = studentGroups.flatMap(
+          (group) => group || [],
+        );
         const certificateNames = new Set();
 
         studentsForCollege.forEach((student) => {
@@ -84,6 +138,18 @@ export default function AdminDashboard() {
         setStudents(studentsForCollege);
         setProjects(normalizedProjects);
         setCertifications(Array.from(certificateNames));
+        setCollegeInfo({
+          name: String(
+            college?.college_name || profile?.collegeName || collegeCode || "",
+          ).trim(),
+          logo: normalizeCollegeLogoUrl(
+            college?.college_logo ||
+              college?.collegeLogo ||
+              college?.logo ||
+              "",
+          ),
+        });
+        setLogoLoadFailed(false);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       }
@@ -135,8 +201,10 @@ export default function AdminDashboard() {
     const avgProgress =
       students.length > 0
         ? Math.round(
-            students.reduce((sum, student) => sum + parseProgress(student.progress), 0) /
-              students.length,
+            students.reduce(
+              (sum, student) => sum + parseProgress(student.progress),
+              0,
+            ) / students.length,
           )
         : 0;
 
@@ -163,24 +231,63 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-[#D7E2F1] bg-white px-6 py-7 shadow-sm">
-        <h1 className="text-2xl font-semibold text-[#0B2A4A]">College Admin Control Center</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Monitor enrollments, performance trends, and certification health.
-        </p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-[#0B2A4A]">
+              College Admin Control Center
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Monitor enrollments, performance trends, and certification health.
+            </p>
+          </div>
+          {collegeInfo.logo && !logoLoadFailed ? (
+            <img
+              src={collegeInfo.logo}
+              alt={collegeInfo.name || "College"}
+              className="max-h-24 w-auto max-w-104 rounded-lg"
+              referrerPolicy="no-referrer"
+              onError={() => setLogoLoadFailed(true)}
+            />
+          ) : (
+            <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-[#0B2A4A] text-3xl font-bold text-white">
+              {String(collegeCode || "CLG").slice(0, 2)}
+            </div>
+          )}
+        </div>
       </section>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total Enrollments" value={data.totalEnrollments} icon={<Users size={18} />} />
-        <StatCard title="Avg Completion" value={data.completionRate} icon={<BookOpenCheck size={18} />} />
-        <StatCard title="Certificates" value={data.certificatesIssued} icon={<Award size={18} />} />
-        <StatCard title="Project Codes" value={data.activeProjectCodes} icon={<Layers3 size={18} />} />
+        <StatCard
+          title="Total Enrollments"
+          value={data.totalEnrollments}
+          icon={<Users size={18} />}
+        />
+        <StatCard
+          title="Avg Completion"
+          value={data.completionRate}
+          icon={<BookOpenCheck size={18} />}
+        />
+        <StatCard
+          title="Certificates"
+          value={data.certificatesIssued}
+          icon={<Award size={18} />}
+        />
+        <StatCard
+          title="Project Codes"
+          value={data.activeProjectCodes}
+          icon={<Layers3 size={18} />}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Enrollment by Course">
           <ResponsiveContainer width="100%" height={270}>
             <BarChart data={data.barData} barSize={42}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#e5e7eb"
+              />
               <XAxis dataKey="course" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
@@ -192,7 +299,13 @@ export default function AdminDashboard() {
         <Panel title="Student Progress Distribution">
           <ResponsiveContainer width="100%" height={270}>
             <PieChart>
-              <Pie data={data.progressBands} dataKey="value" nameKey="name" innerRadius={60} outerRadius={92}>
+              <Pie
+                data={data.progressBands}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={60}
+                outerRadius={92}
+              >
                 {data.progressBands.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
@@ -208,7 +321,13 @@ export default function AdminDashboard() {
         <Panel title="Course Share">
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={data.pieData} dataKey="value" nameKey="name" outerRadius={92} label>
+              <Pie
+                data={data.pieData}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={92}
+                label
+              >
                 {data.pieData.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
@@ -226,9 +345,13 @@ export default function AdminDashboard() {
                 key={project.id || project.code}
                 className="rounded-xl border border-[#D7E2F1] bg-[#F7FAFF] px-4 py-3"
               >
-                <p className="text-sm font-semibold text-gray-900">{project.code || project.id}</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {project.code || project.id}
+                </p>
                 <p className="text-xs text-gray-600">{project.course}</p>
-                <p className="mt-1 text-xs text-[#0B2A4A]">{project.totalStudents} students</p>
+                <p className="mt-1 text-xs text-[#0B2A4A]">
+                  {project.totalStudents} students
+                </p>
               </div>
             ))}
           </div>
@@ -268,7 +391,9 @@ function StatCard({ title, value, icon }) {
     <div className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <p className="text-sm text-[#0B2A4A]/70">{title}</p>
-        <span className="rounded-lg bg-[#0B2A4A]/10 p-2 text-[#0B2A4A]">{icon}</span>
+        <span className="rounded-lg bg-[#0B2A4A]/10 p-2 text-[#0B2A4A]">
+          {icon}
+        </span>
       </div>
       <h2 className="mt-2 text-2xl font-semibold text-[#0B2A4A]">{value}</h2>
     </div>

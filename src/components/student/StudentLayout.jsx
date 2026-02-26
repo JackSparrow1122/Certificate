@@ -26,8 +26,10 @@ export default function StudentLayout() {
       />
 
       {/* MAIN CONTENT */}
-      <div className="flex h-full min-w-0 w-full flex-1 flex-col">
-        {!hideNavbar && <StudentNavbar onMenuClick={() => setMobileMenuOpen(true)} />}
+      <div className="flex h-full min-w-0 w-full flex-1 flex-col overflow-y-auto">
+        {!hideNavbar && (
+          <StudentNavbar onMenuClick={() => setMobileMenuOpen(true)} />
+        )}
         {hideNavbar && (
           <div className="px-4 pt-4 sm:px-6 md:hidden">
             <button
@@ -41,7 +43,7 @@ export default function StudentLayout() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+        <main className="flex-1 overflow-x-hidden p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

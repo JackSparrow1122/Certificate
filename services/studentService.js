@@ -176,7 +176,6 @@ export const getAllStudents = async () => {
     return localGetAllStudents();
   }
   try {
-    // Use collectionGroup to query all students_list subcollections
     const allStudentsQuery = collectionGroup(db, "students_list");
     const querySnapshot = await getDocs(allStudentsQuery);
     const students = [];
@@ -186,7 +185,35 @@ export const getAllStudents = async () => {
         ...studentDoc.data(),
       });
     });
-    return students;
+
+    if (students.length > 0) {
+      return students;
+    }
+
+    const projectsSnapshot = await getDocs(collection(db, STUDENTS_COLLECTION));
+    if (projectsSnapshot.empty) {
+      return [];
+    }
+
+    const studentsByProjectSnapshots = await Promise.all(
+      projectsSnapshot.docs.map((projectDoc) =>
+        getDocs(
+          collection(db, STUDENTS_COLLECTION, projectDoc.id, "students_list"),
+        ),
+      ),
+    );
+
+    const fallbackStudents = [];
+    studentsByProjectSnapshots.forEach((projectStudentsSnapshot) => {
+      projectStudentsSnapshot.forEach((studentDoc) => {
+        fallbackStudents.push({
+          docId: studentDoc.id,
+          ...studentDoc.data(),
+        });
+      });
+    });
+
+    return fallbackStudents;
   } catch (error) {
     console.error("Error getting students:", error);
     throw error;

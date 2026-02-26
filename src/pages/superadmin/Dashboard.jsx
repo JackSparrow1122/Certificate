@@ -14,7 +14,10 @@ import {
 import { BookOpenCheck, Building2, GraduationCap, Users } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { useEffect, useState } from "react";
-import { getAllStudents } from "../../../services/studentService";
+import {
+  getAllStudents,
+  getStudentsByProject,
+} from "../../../services/studentService";
 import { getAllAdmins } from "../../../services/userService";
 import { getAllCertificates } from "../../../services/certificateService";
 import { getAllColleges } from "../../../services/collegeService";
@@ -42,6 +45,28 @@ const parseProgress = (progressValue) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const resolveStudentGender = (student) => {
+  const officialDetails = student?.OFFICIAL_DETAILS || {};
+  const raw = String(
+    student?.gender ||
+      officialDetails?.GENDER ||
+      officialDetails?.Gender ||
+      officialDetails?.gender ||
+      "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!raw) return "Unknown";
+  if (["male", "m", "boy"].includes(raw)) return "Male";
+  if (["female", "f", "girl"].includes(raw)) return "Female";
+  if (["other", "others", "non-binary", "non binary"].includes(raw)) {
+    return "Other";
+  }
+
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
 export default function Dashboard() {
   const [students, setStudents] = useState([]);
   const [admins, setAdmins] = useState([]);
@@ -51,21 +76,81 @@ export default function Dashboard() {
   const [dbMode, setDbModeState] = useState(getDbMode());
 
   const loadDashboardData = async () => {
-    try {
-      const [s, a, c, clg, pc] = await Promise.all([
-        getAllStudents(),
-        getAllAdmins(),
-        getAllCertificates(),
-        getAllColleges(),
-        getAllProjectCodes(),
-      ]);
-      setStudents(s || []);
-      setAdmins(a || []);
-      setCertifications(c || []);
-      setColleges(clg || []);
-      setProjectCodes(pc || []);
-    } catch (error) {
-      console.error("Failed to load dashboard data:", error);
+    const requests = [
+      { key: "students", label: "students/students_list", run: getAllStudents },
+      { key: "admins", label: "users", run: getAllAdmins },
+      { key: "certifications", label: "certificates", run: getAllCertificates },
+      { key: "colleges", label: "college", run: getAllColleges },
+      { key: "projectCodes", label: "projectCodes", run: getAllProjectCodes },
+    ];
+
+    const settled = await Promise.allSettled(
+      requests.map((request) => request.run()),
+    );
+
+    const nextData = {
+      students: [],
+      admins: [],
+      certifications: [],
+      colleges: [],
+      projectCodes: [],
+    };
+
+    settled.forEach((result, index) => {
+      const request = requests[index];
+      if (result.status === "fulfilled") {
+        nextData[request.key] = result.value || [];
+        return;
+      }
+
+      const error = result.reason;
+      const errorCode = String(error?.code || "");
+      const isPermissionIssue =
+        errorCode === "permission-denied" ||
+        errorCode === "failed-precondition" ||
+        /insufficient permissions|permission denied/i.test(
+          String(error?.message || ""),
+        );
+
+      console.error(`Dashboard data load failed for ${request.label}:`, error);
+      if (isPermissionIssue) {
+        console.warn(
+          `Firestore access blocked for ${request.label}. Check rules and verify the logged-in user has a users/{uid} document with role superAdmin.`,
+        );
+      }
+    });
+
+    setStudents(nextData.students);
+    setAdmins(nextData.admins);
+    setCertifications(nextData.certifications);
+    setColleges(nextData.colleges);
+    setProjectCodes(nextData.projectCodes);
+
+    if (nextData.students.length === 0 && nextData.projectCodes.length > 0) {
+      try {
+        const projectStudentGroups = await Promise.allSettled(
+          nextData.projectCodes.map((projectCodeRow) =>
+            getStudentsByProject(String(projectCodeRow?.code || "").trim()),
+          ),
+        );
+
+        const fallbackStudents = [];
+        projectStudentGroups.forEach((result) => {
+          if (result.status !== "fulfilled") return;
+          (result.value || []).forEach((student) => {
+            fallbackStudents.push(student);
+          });
+        });
+
+        if (fallbackStudents.length > 0) {
+          setStudents(fallbackStudents);
+        }
+      } catch (fallbackError) {
+        console.error(
+          "Fallback project-wise student loading failed:",
+          fallbackError,
+        );
+      }
     }
   };
 
@@ -135,7 +220,7 @@ export default function Dashboard() {
 
   const studentsByGender = Object.entries(
     students.reduce((accumulator, student) => {
-      const key = student.gender || "Unknown";
+      const key = resolveStudentGender(student);
       accumulator[key] = (accumulator[key] || 0) + 1;
       return accumulator;
     }, {}),
@@ -154,17 +239,63 @@ export default function Dashboard() {
     else progressBuckets[2].count += 1;
   });
 
-  const topStudents = [...students]
-    .sort((a, b) => parseProgress(b.progress) - parseProgress(a.progress))
-    .slice(0, 6);
+  const certificateToOrganization = new Map(
+    certifications.map((certificate) => [
+      String(certificate?.id || "").trim(),
+      String(certificate?.domain || "").trim() || "Other",
+    ]),
+  );
 
-  const certificationByPlatform = Object.entries(
-    certifications.reduce((accumulator, certificate) => {
-      const key = certificate.platform || "Other";
-      accumulator[key] = (accumulator[key] || 0) + 1;
-      return accumulator;
-    }, {}),
-  ).map(([platform, count]) => ({ platform, count }));
+  const organizationEnrollmentMap = new Map();
+  students.forEach((student) => {
+    const studentKey = String(student?.docId || student?.id || "").trim();
+    if (!studentKey) return;
+
+    const idsFromArray = Array.isArray(student?.certificateIds)
+      ? student.certificateIds
+      : [];
+    const idsFromResults =
+      student?.certificateResults &&
+      typeof student.certificateResults === "object"
+        ? Object.values(student.certificateResults)
+            .map((entry) => entry?.certificateId)
+            .filter(Boolean)
+        : [];
+
+    const uniqueCertificateIds = [
+      ...new Set(
+        [...idsFromArray, ...idsFromResults]
+          .map((id) => String(id || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    const organizationsForStudent = new Set(
+      uniqueCertificateIds
+        .map(
+          (certificateId) =>
+            certificateToOrganization.get(certificateId) || "Other",
+        )
+        .filter(Boolean),
+    );
+
+    organizationsForStudent.forEach((organization) => {
+      if (!organizationEnrollmentMap.has(organization)) {
+        organizationEnrollmentMap.set(organization, new Set());
+      }
+      organizationEnrollmentMap.get(organization).add(studentKey);
+    });
+  });
+
+  const organizationEnrollmentMix = Array.from(
+    organizationEnrollmentMap.entries(),
+  )
+    .map(([organization, studentIds]) => ({
+      organization,
+      count: studentIds.size,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
 
   return (
     <SuperAdminLayout>
@@ -248,11 +379,11 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Platform Mix">
+        <ChartCard title="Organisation Enrollment Mix">
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={certificationByPlatform}>
+            <BarChart data={organizationEnrollmentMix}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="platform" />
+              <XAxis dataKey="organization" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Bar dataKey="count" fill={SIDEBAR_BLUE} radius={[8, 8, 0, 0]} />
@@ -261,7 +392,7 @@ export default function Dashboard() {
         </ChartCard>
       </section>
 
-      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.8fr]">
+      <section className="mt-5 grid grid-cols-1 gap-5">
         <ChartCard title="Gender Mix">
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
@@ -283,44 +414,6 @@ export default function Dashboard() {
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
-
-        <section className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#0B2A4A]">
-              Top Performing Students
-            </h2>
-            <span className="text-xs text-gray-500">
-              Based on progress percentage
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-600">
-                  <th className="px-2 py-2">Student</th>
-                  <th className="px-2 py-2">Project</th>
-                  <th className="px-2 py-2">Certificate</th>
-                  <th className="px-2 py-2">Progress</th>
-                  <th className="px-2 py-2">Exams</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topStudents.map((student) => (
-                  <tr
-                    key={student.id}
-                    className="border-b border-gray-100 text-gray-800"
-                  >
-                    <td className="px-2 py-2 font-medium">{student.name}</td>
-                    <td className="px-2 py-2">{student.projectId}</td>
-                    <td className="px-2 py-2">{student.certificate || "-"}</td>
-                    <td className="px-2 py-2">{student.progress || "0%"}</td>
-                    <td className="px-2 py-2">{student.exams || "0 / 0"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
       </section>
     </SuperAdminLayout>
   );
