@@ -67,6 +67,13 @@ const resolveStudentGender = (student) => {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 };
 
+const isCollegeAdminRole = (roleValue) => {
+  const normalized = String(roleValue || "")
+    .trim()
+    .toLowerCase();
+  return normalized === "collegeadmin" || normalized === "college admin";
+};
+
 export default function Dashboard() {
   const [students, setStudents] = useState([]);
   const [admins, setAdmins] = useState([]);
@@ -203,8 +210,8 @@ export default function Dashboard() {
   ).length;
   const totalProjectCodes = projectCodes.length;
   const totalCertificates = certifications.length;
-  const totalCollegeAdmins = admins.filter(
-    (admin) => admin.role === "College Admin",
+  const totalCollegeAdmins = admins.filter((admin) =>
+    isCollegeAdminRole(admin?.role),
   ).length;
 
   const studentsByProject = Object.entries(
