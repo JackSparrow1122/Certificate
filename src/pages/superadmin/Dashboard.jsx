@@ -107,7 +107,9 @@ export default function Dashboard() {
       {
         key: "students",
         label: "students/students_list",
-        run: () => getAllStudents({ maxDocs: 1500 }),
+        // Sample up to 3000 students for chart rendering — stat card uses
+        // server-side count via getAllStudentsCount for the accurate total.
+        run: () => getAllStudents({ maxDocs: 3000 }),
       },
       {
         key: "totalStudentsCount",
@@ -167,7 +169,7 @@ export default function Dashboard() {
     if (nextData.students.length === 0 && nextData.projectCodes.length > 0) {
       try {
         const projectStudentGroups = await Promise.allSettled(
-          nextData.projectCodes.slice(0, 25).map((projectCodeRow) =>
+          nextData.projectCodes.slice(0, 15).map((projectCodeRow) =>
             getStudentsByProject(String(projectCodeRow?.code || "").trim(), {
               maxDocs: 200,
             }),

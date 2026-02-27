@@ -188,6 +188,9 @@ export default function Students() {
   const [loadingServerPage, setLoadingServerPage] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [sortField, setSortField] = useState("id"); // 'id' | 'result'
+  const [idSortDir, setIdSortDir] = useState("asc"); // 'asc' | 'desc'
+  const [resultSortCycle, setResultSortCycle] = useState(0); // 0=enrolled, 1=passed, 2=failed
 
   const loadServerPage = async ({
     projectCode,
@@ -283,7 +286,7 @@ export default function Students() {
         setCurrentPage(1);
         const studentsByProject = await getStudentsByProject(
           selectedProjectCode,
-          { maxDocs: 1000 },
+          { maxDocs: 5000 },
         );
         if (!mounted) return;
         const mappedStudents = (studentsByProject || []).map(toDisplayStudent);
@@ -349,6 +352,9 @@ export default function Students() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setSortField("id");
+    setIdSortDir("asc");
+    setResultSortCycle(0);
   }, [selectedProjectCode, selectedCertificateId]);
 
   useEffect(() => {
@@ -360,11 +366,145 @@ export default function Students() {
     });
   }, [isServerPaginationMode, selectedProjectCode]);
 
-  const totalPages = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
+  // Determine if any student in current filtered list has an Enrolled status
+  const hasEnrolledStudents = useMemo(() => {
+    return students.some((student) => {
+      const items = selectedCertificate
+        ? (student.certificateItems || []).filter(
+            (item) =>
+              String(item.name || "")
+                .trim()
+                .toLowerCase() ===
+              String(selectedCertificate.name || "")
+                .trim()
+                .toLowerCase(),
+          )
+        : student.certificateItems || [];
+      return items.some((i) => i.status === "Enrolled");
+    });
+  }, [students, selectedCertificate]);
+
+  const getStudentPrimaryStatus = (student, cycle, withEnrolled) => {
+    const items = selectedCertificate
+      ? (student.certificateItems || []).filter(
+          (item) =>
+            String(item.name || "")
+              .trim()
+              .toLowerCase() ===
+            String(selectedCertificate.name || "")
+              .trim()
+              .toLowerCase(),
+        )
+      : student.certificateItems || [];
+
+    // Return the status that ranks highest in the current sort cycle
+    const statuses = items.map((i) => i.status);
+    if (withEnrolled) {
+      if (cycle === 0) {
+        if (statuses.some((s) => s === "Enrolled")) return "Enrolled";
+        if (statuses.some((s) => s === "Passed")) return "Passed";
+        return "Failed";
+      }
+      if (cycle === 1) {
+        if (statuses.some((s) => s === "Passed")) return "Passed";
+        if (statuses.some((s) => s === "Enrolled")) return "Enrolled";
+        return "Failed";
+      }
+      // cycle === 2
+      if (statuses.some((s) => s === "Failed")) return "Failed";
+      if (statuses.some((s) => s === "Passed")) return "Passed";
+      return "Enrolled";
+    } else {
+      // only pass/fail
+      if (cycle === 0) {
+        if (statuses.some((s) => s === "Passed")) return "Passed";
+        return "Failed";
+      }
+      // cycle === 1
+      if (statuses.some((s) => s === "Failed")) return "Failed";
+      return "Passed";
+    }
+  };
+
+  const getStatusRank = (status, cycle, withEnrolled) => {
+    if (withEnrolled) {
+      if (cycle === 0)
+        return status === "Enrolled" ? 0 : status === "Passed" ? 1 : 2;
+      if (cycle === 1)
+        return status === "Passed" ? 0 : status === "Enrolled" ? 1 : 2;
+      return status === "Failed" ? 0 : status === "Passed" ? 1 : 2;
+    } else {
+      // only pass/fail — 2-step cycle
+      if (cycle === 0) return status === "Passed" ? 0 : 1;
+      return status === "Failed" ? 0 : 1;
+    }
+  };
+
+  const handleIdSortClick = () => {
+    if (sortField !== "id") {
+      setSortField("id");
+      setIdSortDir("asc");
+    } else {
+      setIdSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    }
+    setCurrentPage(1);
+  };
+
+  const handleResultSortClick = () => {
+    if (sortField !== "result") {
+      setSortField("result");
+      setResultSortCycle(0);
+    } else {
+      const maxCycle = hasEnrolledStudents ? 3 : 2;
+      setResultSortCycle((c) => (c + 1) % maxCycle);
+    }
+    setCurrentPage(1);
+  };
+
+  const sortedStudents = useMemo(() => {
+    const list = [...students];
+    if (sortField === "id") {
+      list.sort((a, b) => {
+        const cmp = String(a.id || "").localeCompare(
+          String(b.id || ""),
+          undefined,
+          { numeric: true, sensitivity: "base" },
+        );
+        return idSortDir === "asc" ? cmp : -cmp;
+      });
+    } else if (sortField === "result") {
+      list.sort((a, b) => {
+        const aRank = getStatusRank(
+          getStudentPrimaryStatus(a, resultSortCycle, hasEnrolledStudents),
+          resultSortCycle,
+          hasEnrolledStudents,
+        );
+        const bRank = getStatusRank(
+          getStudentPrimaryStatus(b, resultSortCycle, hasEnrolledStudents),
+          resultSortCycle,
+          hasEnrolledStudents,
+        );
+        if (aRank !== bRank) return aRank - bRank;
+        return String(a.id || "").localeCompare(String(b.id || ""), undefined, {
+          numeric: true,
+        });
+      });
+    }
+    return list;
+  }, [
+    students,
+    sortField,
+    idSortDir,
+    resultSortCycle,
+    hasEnrolledStudents,
+    selectedCertificate,
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedStudents.length / PAGE_SIZE));
   const paginatedStudents = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
-    return students.slice(start, start + PAGE_SIZE);
-  }, [students, currentPage, PAGE_SIZE]);
+    return sortedStudents.slice(start, start + PAGE_SIZE);
+  }, [sortedStudents, currentPage, PAGE_SIZE]);
 
   const displayedStudents = isServerPaginationMode
     ? serverPageStudents
@@ -489,8 +629,32 @@ export default function Students() {
             <table className="min-w-full divide-y divide-[#E6EDF6]">
               <thead className="bg-[#F5F8FD]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
-                    Student ID
+                  <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                    <button
+                      type="button"
+                      onClick={handleIdSortClick}
+                      className="flex items-center gap-2 px-1 py-0.5 hover:text-[#1D5FA8] transition-colors"
+                      title={
+                        sortField === "id"
+                          ? idSortDir === "asc"
+                            ? "Sorted A→Z (click for Z→A)"
+                            : "Sorted Z→A (click for A→Z)"
+                          : "Sort by Student ID"
+                      }
+                    >
+                      Student ID
+                      <span className="text-[14px] leading-none">
+                        {sortField === "id" ? (
+                          idSortDir === "asc" ? (
+                            "▲"
+                          ) : (
+                            "▼"
+                          )
+                        ) : (
+                          <span className="opacity-30">⇅</span>
+                        )}
+                      </span>
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                     Name
@@ -501,8 +665,51 @@ export default function Students() {
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                     Current Year
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
-                    Result Status
+                  <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                    <button
+                      type="button"
+                      onClick={handleResultSortClick}
+                      className="flex items-center gap-2 px-1 py-0.5 hover:text-[#1D5FA8] transition-colors"
+                      title={
+                        sortField !== "result"
+                          ? "Sort by Result Status"
+                          : hasEnrolledStudents
+                            ? [
+                                "Enrolled first (click for Passed first)",
+                                "Passed first (click for Failed first)",
+                                "Failed first (click for Enrolled first)",
+                              ][resultSortCycle]
+                            : [
+                                "Passed first (click for Failed first)",
+                                "Failed first (click for Passed first)",
+                              ][resultSortCycle]
+                      }
+                    >
+                      Result Status
+                      <span className="text-[14px] leading-none">
+                        {sortField === "result" ? (
+                          <span
+                            className={
+                              hasEnrolledStudents
+                                ? [
+                                    "text-blue-500",
+                                    "text-green-600",
+                                    "text-red-500",
+                                  ][resultSortCycle]
+                                : ["text-green-600", "text-red-500"][
+                                    resultSortCycle
+                                  ]
+                            }
+                          >
+                            {hasEnrolledStudents
+                              ? ["●E", "●P", "●F"][resultSortCycle]
+                              : ["●P", "●F"][resultSortCycle]}
+                          </span>
+                        ) : (
+                          <span className="opacity-30">⇅</span>
+                        )}
+                      </span>
+                    </button>
                   </th>
                 </tr>
               </thead>
@@ -602,12 +809,13 @@ export default function Students() {
             !loadingStudents &&
             !loadingServerPage &&
             ((isServerPaginationMode && (serverHasPrev || serverHasNext)) ||
-              (!isServerPaginationMode && students.length > PAGE_SIZE)) && (
+              (!isServerPaginationMode &&
+                sortedStudents.length > PAGE_SIZE)) && (
               <div className="mt-3 flex items-center justify-between px-1">
                 <p className="text-xs text-[#415a77]">
                   {isServerPaginationMode
                     ? `Showing page ${serverCurrentPage}`
-                    : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, students.length)} of ${students.length}`}
+                    : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, sortedStudents.length)} of ${sortedStudents.length}`}
                 </p>
                 <div className="flex items-center gap-2">
                   <button

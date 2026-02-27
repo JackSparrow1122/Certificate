@@ -147,7 +147,8 @@ export default function DeclareResultModal({
     setError(null);
 
     try {
-      const batch = writeBatch(db);
+      const BATCH_CHUNK_SIZE = 400;
+      const ops = [];
       let passedCount = 0;
       let failedCount = 0;
 
@@ -183,36 +184,47 @@ export default function DeclareResultModal({
             }
           }
 
-          batch.update(studentDoc.ref, {
-            certificateStatus: status,
-            certificateResult: {
-              certificateId: certificate.id,
-              certificateName: certificate.name,
-              status,
-              isDeleted: false,
-              declaredAt: new Date(),
-            },
-            certificateResults: {
-              ...(student.certificateResults &&
-              typeof student.certificateResults === "object"
-                ? student.certificateResults
-                : {}),
-              [certificate.id]: {
+          ops.push({
+            ref: studentDoc.ref,
+            data: {
+              certificateStatus: status,
+              certificateResult: {
                 certificateId: certificate.id,
                 certificateName: certificate.name,
                 status,
                 isDeleted: false,
                 declaredAt: new Date(),
               },
+              certificateResults: {
+                ...(student.certificateResults &&
+                typeof student.certificateResults === "object"
+                  ? student.certificateResults
+                  : {}),
+                [certificate.id]: {
+                  certificateId: certificate.id,
+                  certificateName: certificate.name,
+                  status,
+                  isDeleted: false,
+                  declaredAt: new Date(),
+                },
+              },
+              updatedAt: new Date(),
             },
-            updatedAt: new Date(),
           });
 
           status === "passed" ? passedCount++ : failedCount++;
         });
       }
 
-      await batch.commit();
+      // Commit in chunks of BATCH_CHUNK_SIZE
+      for (let i = 0; i < ops.length; i += BATCH_CHUNK_SIZE) {
+        const chunk = ops.slice(i, i + BATCH_CHUNK_SIZE);
+        const batch = writeBatch(db);
+        for (const op of chunk) {
+          batch.update(op.ref, op.data);
+        }
+        await batch.commit();
+      }
 
       await Promise.all(
         selectedProjectCodes.map((projectCode) =>

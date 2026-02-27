@@ -25,6 +25,7 @@ import {
 
 const PROJECT_CODES_COLLECTION = "projectCodes";
 const STUDENTS_COLLECTION = "students";
+const BATCH_CHUNK_SIZE = 400;
 
 const normalizeValue = (value) =>
   String(value || "")
@@ -57,18 +58,22 @@ const setStudentsProjectActiveStatus = async (projectCode, isActive) => {
   );
 
   if (!studentsSnapshot.empty) {
-    const batch = writeBatch(db);
-    studentsSnapshot.forEach((studentDoc) => {
-      batch.set(
-        studentDoc.ref,
-        {
-          isActive,
-          updatedAt: new Date(),
-        },
-        { merge: true },
-      );
-    });
-    await batch.commit();
+    const studentDocs = studentsSnapshot.docs;
+    for (let i = 0; i < studentDocs.length; i += BATCH_CHUNK_SIZE) {
+      const chunk = studentDocs.slice(i, i + BATCH_CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((studentDoc) => {
+        batch.set(
+          studentDoc.ref,
+          {
+            isActive,
+            updatedAt: new Date(),
+          },
+          { merge: true },
+        );
+      });
+      await batch.commit();
+    }
   }
 
   const studentUsersSnapshot = await getDocs(
@@ -78,19 +83,23 @@ const setStudentsProjectActiveStatus = async (projectCode, isActive) => {
     ),
   );
   if (!studentUsersSnapshot.empty) {
-    const usersBatch = writeBatch(db);
-    studentUsersSnapshot.forEach((studentUserDoc) => {
-      usersBatch.set(
-        studentUserDoc.ref,
-        {
-          isActive,
-          deletedAt: isActive ? null : new Date(),
-          updatedAt: new Date(),
-        },
-        { merge: true },
-      );
-    });
-    await usersBatch.commit();
+    const userDocs = studentUsersSnapshot.docs;
+    for (let i = 0; i < userDocs.length; i += BATCH_CHUNK_SIZE) {
+      const chunk = userDocs.slice(i, i + BATCH_CHUNK_SIZE);
+      const usersBatch = writeBatch(db);
+      chunk.forEach((studentUserDoc) => {
+        usersBatch.set(
+          studentUserDoc.ref,
+          {
+            isActive,
+            deletedAt: isActive ? null : new Date(),
+            updatedAt: new Date(),
+          },
+          { merge: true },
+        );
+      });
+      await usersBatch.commit();
+    }
   }
 };
 

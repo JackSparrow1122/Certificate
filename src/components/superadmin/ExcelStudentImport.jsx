@@ -565,7 +565,7 @@ function parseCsvLines(text) {
   return rows;
 }
 
-const WRITE_BATCH_LIMIT = 450;
+const WRITE_BATCH_LIMIT = 400;
 const AUTH_CONCURRENCY = 10;
 
 function pauseMainThread() {

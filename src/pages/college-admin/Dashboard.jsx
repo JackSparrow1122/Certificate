@@ -130,26 +130,32 @@ export default function AdminDashboard() {
             String(a.code || "").localeCompare(String(b.code || "")),
           );
 
-        const countEntries = await Promise.all(
-          normalizedProjects.map(async (project) => {
-            const projectCode = String(project.code || "").trim();
-            const count = await getStudentsByProjectCount(projectCode);
-            return [projectCode, Number(count || 0)];
-          }),
-        );
-        const countsByProject = Object.fromEntries(countEntries);
-
+        // Fetch counts and sampled student docs in parallel
         const sampledProjects = normalizedProjects.slice(
           0,
           DASHBOARD_SAMPLE_PROJECT_LIMIT,
         );
-        const sampledGroups = await Promise.all(
-          sampledProjects.map((project) =>
-            getStudentsByProject(String(project.code || "").trim(), {
-              maxDocs: DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT,
+
+        const [countEntries, sampledGroups] = await Promise.all([
+          // Server-side counts for ALL projects — lightweight
+          Promise.all(
+            normalizedProjects.map(async (project) => {
+              const projectCode = String(project.code || "").trim();
+              const count = await getStudentsByProjectCount(projectCode);
+              return [projectCode, Number(count || 0)];
             }),
           ),
-        );
+          // Sampled student docs only for chart rendering
+          Promise.all(
+            sampledProjects.map((project) =>
+              getStudentsByProject(String(project.code || "").trim(), {
+                maxDocs: DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT,
+              }),
+            ),
+          ),
+        ]);
+
+        const countsByProject = Object.fromEntries(countEntries);
         const studentsForCollege = sampledGroups.flatMap(
           (group) => group || [],
         );

@@ -39,8 +39,8 @@ const STUDENTS_COLLECTION = "students";
 const CERTIFICATES_COLLECTION = "certificates";
 const CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION =
   "certificateProjectEnrollments";
-const DEFAULT_PROJECT_STUDENTS_LIMIT = 500;
-const DEFAULT_ALL_STUDENTS_LIMIT = 2000;
+const DEFAULT_PROJECT_STUDENTS_LIMIT = 5000;
+const DEFAULT_ALL_STUDENTS_LIMIT = 10000;
 const DEFAULT_PROJECT_STUDENTS_PAGE_SIZE = 50;
 
 // Add a student to Firestore
@@ -527,30 +527,44 @@ export const getStudentByEmail = async (email) => {
     const rawEmail = String(email).trim();
     if (!rawEmail) return null;
 
-    const byRawQuery = query(
-      collectionGroup(db, "students_list"),
-      where("email", "==", rawEmail),
-      limit(1),
-    );
-    const rawSnapshot = await getDocs(byRawQuery);
-    if (!rawSnapshot.empty) {
-      const docSnap = rawSnapshot.docs[0];
-      return {
-        docId: docSnap.id,
-        ...docSnap.data(),
-      };
+    const normalized = rawEmail.toLowerCase();
+
+    // Run the two most common lookups in parallel
+    const queries = [
+      getDocs(
+        query(
+          collectionGroup(db, "students_list"),
+          where("email", "==", rawEmail),
+          limit(1),
+        ),
+      ),
+      getDocs(
+        query(
+          collectionGroup(db, "students_list"),
+          where(new FieldPath("OFFICIAL_DETAILS", "EMAIL ID"), "==", rawEmail),
+          limit(1),
+        ),
+      ),
+    ];
+
+    // Also try normalized variant if different
+    if (normalized !== rawEmail) {
+      queries.push(
+        getDocs(
+          query(
+            collectionGroup(db, "students_list"),
+            where("email", "==", normalized),
+            limit(1),
+          ),
+        ),
+      );
     }
 
-    const normalized = rawEmail.toLowerCase();
-    if (normalized !== rawEmail) {
-      const byNormalizedQuery = query(
-        collectionGroup(db, "students_list"),
-        where("email", "==", normalized),
-        limit(1),
-      );
-      const normalizedSnapshot = await getDocs(byNormalizedQuery);
-      if (!normalizedSnapshot.empty) {
-        const docSnap = normalizedSnapshot.docs[0];
+    const results = await Promise.all(queries);
+
+    for (const snapshot of results) {
+      if (!snapshot.empty) {
+        const docSnap = snapshot.docs[0];
         return {
           docId: docSnap.id,
           ...docSnap.data(),
@@ -558,20 +572,7 @@ export const getStudentByEmail = async (email) => {
       }
     }
 
-    const byOfficialEmailQuery = query(
-      collectionGroup(db, "students_list"),
-      where(new FieldPath("OFFICIAL_DETAILS", "EMAIL ID"), "==", rawEmail),
-      limit(1),
-    );
-    const officialEmailSnapshot = await getDocs(byOfficialEmailQuery);
-    if (!officialEmailSnapshot.empty) {
-      const docSnap = officialEmailSnapshot.docs[0];
-      return {
-        docId: docSnap.id,
-        ...docSnap.data(),
-      };
-    }
-
+    // Fallback: try the legacy "EMAIL ID." field path
     const byOfficialEmailDotQuery = query(
       collectionGroup(db, "students_list"),
       where(new FieldPath("OFFICIAL_DETAILS", "EMAIL ID."), "==", rawEmail),

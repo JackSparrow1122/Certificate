@@ -34,6 +34,29 @@ const CERTIFICATES_COLLECTION = "certificates";
 const STUDENTS_COLLECTION = "students";
 const CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION =
   "certificateProjectEnrollments";
+const BATCH_CHUNK_SIZE = 400;
+
+/**
+ * Commit an array of write operations in chunks of BATCH_CHUNK_SIZE to stay
+ * under Firestore's 500-operation-per-batch hard limit.
+ * Each `op` is { type: 'update'|'set'|'delete', ref, data?, options? }.
+ */
+async function commitInChunks(ops) {
+  for (let i = 0; i < ops.length; i += BATCH_CHUNK_SIZE) {
+    const chunk = ops.slice(i, i + BATCH_CHUNK_SIZE);
+    const batch = writeBatch(db);
+    for (const op of chunk) {
+      if (op.type === "delete") {
+        batch.delete(op.ref);
+      } else if (op.type === "set") {
+        batch.set(op.ref, op.data, op.options || {});
+      } else {
+        batch.update(op.ref, op.data);
+      }
+    }
+    await batch.commit();
+  }
+}
 
 export const getCertificateEnrollmentCounts = async (certificateIds) => {
   const ids = Array.isArray(certificateIds)
@@ -254,7 +277,7 @@ export const softDeleteCertificate = async ({ certificateId }) => {
     const certificateData = certificateSnapshot.data() || {};
     const certificateName = String(certificateData?.name || "");
 
-    const batch = writeBatch(db);
+    const ops = [];
     let affectedStudents = 0;
 
     const projectDocsSnapshot = await getDocs(
@@ -323,7 +346,7 @@ export const softDeleteCertificate = async ({ certificateId }) => {
           };
         }
 
-        batch.update(studentDoc.ref, payload);
+        ops.push({ type: "update", ref: studentDoc.ref, data: payload });
       });
     }
 
@@ -333,20 +356,21 @@ export const softDeleteCertificate = async ({ certificateId }) => {
     );
     const enrollmentsSnapshot = await getDocs(enrollmentQuery);
     enrollmentsSnapshot.forEach((enrollmentDoc) => {
-      batch.delete(enrollmentDoc.ref);
+      ops.push({ type: "delete", ref: enrollmentDoc.ref });
     });
 
-    batch.set(
-      certificateRef,
-      {
+    ops.push({
+      type: "set",
+      ref: certificateRef,
+      data: {
         isActive: false,
         deletedAt: new Date(),
         updatedAt: new Date(),
       },
-      { merge: true },
-    );
+      options: { merge: true },
+    });
 
-    await batch.commit();
+    await commitInChunks(ops);
 
     return {
       deleted: true,
@@ -397,7 +421,7 @@ export const enrollProjectCodeIntoCertificate = async ({
       return { newlyEnrolledCount: 0, matchedStudentsCount: 0 };
     }
 
-    const batch = writeBatch(db);
+    const ops = [];
     let newlyEnrolledCount = 0;
 
     studentsSnapshot.forEach((studentDoc) => {
@@ -417,30 +441,36 @@ export const enrollProjectCodeIntoCertificate = async ({
           ? studentData.certificateResults
           : {};
 
-      batch.update(studentDoc.ref, {
-        certificate: certificateName,
-        certificateIds: arrayUnion(certificateId),
-        certificateStatus: "enrolled",
-        enrolledCertificates: arrayUnion(certificateName),
-        certificateResults: {
-          ...existingCertificateResults,
-          [certificateId]: {
-            certificateId,
-            certificateName,
-            status: "enrolled",
-            isDeleted: false,
-            updatedAt: new Date(),
+      ops.push({
+        type: "update",
+        ref: studentDoc.ref,
+        data: {
+          certificate: certificateName,
+          certificateIds: arrayUnion(certificateId),
+          certificateStatus: "enrolled",
+          enrolledCertificates: arrayUnion(certificateName),
+          certificateResults: {
+            ...existingCertificateResults,
+            [certificateId]: {
+              certificateId,
+              certificateName,
+              status: "enrolled",
+              isDeleted: false,
+              updatedAt: new Date(),
+            },
           },
+          updatedAt: new Date(),
         },
-        updatedAt: new Date(),
       });
     });
 
     if (newlyEnrolledCount > 0) {
-      batch.update(doc(db, CERTIFICATES_COLLECTION, certificateId), {
-        enrolledCount: increment(newlyEnrolledCount),
+      ops.push({
+        type: "update",
+        ref: doc(db, CERTIFICATES_COLLECTION, certificateId),
+        data: { enrolledCount: increment(newlyEnrolledCount) },
       });
-      await batch.commit();
+      await commitInChunks(ops);
     }
 
     return {
@@ -490,25 +520,18 @@ export const getCertificatesByProjectCode = async (projectCode) => {
     const normalizedProjectCode = String(projectCode || "").trim();
     if (!normalizedProjectCode) return [];
 
-    const normalizeForCompare = (value) =>
-      String(value || "")
-        .trim()
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "");
-
-    const targetCode = normalizeForCompare(normalizedProjectCode);
-    const enrollmentsSnapshot = await getDocs(
+    const enrollmentsQuery = query(
       collection(db, CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION),
+      where("projectCode", "==", normalizedProjectCode),
     );
+    const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
     if (enrollmentsSnapshot.empty) return [];
 
-    const enrollmentRows = enrollmentsSnapshot.docs
-      .map((enrollmentDoc) => ({
-        certificateId: enrollmentDoc.data()?.certificateId || "",
-        certificateName: enrollmentDoc.data()?.certificateName || "",
-        projectCode: enrollmentDoc.data()?.projectCode || "",
-      }))
-      .filter((row) => normalizeForCompare(row.projectCode) === targetCode);
+    const enrollmentRows = enrollmentsSnapshot.docs.map((enrollmentDoc) => ({
+      certificateId: enrollmentDoc.data()?.certificateId || "",
+      certificateName: enrollmentDoc.data()?.certificateName || "",
+      projectCode: enrollmentDoc.data()?.projectCode || "",
+    }));
 
     const certificateIds = [
       ...new Set(
@@ -570,7 +593,7 @@ export const unassignProjectCodeFromCertificate = async ({
       return { unenrolledCount: 0 };
     }
 
-    const batch = writeBatch(db);
+    const ops = [];
     let unenrolledCount = 0;
 
     studentsSnapshot.forEach((studentDoc) => {
@@ -632,16 +655,18 @@ export const unassignProjectCodeFromCertificate = async ({
         updatePayload.certificateResult = null;
       }
 
-      batch.update(studentDoc.ref, updatePayload);
+      ops.push({ type: "update", ref: studentDoc.ref, data: updatePayload });
     });
 
     if (unenrolledCount > 0) {
-      batch.update(doc(db, CERTIFICATES_COLLECTION, certificateId), {
-        enrolledCount: increment(-unenrolledCount),
+      ops.push({
+        type: "update",
+        ref: doc(db, CERTIFICATES_COLLECTION, certificateId),
+        data: { enrolledCount: increment(-unenrolledCount) },
       });
     }
 
-    await batch.commit();
+    await commitInChunks(ops);
     await deleteDoc(
       doc(db, CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION, enrollmentDocId),
     );
