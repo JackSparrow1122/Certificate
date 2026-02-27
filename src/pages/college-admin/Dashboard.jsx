@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { getStudentsByProject } from "../../../services/studentService";
+import {
+  getStudentsByProject,
+  getStudentsByProjectCount,
+} from "../../../services/studentService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import {
   getAllColleges,
@@ -36,6 +39,9 @@ const normalizeCollegeLogoUrl = (value) => {
   return "";
 };
 
+const DASHBOARD_SAMPLE_PROJECT_LIMIT = 12;
+const DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT = 120;
+
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const COLORS = ["#0B2A4A", "#1D5FA8", "#6BC7A7", "#D29A2D"];
@@ -56,9 +62,28 @@ export default function AdminDashboard() {
 
   const [students, setStudents] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [projectStudentCounts, setProjectStudentCounts] = useState({});
   const [certifications, setCertifications] = useState([]);
   const [collegeInfo, setCollegeInfo] = useState({ name: "", logo: "" });
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
+  const [isLayoutResizing, setIsLayoutResizing] = useState(false);
+
+  useEffect(() => {
+    let resizeTimer;
+    const handleResize = () => {
+      setIsLayoutResizing(true);
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        setIsLayoutResizing(false);
+      }, 260);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.clearTimeout(resizeTimer);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -68,6 +93,7 @@ export default function AdminDashboard() {
           if (!mounted) return;
           setStudents([]);
           setProjects([]);
+          setProjectStudentCounts({});
           setCertifications([]);
           setCollegeInfo({ name: "", logo: "" });
           return;
@@ -104,12 +130,27 @@ export default function AdminDashboard() {
             String(a.code || "").localeCompare(String(b.code || "")),
           );
 
-        const studentGroups = await Promise.all(
-          normalizedProjects.map((project) =>
-            getStudentsByProject(String(project.code || "").trim()),
+        const countEntries = await Promise.all(
+          normalizedProjects.map(async (project) => {
+            const projectCode = String(project.code || "").trim();
+            const count = await getStudentsByProjectCount(projectCode);
+            return [projectCode, Number(count || 0)];
+          }),
+        );
+        const countsByProject = Object.fromEntries(countEntries);
+
+        const sampledProjects = normalizedProjects.slice(
+          0,
+          DASHBOARD_SAMPLE_PROJECT_LIMIT,
+        );
+        const sampledGroups = await Promise.all(
+          sampledProjects.map((project) =>
+            getStudentsByProject(String(project.code || "").trim(), {
+              maxDocs: DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT,
+            }),
           ),
         );
-        const studentsForCollege = studentGroups.flatMap(
+        const studentsForCollege = sampledGroups.flatMap(
           (group) => group || [],
         );
         const certificateNames = new Set();
@@ -137,6 +178,7 @@ export default function AdminDashboard() {
         if (!mounted) return;
         setStudents(studentsForCollege);
         setProjects(normalizedProjects);
+        setProjectStudentCounts(countsByProject);
         setCertifications(Array.from(certificateNames));
         setCollegeInfo({
           name: String(
@@ -152,6 +194,11 @@ export default function AdminDashboard() {
         setLogoLoadFailed(false);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
+        if (!mounted) return;
+        setStudents([]);
+        setProjects([]);
+        setProjectStudentCounts({});
+        setCertifications([]);
       }
     };
     load();
@@ -161,18 +208,12 @@ export default function AdminDashboard() {
   }, [collegeCode]);
 
   const data = useMemo(() => {
-    const studentCountByProject = students.reduce((acc, student) => {
-      const key = student.projectId || student.projectCode || "";
-      if (!key) return acc;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
     const byCourse = {};
     projects.forEach((p) => {
       const courseKey = p.course || p.courseCode || "Unknown";
       byCourse[courseKey] =
-        (byCourse[courseKey] || 0) + (studentCountByProject[p.code] || 0);
+        (byCourse[courseKey] || 0) +
+        Number(projectStudentCounts[String(p.code || "").trim()] || 0);
     });
 
     const barData = Object.keys(byCourse).map((k) => ({
@@ -211,13 +252,20 @@ export default function AdminDashboard() {
     const topProjects = projects
       .map((project) => ({
         ...project,
-        totalStudents: studentCountByProject[project.code] || 0,
+        totalStudents: Number(
+          projectStudentCounts[String(project.code || "").trim()] || 0,
+        ),
       }))
       .sort((a, b) => b.totalStudents - a.totalStudents)
       .slice(0, 5);
 
+    const totalEnrollments = Object.values(projectStudentCounts).reduce(
+      (sum, count) => sum + Number(count || 0),
+      0,
+    );
+
     return {
-      totalEnrollments: students.length,
+      totalEnrollments,
       completionRate: `${avgProgress}%`,
       certificatesIssued: certifications.length,
       activeProjectCodes: projects.length,
@@ -226,7 +274,7 @@ export default function AdminDashboard() {
       progressBands,
       topProjects,
     };
-  }, [students, projects, certifications]);
+  }, [students, projects, certifications, projectStudentCounts]);
 
   return (
     <div className="space-y-6">
@@ -283,7 +331,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Enrollment by Course">
-          <ResponsiveContainer width="100%" height={270}>
+          <ResponsiveContainer width="100%" height={270} debounce={75}>
             <BarChart data={data.barData} barSize={42}>
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -293,13 +341,20 @@ export default function AdminDashboard() {
               <XAxis dataKey="course" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} />
               <Tooltip cursor={false} />
-              <Bar dataKey="count" fill="#1D5FA8" radius={[10, 10, 0, 0]} />
+              <Bar
+                dataKey="count"
+                fill="#1D5FA8"
+                radius={[10, 10, 0, 0]}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
+              />
             </BarChart>
           </ResponsiveContainer>
         </Panel>
 
         <Panel title="Student Progress Distribution">
-          <ResponsiveContainer width="100%" height={270}>
+          <ResponsiveContainer width="100%" height={270} debounce={75}>
             <PieChart>
               <Pie
                 data={data.progressBands}
@@ -307,6 +362,9 @@ export default function AdminDashboard() {
                 nameKey="name"
                 innerRadius={60}
                 outerRadius={92}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
               >
                 {data.progressBands.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
@@ -321,14 +379,17 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Course Share">
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={260} debounce={75}>
             <PieChart>
               <Pie
                 data={data.pieData}
                 dataKey="value"
                 nameKey="name"
                 outerRadius={92}
-                label
+                label={!isLayoutResizing}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
               >
                 {data.pieData.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />

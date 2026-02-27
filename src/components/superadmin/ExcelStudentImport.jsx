@@ -1,10 +1,6 @@
 import { useState } from "react";
 import { db } from "../../firebase/config";
-import {
-  writeBatch,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { writeBatch, doc, serverTimestamp } from "firebase/firestore";
 import { codeToDocId } from "../../utils/projectCodeUtils";
 import { getStudentsByProject } from "../../../services/studentService";
 import { createStudentAuthUser } from "../../../services/userService";
@@ -253,7 +249,9 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       let existingPhones = new Set();
       try {
         if (projectCode) {
-          const existing = await getStudentsByProject(projectCode);
+          const existing = await getStudentsByProject(projectCode, {
+            maxDocs: 5000,
+          });
           existing.forEach((s) => {
             const e = s.OFFICIAL_DETAILS?.["EMAIL ID"] || s.email || null;
             const p = s.OFFICIAL_DETAILS?.["MOBILE NO."] || s.phone || null;
@@ -567,6 +565,21 @@ function parseCsvLines(text) {
   return rows;
 }
 
+const WRITE_BATCH_LIMIT = 450;
+const AUTH_CONCURRENCY = 10;
+
+function pauseMainThread() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function processInChunks(items, chunkSize, handler) {
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    await handler(chunk, i / chunkSize);
+    await pauseMainThread();
+  }
+}
+
 async function processRows(
   rows,
   headerMap,
@@ -577,8 +590,6 @@ async function processRows(
   setSuccess,
 ) {
   try {
-    const batch = writeBatch(db);
-
     let successCount = 0;
     let failedCount = 0;
     let authCreatedCount = 0;
@@ -590,141 +601,169 @@ async function processRows(
     const collegeCode = String(projectCode || "").split("/")[0] || "";
     const authCandidates = [];
 
-    // Ensure parent project document contains project/college linkage metadata.
-    const projectDocRef = doc(db, "students", projectDocId);
-    batch.set(
-      projectDocRef,
-      {
-        projectCode,
-        collegeCode,
-        isActive: true,
-        updatedAt: serverTimestamp(),
+    await processInChunks(
+      rows,
+      WRITE_BATCH_LIMIT,
+      async (rowChunk, chunkIndex) => {
+        const batch = writeBatch(db);
+
+        if (chunkIndex === 0) {
+          const projectDocRef = doc(db, "students", projectDocId);
+          batch.set(
+            projectDocRef,
+            {
+              projectCode,
+              collegeCode,
+              isActive: true,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        for (const row of rowChunk) {
+          try {
+            const official = buildNested(row, {
+              SN: headerMap["SN"] || "SN",
+              "FULL NAME OF STUDENT":
+                headerMap["FULL NAME OF STUDENT"] || "FULL NAME OF STUDENT",
+              "EMAIL ID": headerMap["EMAIL ID"] || "EMAIL ID",
+              "MOBILE NO.": headerMap["MOBILE NO."] || "MOBILE NO.",
+              "BIRTH DATE": headerMap["BIRTH DATE"] || "BIRTH DATE",
+              GENDER: headerMap["GENDER"] || "GENDER",
+              HOMETOWN: headerMap["HOMETOWN"] || "HOMETOWN",
+            });
+
+            const tenth = buildNested(row, {
+              "10th PASSING YR":
+                headerMap["10th PASSING YR"] || "10th PASSING YR",
+              "10th OVERALL MARKS %":
+                headerMap["10th OVERALL MARKS %"] || "10th OVERALL MARKS %",
+            });
+
+            const twelfth = buildNested(row, {
+              "12th PASSING YR":
+                headerMap["12th PASSING YR"] || "12th PASSING YR",
+              "12th OVERALL MARKS %":
+                headerMap["12th OVERALL MARKS %"] || "12th OVERALL MARKS %",
+            });
+
+            const diploma = buildNested(row, {
+              "DIPLOMA COURSE": headerMap["DIPLOMA COURSE"] || "DIPLOMA COURSE",
+              "DIPLOMA SPECIALIZATION":
+                headerMap["DIPLOMA SPECIALIZATION"] || "DIPLOMA SPECIALIZATION",
+              "DIPLOMA PASSING YR":
+                headerMap["DIPLOMA PASSING YR"] || "DIPLOMA PASSING YR",
+              "DIPLOMA OVERALL MARKS %":
+                headerMap["DIPLOMA OVERALL MARKS %"] ||
+                "DIPLOMA OVERALL MARKS %",
+            });
+
+            const graduation = buildNested(row, {
+              "GRADUATION COURSE":
+                headerMap["GRADUATION COURSE"] || "GRADUATION COURSE",
+              "GRADUATION SPECIALIZATION":
+                headerMap["GRADUATION SPECIALIZATION"] ||
+                "GRADUATION SPECIALIZATION",
+              "GRADUATION PASSING YR":
+                headerMap["GRADUATION PASSING YR"] || "GRADUATION PASSING YR",
+              "GRADUATION OVERALL MARKS %":
+                headerMap["GRADUATION OVERALL MARKS %"] ||
+                "GRADUATION OVERALL MARKS %",
+            });
+
+            const postGrad = buildNested(row, {
+              COURSE: headerMap["COURSE"] || "COURSE",
+              SPECIALIZATION: headerMap["SPECIALIZATION"] || "SPECIALIZATION",
+              "PASSING YEAR": headerMap["PASSING YEAR"] || "PASSING YEAR",
+              "OVERALL MARKS %":
+                headerMap["OVERALL MARKS %"] || "OVERALL MARKS %",
+            });
+
+            const docBody = {};
+            if (official) docBody.OFFICIAL_DETAILS = official;
+            if (tenth) docBody.TENTH_DETAILS = tenth;
+            if (twelfth) docBody.TWELFTH_DETAILS = twelfth;
+            if (diploma) docBody.DIPLOMA_DETAILS = diploma;
+            if (graduation) docBody.GRADUATION_DETAILS = graduation;
+            if (postGrad) docBody.POST_GRADUATION_DETAILS = postGrad;
+
+            if (projectCode) docBody.projectCode = projectCode;
+            docBody.collegeCode = collegeCode;
+            docBody.isActive = true;
+
+            const idVal =
+              official && official.SN ? String(official.SN) : undefined;
+            if (!idVal) {
+              failedCount++;
+              continue;
+            }
+            docBody.createdAt = serverTimestamp();
+            docBody.updatedAt = serverTimestamp();
+
+            const studentDocRef = doc(
+              db,
+              "students",
+              projectDocId,
+              "students_list",
+              idVal,
+            );
+            batch.set(studentDocRef, docBody, { merge: true });
+
+            authCandidates.push({
+              studentId: idVal,
+              name:
+                official && official["FULL NAME OF STUDENT"]
+                  ? String(official["FULL NAME OF STUDENT"])
+                  : "",
+              email:
+                official && official["EMAIL ID"]
+                  ? String(official["EMAIL ID"]).trim().toLowerCase()
+                  : "",
+              mobile: official ? official["MOBILE NO."] : "",
+              projectCode,
+              collegeCode,
+            });
+
+            successCount++;
+          } catch (e) {
+            console.error("Failed to import row", e);
+            failedCount++;
+          }
+        }
+
+        await batch.commit();
       },
-      { merge: true },
     );
 
-    for (const row of rows) {
-      try {
-        const official = buildNested(row, {
-          SN: headerMap["SN"] || "SN",
-          "FULL NAME OF STUDENT":
-            headerMap["FULL NAME OF STUDENT"] || "FULL NAME OF STUDENT",
-          "EMAIL ID": headerMap["EMAIL ID"] || "EMAIL ID",
-          "MOBILE NO.": headerMap["MOBILE NO."] || "MOBILE NO.",
-          "BIRTH DATE": headerMap["BIRTH DATE"] || "BIRTH DATE",
-          GENDER: headerMap["GENDER"] || "GENDER",
-          HOMETOWN: headerMap["HOMETOWN"] || "HOMETOWN",
-        });
-
-        const tenth = buildNested(row, {
-          "10th PASSING YR": headerMap["10th PASSING YR"] || "10th PASSING YR",
-          "10th OVERALL MARKS %":
-            headerMap["10th OVERALL MARKS %"] || "10th OVERALL MARKS %",
-        });
-
-        const twelfth = buildNested(row, {
-          "12th PASSING YR": headerMap["12th PASSING YR"] || "12th PASSING YR",
-          "12th OVERALL MARKS %":
-            headerMap["12th OVERALL MARKS %"] || "12th OVERALL MARKS %",
-        });
-
-        const diploma = buildNested(row, {
-          "DIPLOMA COURSE": headerMap["DIPLOMA COURSE"] || "DIPLOMA COURSE",
-          "DIPLOMA SPECIALIZATION":
-            headerMap["DIPLOMA SPECIALIZATION"] || "DIPLOMA SPECIALIZATION",
-          "DIPLOMA PASSING YR":
-            headerMap["DIPLOMA PASSING YR"] || "DIPLOMA PASSING YR",
-          "DIPLOMA OVERALL MARKS %":
-            headerMap["DIPLOMA OVERALL MARKS %"] || "DIPLOMA OVERALL MARKS %",
-        });
-
-        const graduation = buildNested(row, {
-          "GRADUATION COURSE":
-            headerMap["GRADUATION COURSE"] || "GRADUATION COURSE",
-          "GRADUATION SPECIALIZATION":
-            headerMap["GRADUATION SPECIALIZATION"] ||
-            "GRADUATION SPECIALIZATION",
-          "GRADUATION PASSING YR":
-            headerMap["GRADUATION PASSING YR"] || "GRADUATION PASSING YR",
-          "GRADUATION OVERALL MARKS %":
-            headerMap["GRADUATION OVERALL MARKS %"] ||
-            "GRADUATION OVERALL MARKS %",
-        });
-
-        const postGrad = buildNested(row, {
-          COURSE: headerMap["COURSE"] || "COURSE",
-          SPECIALIZATION: headerMap["SPECIALIZATION"] || "SPECIALIZATION",
-          "PASSING YEAR": headerMap["PASSING YEAR"] || "PASSING YEAR",
-          "OVERALL MARKS %": headerMap["OVERALL MARKS %"] || "OVERALL MARKS %",
-        });
-
-        const docBody = {};
-        if (official) docBody.OFFICIAL_DETAILS = official;
-        if (tenth) docBody.TENTH_DETAILS = tenth;
-        if (twelfth) docBody.TWELFTH_DETAILS = twelfth;
-        if (diploma) docBody.DIPLOMA_DETAILS = diploma;
-        if (graduation) docBody.GRADUATION_DETAILS = graduation;
-        if (postGrad) docBody.POST_GRADUATION_DETAILS = postGrad;
-
-        // Store original project code in data (with slashes)
-        if (projectCode) docBody.projectCode = projectCode;
-        docBody.collegeCode = collegeCode;
-        docBody.isActive = true;
-
-        const idVal = official && official.SN ? String(official.SN) : undefined;
-        docBody.createdAt = serverTimestamp();
-        docBody.updatedAt = serverTimestamp();
-
-        // New path: students/{projectCodeWithHyphens}/students_list/{sn}
-        const studentDocRef = doc(
-          db,
-          "students",
-          projectDocId,
-          "students_list",
-          idVal,
+    await processInChunks(
+      authCandidates,
+      AUTH_CONCURRENCY,
+      async (authChunk) => {
+        const results = await Promise.allSettled(
+          authChunk.map((student) => createStudentAuthUser(student)),
         );
-        batch.set(studentDocRef, docBody, { merge: true });
 
-        authCandidates.push({
-          studentId: idVal || "",
-          name:
-            official && official["FULL NAME OF STUDENT"]
-              ? String(official["FULL NAME OF STUDENT"])
-              : "",
-          email:
-            official && official["EMAIL ID"]
-              ? String(official["EMAIL ID"]).trim().toLowerCase()
-              : "",
-          mobile: official ? official["MOBILE NO."] : "",
-          projectCode,
-          collegeCode,
+        results.forEach((result, index) => {
+          const student = authChunk[index];
+          if (result.status === "fulfilled") {
+            if (result.value?.skippedExisting) {
+              authSkippedExistingCount++;
+            } else {
+              authCreatedCount++;
+            }
+            return;
+          }
+
+          const authError = result.reason;
+          authFailures.push({
+            studentId: student?.studentId || "-",
+            email: student?.email || "-",
+            reason: authError?.message || "Auth creation failed",
+          });
         });
-
-        successCount++;
-      } catch (e) {
-        console.error("Failed to import row", e);
-        failedCount++;
-      }
-    }
-
-    await batch.commit();
-
-    for (const student of authCandidates) {
-      try {
-        const authResult = await createStudentAuthUser(student);
-        if (authResult?.skippedExisting) {
-          authSkippedExistingCount++;
-        } else {
-          authCreatedCount++;
-        }
-      } catch (authError) {
-        authFailures.push({
-          studentId: student.studentId || "-",
-          email: student.email || "-",
-          reason: authError?.message || "Auth creation failed",
-        });
-      }
-    }
+      },
+    );
 
     setSuccess(
       `✅ Imported ${successCount} students${
@@ -733,9 +772,7 @@ async function processRows(
         authSkippedExistingCount
           ? `, ${authSkippedExistingCount} skipped (email already in student_users)`
           : ""
-      }${
-        authFailures.length ? `, ${authFailures.length} auth failed` : ""
-      }`,
+      }${authFailures.length ? `, ${authFailures.length} auth failed` : ""}`,
     );
 
     if (authFailures.length > 0) {

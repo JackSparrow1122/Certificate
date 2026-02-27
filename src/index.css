@@ -16,29 +16,74 @@ body {
 }
 
 /* Global portal scrollbar (all three portals) */
-* {
+:where(
+  html,
+  body,
+  #root,
+  .student-modal-scroll,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-scroll
+) {
   -ms-overflow-style: auto;
   scrollbar-width: thin;
   scrollbar-color: #9ca3af transparent;
 }
 
-*::-webkit-scrollbar {
+:where(
+  html,
+  body,
+  #root,
+  .student-modal-scroll,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-scroll
+)::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-*::-webkit-scrollbar-track {
+:where(
+  html,
+  body,
+  #root,
+  .student-modal-scroll,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-scroll
+)::-webkit-scrollbar-track {
   background: transparent;
 }
 
-*::-webkit-scrollbar-thumb {
+:where(
+  html,
+  body,
+  #root,
+  .student-modal-scroll,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-scroll
+)::-webkit-scrollbar-thumb {
   background-color: #9ca3af;
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
-*::-webkit-scrollbar-button {
+:where(
+  html,
+  body,
+  #root,
+  .student-modal-scroll,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-scroll
+)::-webkit-scrollbar-button {
   -webkit-appearance: none;
   appearance: none;
   display: none;
@@ -46,24 +91,59 @@ body {
   height: 0;
 }
 
-*::-webkit-scrollbar-button:single-button,
-*::-webkit-scrollbar-button:vertical:decrement,
-*::-webkit-scrollbar-button:vertical:increment,
-*::-webkit-scrollbar-button:horizontal:decrement,
-*::-webkit-scrollbar-button:horizontal:increment {
+:where(
+    html,
+    body,
+    #root,
+    .student-modal-scroll,
+    .overflow-auto,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-scroll
+  )::-webkit-scrollbar-button:single-button,
+:where(
+    html,
+    body,
+    #root,
+    .student-modal-scroll,
+    .overflow-auto,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-scroll
+  )::-webkit-scrollbar-button:vertical:decrement,
+:where(
+    html,
+    body,
+    #root,
+    .student-modal-scroll,
+    .overflow-auto,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-scroll
+  )::-webkit-scrollbar-button:vertical:increment,
+:where(
+    html,
+    body,
+    #root,
+    .student-modal-scroll,
+    .overflow-auto,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-scroll
+  )::-webkit-scrollbar-button:horizontal:decrement,
+:where(
+    html,
+    body,
+    #root,
+    .student-modal-scroll,
+    .overflow-auto,
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-scroll
+  )::-webkit-scrollbar-button:horizontal:increment {
   display: none;
   width: 0;
   height: 0;
-}
-
-*:hover::-webkit-scrollbar-button:single-button,
-*:hover::-webkit-scrollbar-button:vertical:decrement,
-*:hover::-webkit-scrollbar-button:vertical:increment,
-*:hover::-webkit-scrollbar-button:horizontal:decrement,
-*:hover::-webkit-scrollbar-button:horizontal:increment {
-  display: block;
-  width: 8px;
-  height: 8px;
 }
 
 #root {
@@ -133,10 +213,9 @@ textarea:focus {
 }
 
 /* 4. Table Rows and List Items */
-tr,
-li,
-.flex.items-center.p-3,
-.flex.items-center.p-4 {
+tbody tr,
+li.hover\:bg-gray-50,
+.hover\:bg-gray-50 {
   transition: all 0.2s ease-in-out;
 }
 

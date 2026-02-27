@@ -83,12 +83,12 @@ export default function Sidebar() {
       className={`${
         expanded ? "w-72" : "w-20"
       } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#0B2A4A] text-white flex flex-col justify-between
-         transition-all duration-300 ease-in-out`}
+         transition-[width,transform] duration-300 ease-in-out`}
     >
       {/* TOP */}
       <div>
         {/* Logo */}
-        <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
+        <div className="px-4 py-8 flex items-center justify-center">
           <img
             src={expanded ? logo : profileImage}
             alt="Academy Logo"

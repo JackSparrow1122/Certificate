@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { getStudentsByProject } from "../../../services/studentService";
+import {
+  getStudentsByProject,
+  getStudentsByProjectPage,
+} from "../../../services/studentService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import StudentModal from "../../components/StudentModal";
 
@@ -167,6 +170,8 @@ const matchesCertificate = (student, certificate) => {
   );
 };
 
+const PAGE_SIZE = 50;
+
 export default function Students() {
   const { profile } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -175,8 +180,49 @@ export default function Students() {
   const [selectedProjectCode, setSelectedProjectCode] = useState("");
   const [selectedCertificateId, setSelectedCertificateId] = useState("");
   const [projectStudents, setProjectStudents] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverPageStudents, setServerPageStudents] = useState([]);
+  const [serverCursor, setServerCursor] = useState(null);
+  const [serverCursorHistory, setServerCursorHistory] = useState([]);
+  const [serverNextCursor, setServerNextCursor] = useState(null);
+  const [loadingServerPage, setLoadingServerPage] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(false);
+
+  const loadServerPage = async ({
+    projectCode,
+    cursor = null,
+    history = [],
+  }) => {
+    if (!projectCode) {
+      setServerPageStudents([]);
+      setServerCursor(null);
+      setServerCursorHistory([]);
+      setServerNextCursor(null);
+      return;
+    }
+
+    setLoadingServerPage(true);
+    try {
+      const response = await getStudentsByProjectPage(projectCode, {
+        pageSize: PAGE_SIZE,
+        cursor,
+      });
+      const mappedStudents = (response?.students || []).map(toDisplayStudent);
+      setServerPageStudents(mappedStudents);
+      setServerCursor(cursor);
+      setServerCursorHistory(history);
+      setServerNextCursor(
+        response?.hasMore ? response?.nextCursor || null : null,
+      );
+    } catch (error) {
+      console.error("Failed to load paged students:", error);
+      setServerPageStudents([]);
+      setServerNextCursor(null);
+    } finally {
+      setLoadingServerPage(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -224,25 +270,40 @@ export default function Students() {
         setCertificateOptions([]);
         setSelectedCertificateId("");
         setProjectStudents([]);
+        setServerPageStudents([]);
+        setServerCursor(null);
+        setServerCursorHistory([]);
+        setServerNextCursor(null);
         return;
       }
 
       try {
         setLoadingStudents(true);
         setSelectedCertificateId("");
-        const studentsByProject =
-          await getStudentsByProject(selectedProjectCode);
+        setCurrentPage(1);
+        const studentsByProject = await getStudentsByProject(
+          selectedProjectCode,
+          { maxDocs: 1000 },
+        );
         if (!mounted) return;
         const mappedStudents = (studentsByProject || []).map(toDisplayStudent);
         setProjectStudents(mappedStudents);
         setCertificateOptions(
           getCertificateOptionsFromStudents(mappedStudents),
         );
+        setServerPageStudents([]);
+        setServerCursor(null);
+        setServerCursorHistory([]);
+        setServerNextCursor(null);
       } catch (error) {
         console.error("Failed to load selected project data:", error);
         if (!mounted) return;
         setProjectStudents([]);
         setCertificateOptions([]);
+        setServerPageStudents([]);
+        setServerCursor(null);
+        setServerCursorHistory([]);
+        setServerNextCursor(null);
       } finally {
         if (mounted) setLoadingStudents(false);
       }
@@ -267,6 +328,9 @@ export default function Students() {
     !loadingStudents &&
     certificateOptions.length === 0;
 
+  const isServerPaginationMode =
+    Boolean(selectedProjectCode) && shouldShowAllStudents;
+
   const students = useMemo(() => {
     if (!selectedProjectCode) return [];
     if (certificateOptions.length === 0) return projectStudents;
@@ -280,6 +344,39 @@ export default function Students() {
     selectedProjectCode,
     certificateOptions.length,
   ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedProjectCode, selectedCertificateId]);
+
+  useEffect(() => {
+    if (!isServerPaginationMode) return;
+    loadServerPage({
+      projectCode: selectedProjectCode,
+      cursor: null,
+      history: [],
+    });
+  }, [isServerPaginationMode, selectedProjectCode]);
+
+  const totalPages = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return students.slice(start, start + PAGE_SIZE);
+  }, [students, currentPage, PAGE_SIZE]);
+
+  const displayedStudents = isServerPaginationMode
+    ? serverPageStudents
+    : paginatedStudents;
+
+  const serverCurrentPage = serverCursorHistory.length + 1;
+  const serverHasPrev = serverCursorHistory.length > 0;
+  const serverHasNext = Boolean(serverNextCursor);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div>
@@ -416,7 +513,9 @@ export default function Students() {
                 </thead>
 
                 <tbody className="divide-y divide-[#E6EDF6] bg-white">
-                  {(loadingProjects || loadingStudents) && (
+                  {(loadingProjects ||
+                    loadingStudents ||
+                    loadingServerPage) && (
                     <tr className="bg-gray-50">
                       <td
                         className="px-6 py-6 text-center text-sm text-gray-500"
@@ -428,9 +527,10 @@ export default function Students() {
                   )}
                   {!loadingProjects &&
                     !loadingStudents &&
+                    !loadingServerPage &&
                     selectedProjectCode &&
                     (selectedCertificateId || shouldShowAllStudents) &&
-                    students.length === 0 && (
+                    displayedStudents.length === 0 && (
                       <tr className="bg-gray-50">
                         <td
                           className="px-6 py-6 text-center text-sm text-gray-500"
@@ -441,7 +541,7 @@ export default function Students() {
                         </td>
                       </tr>
                     )}
-                  {students.map((student) => (
+                  {displayedStudents.map((student) => (
                     <tr
                       key={`${student.projectCode || student.projectId || "NA"}-${student.id || student.docId || student.email || student.name}`}
                       onClick={() => setSelectedStudent(student)}
@@ -482,6 +582,80 @@ export default function Students() {
                 </tbody>
               </table>
             </div>
+
+            {!loadingProjects &&
+              !loadingStudents &&
+              !loadingServerPage &&
+              ((isServerPaginationMode && (serverHasPrev || serverHasNext)) ||
+                (!isServerPaginationMode && students.length > PAGE_SIZE)) && (
+                <div className="mt-3 flex items-center justify-between px-1">
+                  <p className="text-xs text-[#415a77]">
+                    {isServerPaginationMode
+                      ? `Showing page ${serverCurrentPage}`
+                      : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, students.length)} of ${students.length}`}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isServerPaginationMode) {
+                          if (!serverHasPrev) return;
+                          const prevCursor =
+                            serverCursorHistory[
+                              serverCursorHistory.length - 1
+                            ] || null;
+                          const nextHistory = serverCursorHistory.slice(0, -1);
+                          loadServerPage({
+                            projectCode: selectedProjectCode,
+                            cursor: prevCursor,
+                            history: nextHistory,
+                          });
+                          return;
+                        }
+                        setCurrentPage((page) => Math.max(1, page - 1));
+                      }}
+                      disabled={
+                        isServerPaginationMode
+                          ? !serverHasPrev
+                          : currentPage === 1
+                      }
+                      className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs font-medium text-[#0B2A4A]">
+                      {isServerPaginationMode
+                        ? `Page ${serverCurrentPage}`
+                        : `Page ${currentPage} of ${totalPages}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isServerPaginationMode) {
+                          if (!serverHasNext) return;
+                          loadServerPage({
+                            projectCode: selectedProjectCode,
+                            cursor: serverNextCursor,
+                            history: [...serverCursorHistory, serverCursor],
+                          });
+                          return;
+                        }
+                        setCurrentPage((page) =>
+                          Math.min(totalPages, page + 1),
+                        );
+                      }}
+                      disabled={
+                        isServerPaginationMode
+                          ? !serverHasNext
+                          : currentPage === totalPages
+                      }
+                      className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
           </div>
         )}
 

@@ -15,6 +15,9 @@ import {
   documentId,
   limit,
   FieldPath,
+  orderBy,
+  startAfter,
+  getCountFromServer,
 } from "firebase/firestore";
 import { codeToDocId, docIdToCode } from "../src/utils/projectCodeUtils";
 import { isLocalDbMode } from "./dbModeService";
@@ -36,6 +39,9 @@ const STUDENTS_COLLECTION = "students";
 const CERTIFICATES_COLLECTION = "certificates";
 const CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION =
   "certificateProjectEnrollments";
+const DEFAULT_PROJECT_STUDENTS_LIMIT = 500;
+const DEFAULT_ALL_STUDENTS_LIMIT = 2000;
+const DEFAULT_PROJECT_STUDENTS_PAGE_SIZE = 50;
 
 // Add a student to Firestore
 export const addStudent = async (studentData) => {
@@ -171,12 +177,17 @@ export const addStudent = async (studentData) => {
 };
 
 // Get all students
-export const getAllStudents = async () => {
+export const getAllStudents = async ({
+  maxDocs = DEFAULT_ALL_STUDENTS_LIMIT,
+} = {}) => {
   if (isLocalDbMode()) {
     return localGetAllStudents();
   }
   try {
-    const allStudentsQuery = collectionGroup(db, "students_list");
+    const allStudentsQuery = query(
+      collectionGroup(db, "students_list"),
+      limit(maxDocs),
+    );
     const querySnapshot = await getDocs(allStudentsQuery);
     const students = [];
     querySnapshot.forEach((studentDoc) => {
@@ -195,10 +206,22 @@ export const getAllStudents = async () => {
       return [];
     }
 
+    const projectDocs = projectsSnapshot.docs.slice(
+      0,
+      Math.max(1, Math.ceil(maxDocs / 20)),
+    );
     const studentsByProjectSnapshots = await Promise.all(
-      projectsSnapshot.docs.map((projectDoc) =>
+      projectDocs.map((projectDoc) =>
         getDocs(
-          collection(db, STUDENTS_COLLECTION, projectDoc.id, "students_list"),
+          query(
+            collection(db, STUDENTS_COLLECTION, projectDoc.id, "students_list"),
+            limit(
+              Math.max(
+                1,
+                Math.floor(maxDocs / Math.max(projectDocs.length, 1)),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -221,7 +244,10 @@ export const getAllStudents = async () => {
 };
 
 // Get students by project ID
-export const getStudentsByProject = async (projectId) => {
+export const getStudentsByProject = async (
+  projectId,
+  { maxDocs = DEFAULT_PROJECT_STUDENTS_LIMIT } = {},
+) => {
   if (isLocalDbMode()) {
     return localGetStudentsByProject(projectId);
   }
@@ -233,7 +259,7 @@ export const getStudentsByProject = async (projectId) => {
       projectDocId,
       "students_list",
     );
-    const querySnapshot = await getDocs(studentsList);
+    const querySnapshot = await getDocs(query(studentsList, limit(maxDocs)));
     const students = [];
     querySnapshot.forEach((studentDoc) => {
       students.push({
@@ -246,6 +272,124 @@ export const getStudentsByProject = async (projectId) => {
     return students;
   } catch (error) {
     console.error("Error getting students by project:", error);
+    throw error;
+  }
+};
+
+export const getStudentsByProjectPage = async (
+  projectId,
+  { pageSize = DEFAULT_PROJECT_STUDENTS_PAGE_SIZE, cursor = null } = {},
+) => {
+  const safePageSize = Math.max(1, Number(pageSize) || 1);
+  const safeCursor = String(cursor || "").trim() || null;
+
+  if (isLocalDbMode()) {
+    const allRows = await localGetStudentsByProject(projectId);
+    const sortedRows = [...(allRows || [])].sort((a, b) =>
+      String(a?.docId || a?.id || "").localeCompare(
+        String(b?.docId || b?.id || ""),
+      ),
+    );
+
+    const startIndex = safeCursor
+      ? sortedRows.findIndex(
+          (row) => String(row?.docId || row?.id || "") === safeCursor,
+        ) + 1
+      : 0;
+
+    const pageRows = sortedRows.slice(startIndex, startIndex + safePageSize);
+    const hasMore = startIndex + safePageSize < sortedRows.length;
+    const nextCursor = hasMore
+      ? String(
+          pageRows[pageRows.length - 1]?.docId ||
+            pageRows[pageRows.length - 1]?.id ||
+            "",
+        )
+      : null;
+
+    return {
+      students: pageRows,
+      hasMore,
+      nextCursor,
+    };
+  }
+
+  try {
+    const projectDocId = codeToDocId(projectId);
+    const studentsListRef = collection(
+      db,
+      STUDENTS_COLLECTION,
+      projectDocId,
+      "students_list",
+    );
+
+    const queryConstraints = [orderBy(documentId())];
+    if (safeCursor) {
+      queryConstraints.push(startAfter(safeCursor));
+    }
+    queryConstraints.push(limit(safePageSize + 1));
+
+    const snapshot = await getDocs(query(studentsListRef, ...queryConstraints));
+    const docs = snapshot.docs;
+    const hasMore = docs.length > safePageSize;
+    const pageDocs = hasMore ? docs.slice(0, safePageSize) : docs;
+
+    const students = pageDocs.map((studentDoc) => ({
+      id: studentDoc.id,
+      docId: studentDoc.id,
+      projectCode: projectId,
+      ...studentDoc.data(),
+    }));
+
+    return {
+      students,
+      hasMore,
+      nextCursor:
+        hasMore && pageDocs.length > 0
+          ? String(pageDocs[pageDocs.length - 1].id)
+          : null,
+    };
+  } catch (error) {
+    console.error("Error getting students by project page:", error);
+    throw error;
+  }
+};
+
+export const getAllStudentsCount = async () => {
+  if (isLocalDbMode()) {
+    const allRows = await localGetAllStudents();
+    return Number(allRows?.length || 0);
+  }
+
+  try {
+    const countSnapshot = await getCountFromServer(
+      collectionGroup(db, "students_list"),
+    );
+    return Number(countSnapshot?.data?.()?.count || 0);
+  } catch (error) {
+    console.error("Error getting all students count:", error);
+    throw error;
+  }
+};
+
+export const getStudentsByProjectCount = async (projectId) => {
+  if (isLocalDbMode()) {
+    const rows = await localGetStudentsByProject(projectId);
+    return Number(rows?.length || 0);
+  }
+
+  try {
+    const projectDocId = codeToDocId(projectId);
+    const studentsListRef = collection(
+      db,
+      STUDENTS_COLLECTION,
+      projectDocId,
+      "students_list",
+    );
+    const countSnapshot = await getCountFromServer(studentsListRef);
+    return Number(countSnapshot?.data?.()?.count || 0);
+  } catch (error) {
+    console.error("Error getting students by project count:", error);
     throw error;
   }
 };

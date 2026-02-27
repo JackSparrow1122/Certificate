@@ -16,6 +16,7 @@ import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { useEffect, useState } from "react";
 import {
   getAllStudents,
+  getAllStudentsCount,
   getStudentsByProject,
 } from "../../../services/studentService";
 import { getAllAdmins } from "../../../services/userService";
@@ -80,11 +81,39 @@ export default function Dashboard() {
   const [certifications, setCertifications] = useState([]);
   const [colleges, setColleges] = useState([]);
   const [projectCodes, setProjectCodes] = useState([]);
+  const [totalStudentsCount, setTotalStudentsCount] = useState(0);
   const [dbMode, setDbModeState] = useState(getDbMode());
+  const [isLayoutResizing, setIsLayoutResizing] = useState(false);
+
+  useEffect(() => {
+    let resizeTimer;
+    const handleResize = () => {
+      setIsLayoutResizing(true);
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        setIsLayoutResizing(false);
+      }, 260);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.clearTimeout(resizeTimer);
+    };
+  }, []);
 
   const loadDashboardData = async () => {
     const requests = [
-      { key: "students", label: "students/students_list", run: getAllStudents },
+      {
+        key: "students",
+        label: "students/students_list",
+        run: () => getAllStudents({ maxDocs: 1500 }),
+      },
+      {
+        key: "totalStudentsCount",
+        label: "students count",
+        run: getAllStudentsCount,
+      },
       { key: "admins", label: "users", run: getAllAdmins },
       { key: "certifications", label: "certificates", run: getAllCertificates },
       { key: "colleges", label: "college", run: getAllColleges },
@@ -97,6 +126,7 @@ export default function Dashboard() {
 
     const nextData = {
       students: [],
+      totalStudentsCount: 0,
       admins: [],
       certifications: [],
       colleges: [],
@@ -128,6 +158,7 @@ export default function Dashboard() {
     });
 
     setStudents(nextData.students);
+    setTotalStudentsCount(Number(nextData.totalStudentsCount || 0));
     setAdmins(nextData.admins);
     setCertifications(nextData.certifications);
     setColleges(nextData.colleges);
@@ -136,8 +167,10 @@ export default function Dashboard() {
     if (nextData.students.length === 0 && nextData.projectCodes.length > 0) {
       try {
         const projectStudentGroups = await Promise.allSettled(
-          nextData.projectCodes.map((projectCodeRow) =>
-            getStudentsByProject(String(projectCodeRow?.code || "").trim()),
+          nextData.projectCodes.slice(0, 25).map((projectCodeRow) =>
+            getStudentsByProject(String(projectCodeRow?.code || "").trim(), {
+              maxDocs: 200,
+            }),
           ),
         );
 
@@ -203,7 +236,10 @@ export default function Dashboard() {
     }
   };
 
-  const totalStudents = students.length;
+  const totalStudents = Math.max(
+    Number(totalStudentsCount || 0),
+    Number(students.length || 0),
+  );
   const totalColleges = colleges.length;
   const activeColleges = colleges.filter(
     (college) => String(college.status || "Active") === "Active",
@@ -352,7 +388,7 @@ export default function Dashboard() {
 
       <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.6fr_1fr]">
         <ChartCard title="Progress Breakdown">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={240} debounce={75}>
             <PieChart>
               <Pie
                 data={progressBuckets}
@@ -360,6 +396,9 @@ export default function Dashboard() {
                 nameKey="bucket"
                 innerRadius={52}
                 outerRadius={82}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
               >
                 {progressBuckets.map((entry, index) => (
                   <Cell
@@ -375,25 +414,39 @@ export default function Dashboard() {
         </ChartCard>
 
         <ChartCard title="Students by Project Code">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={240} debounce={75}>
             <BarChart data={studentsByProject}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="projectId" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip cursor={false} />
-              <Bar dataKey="count" fill={ACCENT_BLUE} radius={[8, 8, 0, 0]} />
+              <Bar
+                dataKey="count"
+                fill={ACCENT_BLUE}
+                radius={[8, 8, 0, 0]}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Organisation Enrollment Mix">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={240} debounce={75}>
             <BarChart data={organizationEnrollmentMix}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="organization" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip cursor={false} />
-              <Bar dataKey="count" fill={SIDEBAR_BLUE} radius={[8, 8, 0, 0]} />
+              <Bar
+                dataKey="count"
+                fill={SIDEBAR_BLUE}
+                radius={[8, 8, 0, 0]}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -401,7 +454,7 @@ export default function Dashboard() {
 
       <section className="mt-5 grid grid-cols-1 gap-5">
         <ChartCard title="Gender Mix">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={240} debounce={75}>
             <PieChart>
               <Pie
                 data={studentsByGender}
@@ -410,7 +463,10 @@ export default function Dashboard() {
                 cx="50%"
                 cy="50%"
                 outerRadius={82}
-                label
+                label={!isLayoutResizing}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
               >
                 {studentsByGender.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />

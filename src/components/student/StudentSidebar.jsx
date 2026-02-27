@@ -83,7 +83,7 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
         </div>
 
         {/* Logo */}
-        <div className="px-4 py-8 border-b border-white/10 flex items-center justify-center">
+        <div className="px-4 py-8 flex items-center justify-center">
           <img
             src={isExpanded ? logo : compactLogo}
             alt="ERP Logo"
