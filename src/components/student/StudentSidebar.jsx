@@ -7,6 +7,8 @@ import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 
+const STUDENT_SIDEBAR_STATE_KEY = "student_sidebar_expanded";
+
 const links = [
   {
     name: "Dashboard",
@@ -18,12 +20,21 @@ const links = [
 
 export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(STUDENT_SIDEBAR_STATE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const { user, role, profile } = useAuth();
   const isExpanded = mobileMenuOpen || expanded;
 
   const studentName =
-    profile?.name || user?.displayName || user?.email?.split("@")[0] || "Student";
+    profile?.name ||
+    user?.displayName ||
+    user?.email?.split("@")[0] ||
+    "Student";
   const roleLabel = role === "student" ? "Student" : "User";
   const studentInitial = studentName.charAt(0).toUpperCase();
 
@@ -39,10 +50,20 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
     navigate("/student/profile");
   };
 
+  const handleMouseEnter = () => {
+    setExpanded(true);
+    localStorage.setItem(STUDENT_SIDEBAR_STATE_KEY, "true");
+  };
+
+  const handleMouseLeave = () => {
+    setExpanded(false);
+    localStorage.setItem(STUDENT_SIDEBAR_STATE_KEY, "false");
+  };
+
   return (
     <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`fixed inset-y-0 left-0 z-40 bg-[#0B2A4A] text-white flex flex-col justify-between transition-all duration-300 ease-in-out
         w-72 -translate-x-full md:translate-x-0 md:sticky md:top-0 md:h-screen md:shrink-0 md:overflow-hidden
         ${mobileMenuOpen ? "translate-x-0" : ""}
@@ -76,22 +97,24 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
         <button
           type="button"
           onClick={handleProfileClick}
-          className={`mt-6 mx-auto flex w-[calc(100%-1.5rem)] items-center transition-all duration-200 ${
+          className={`mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
             isExpanded
-              ? "justify-center gap-3 rounded-2xl border border-white/15 bg-white/12 p-3.5 shadow-sm backdrop-blur-sm hover:bg-white/20"
-              : "justify-center rounded-xl p-2 hover:bg-white/10"
+              ? "rounded-2xl bg-white/12 p-3.5 gap-3 justify-center hover:bg-white/20"
+              : "rounded-xl p-2 justify-center hover:bg-white/10"
           }`}
           title="Open Profile"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-200 text-xl font-bold leading-none text-[#0B2A4A]">
+          <div className="h-11 w-11 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] text-lg font-semibold leading-none flex items-center justify-center">
             {studentInitial}
           </div>
           {isExpanded && (
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-xl font-semibold leading-tight tracking-tight">
+              <p className="truncate text-xl font-semibold leading-tight">
                 {studentName}
               </p>
-              <span className="block truncate text-sm text-white/75">{roleLabel}</span>
+              <span className="block truncate text-sm opacity-80">
+                {roleLabel}
+              </span>
             </div>
           )}
         </button>
@@ -115,7 +138,9 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
                 }
               >
                 <IconComponent size={22} />
-                {isExpanded && <span className="whitespace-nowrap">{link.name}</span>}
+                {isExpanded && (
+                  <span className="whitespace-nowrap">{link.name}</span>
+                )}
               </NavLink>
             );
           })}

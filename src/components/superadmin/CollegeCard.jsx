@@ -6,10 +6,8 @@ export default function CollegeCard({ college, onEdit, onDelete, onOpen }) {
       onClick={() => {
         if (onOpen) onOpen();
       }}
-      className={`relative rounded-2xl border border-transparent bg-gray-200 p-5 shadow transition-all duration-200 ${
-        onOpen
-          ? "cursor-pointer hover:-translate-y-1 hover:border-[#0B2A4A]/20 hover:shadow-lg"
-          : ""
+      className={`relative rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-5 transition ${
+        onOpen ? "cursor-pointer hover:border-[#BCD0E7]" : ""
       }`}
     >
       <div
@@ -19,22 +17,26 @@ export default function CollegeCard({ college, onEdit, onDelete, onOpen }) {
         <CollegeActionsMenu onEdit={onEdit} onDelete={onDelete} />
       </div>
 
-      <div className="bg-white rounded-lg p-2 text-center text-lg mb-4 h-32 flex items-center justify-center overflow-hidden">
+      <div className="mb-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-[#D7E2F1] bg-white p-2 text-center text-lg">
         {college.college_logo ? (
           <img
             src={college.college_logo}
             alt={college.college_name}
-            className="w-full h-full object-contain rounded-lg"
+            className="h-full w-full rounded-lg object-contain"
           />
         ) : (
           "College Logo"
         )}
       </div>
 
-      <p className="text-lg font-medium">{college.college_name}</p>
-      <p className="text-sm text-gray-700 mt-1">
+      <p className="text-lg font-medium text-[#0B2A4A]">
+        {college.college_name}
+      </p>
+      <p className="mt-1 text-sm text-[#415a77]">
         College Code:{" "}
-        <span className="font-medium">{college.college_code}</span>
+        <span className="font-semibold text-[#0B2A4A]">
+          {college.college_code}
+        </span>
       </p>
     </div>
   );

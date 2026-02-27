@@ -15,8 +15,16 @@ import profileImage from "../../assets/image.jpg";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
+const SUPERADMIN_SIDEBAR_STATE_KEY = "superadmin_sidebar_expanded";
+
 export default function Sidebar() {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(SUPERADMIN_SIDEBAR_STATE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const navigate = useNavigate();
   const { user, role, profile } = useAuth();
 
@@ -41,6 +49,16 @@ export default function Sidebar() {
     navigate("/superadmin/profile");
   };
 
+  const handleMouseEnter = () => {
+    setExpanded(true);
+    localStorage.setItem(SUPERADMIN_SIDEBAR_STATE_KEY, "true");
+  };
+
+  const handleMouseLeave = () => {
+    setExpanded(false);
+    localStorage.setItem(SUPERADMIN_SIDEBAR_STATE_KEY, "false");
+  };
+
   const menu = [
     { label: "Dashboard", path: "/superadmin/dashboard", icon: LayoutGrid },
     { label: "Colleges", path: "/superadmin/colleges", icon: GraduationCap },
@@ -60,8 +78,8 @@ export default function Sidebar() {
 
   return (
     <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`${
         expanded ? "w-72" : "w-20"
       } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#0B2A4A] text-white flex flex-col justify-between

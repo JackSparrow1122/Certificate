@@ -57,7 +57,7 @@ export default function StudentModal({ student, onClose }) {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* MODAL */}
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-3xl p-8 z-10 overflow-y-auto max-h-[90vh]">
+      <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
         {/* CLOSE */}
         <button
           onClick={onClose}
@@ -66,38 +66,40 @@ export default function StudentModal({ student, onClose }) {
           ✕
         </button>
 
-        {/* TITLE */}
-        <h2 className="text-2xl font-semibold mb-6">Student Details</h2>
+        <div className="student-modal-scroll mt-12 max-h-[calc(90vh-3rem)] overflow-y-auto px-8 pb-8">
+          {/* TITLE */}
+          <h2 className="text-2xl font-semibold mb-6">Student Details</h2>
 
-        <Section title="Primary Information">
-          {primaryEntries.map(([label, value]) => (
-            <Detail key={label} label={label} value={value} />
+          <Section title="Primary Information">
+            {primaryEntries.map(([label, value]) => (
+              <Detail key={label} label={label} value={value} />
+            ))}
+          </Section>
+
+          {certificateItems.length > 0 && (
+            <Section title="Certificate Status">
+              {certificateItems.map((item) => (
+                <Detail
+                  key={`${item.name}-${item.status}`}
+                  label={item.name}
+                  value={item.status}
+                />
+              ))}
+            </Section>
+          )}
+
+          {nestedSectionEntries.map(({ sectionKey, entries }) => (
+            <Section key={sectionKey} title={toLabel(sectionKey)}>
+              {entries.map(([label, value]) => (
+                <Detail
+                  key={`${sectionKey}-${label}`}
+                  label={toLabel(label)}
+                  value={value}
+                />
+              ))}
+            </Section>
           ))}
-        </Section>
-
-        {certificateItems.length > 0 && (
-          <Section title="Certificate Status">
-            {certificateItems.map((item) => (
-              <Detail
-                key={`${item.name}-${item.status}`}
-                label={item.name}
-                value={item.status}
-              />
-            ))}
-          </Section>
-        )}
-
-        {nestedSectionEntries.map(({ sectionKey, entries }) => (
-          <Section key={sectionKey} title={toLabel(sectionKey)}>
-            {entries.map(([label, value]) => (
-              <Detail
-                key={`${sectionKey}-${label}`}
-                label={toLabel(label)}
-                value={value}
-              />
-            ))}
-          </Section>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -220,7 +222,6 @@ function getCertificateItems(student) {
     .map((result) => ({
       name: String(result?.certificateName || "").trim(),
       status: normalizeStatus(result?.status || result?.result || "enrolled"),
-      isDeleted: Boolean(result?.isDeleted),
     }))
     .filter((item) => item.name);
 
@@ -228,12 +229,8 @@ function getCertificateItems(student) {
     items.push({
       name: String(student.certificate).trim(),
       status: normalizeStatus(student?.certificateStatus || "enrolled"),
-      isDeleted: false,
     });
   }
 
-  return items.map((item) => ({
-    ...item,
-    status: `${item.status} (isDeleted: ${item.isDeleted ? "true" : "false"})`,
-  }));
+  return items;
 }

@@ -292,7 +292,7 @@ export default function AdminDashboard() {
               />
               <XAxis dataKey="course" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Bar dataKey="count" fill="#1D5FA8" radius={[10, 10, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -312,7 +312,7 @@ export default function AdminDashboard() {
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>

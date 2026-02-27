@@ -7,12 +7,20 @@ import logo from "../../assets/logo.png";
 import profileImage from "../../assets/image.jpg";
 import { useAuth } from "../../context/AuthContext";
 
+const COLLEGEADMIN_SIDEBAR_STATE_KEY = "collegeadmin_sidebar_expanded";
+
 export default function CollegeAdminSidebar({
   mobileMenuOpen,
   setMobileMenuOpen,
 }) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(COLLEGEADMIN_SIDEBAR_STATE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const { user, role, profile } = useAuth();
   const isExpanded = mobileMenuOpen || expanded;
 
@@ -29,7 +37,7 @@ export default function CollegeAdminSidebar({
   const links = [
     {
       name: "Dashboard",
-      path: "/college-admin",
+      path: "/college-admin/dashboard",
       end: true,
       icon: LayoutGrid,
     },
@@ -67,10 +75,20 @@ export default function CollegeAdminSidebar({
     navigate("/college-admin/profile");
   };
 
+  const handleMouseEnter = () => {
+    setExpanded(true);
+    localStorage.setItem(COLLEGEADMIN_SIDEBAR_STATE_KEY, "true");
+  };
+
+  const handleMouseLeave = () => {
+    setExpanded(false);
+    localStorage.setItem(COLLEGEADMIN_SIDEBAR_STATE_KEY, "false");
+  };
+
   return (
     <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`fixed inset-y-0 left-0 z-40 bg-[#0B2A4A] text-white flex flex-col justify-between transition-all duration-300 ease-in-out
         w-72 -translate-x-full md:translate-x-0 md:sticky md:top-0 md:h-screen md:shrink-0 md:overflow-hidden
         ${mobileMenuOpen ? "translate-x-0" : ""}

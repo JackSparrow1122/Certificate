@@ -15,6 +15,57 @@ body {
   overflow-x: hidden;
 }
 
+/* Global portal scrollbar (all three portals) */
+* {
+  -ms-overflow-style: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-button:single-button,
+*::-webkit-scrollbar-button:vertical:decrement,
+*::-webkit-scrollbar-button:vertical:increment,
+*::-webkit-scrollbar-button:horizontal:decrement,
+*::-webkit-scrollbar-button:horizontal:increment {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*:hover::-webkit-scrollbar-button:single-button,
+*:hover::-webkit-scrollbar-button:vertical:decrement,
+*:hover::-webkit-scrollbar-button:vertical:increment,
+*:hover::-webkit-scrollbar-button:horizontal:decrement,
+*:hover::-webkit-scrollbar-button:horizontal:increment {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -31,7 +82,9 @@ button:not(aside button) {
 
 button:not(aside button):hover:not(:disabled) {
   transform: translateY(-3px);
-  box-shadow: 0 10px 20px -5px rgba(15, 43, 70, 0.3), 0 8px 10px -6px rgba(15, 43, 70, 0.2) !important;
+  box-shadow:
+    0 10px 20px -5px rgba(15, 43, 70, 0.3),
+    0 8px 10px -6px rgba(15, 43, 70, 0.2) !important;
 }
 
 button:not(aside button):active:not(:disabled) {
@@ -57,7 +110,9 @@ button:not(aside button):active:not(:disabled) {
 .rounded-xl.border:hover,
 .rounded-lg.border:hover {
   transform: translateY(-4px) scale(1.005);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   z-index: 10;
 }
 
@@ -72,7 +127,9 @@ input:focus,
 select:focus,
 textarea:focus {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* 4. Table Rows and List Items */
@@ -101,4 +158,50 @@ a:not(aside a) {
 
 a:not(aside a):hover {
   transform: translateY(-1px);
+}
+
+/* Chart segments: smooth lift effect consistent with global cards */
+.recharts-bar-rectangle path,
+.recharts-pie .recharts-sector {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.recharts-bar-rectangle:hover path,
+.recharts-pie .recharts-sector:hover {
+  transform: translateY(-4px) scale(1.005);
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.18));
+}
+
+/* Minimal chart tooltip */
+.recharts-default-tooltip {
+  border: 1px solid #d7e2f1 !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 8px 18px -8px rgba(11, 42, 74, 0.28) !important;
+  padding: 8px 10px !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-label {
+  margin: 0 0 4px 0 !important;
+  color: #0b2a4a !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item-list {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item {
+  padding: 0 !important;
+  font-size: 12px !important;
+  color: #415a77 !important;
+}
+
+/* Student modal scrollbar */
+.student-modal-scroll {
+  scrollbar-gutter: stable;
 }

@@ -284,129 +284,138 @@ export default function Students() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Students</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
+          Students
+        </h1>
+        <p className="text-sm text-[#415a77]">
           Select project code and certificate to view mapped students
         </p>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-700">
-            Project Code
-          </span>
-          <select
-            value={selectedProjectCode}
-            onChange={(event) => setSelectedProjectCode(event.target.value)}
-            className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors
+      <div className="mb-4 rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#0B2A4A]">
+              Project Code
+            </span>
+            <select
+              value={selectedProjectCode}
+              onChange={(event) => setSelectedProjectCode(event.target.value)}
+              className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors
               ${loadingProjects ? "border-[#D7E2F1]" : "border-[#D7E2F1]"}
               ${!selectedProjectCode && !loadingProjects ? "ring-2 ring-yellow-300 border-yellow-500" : ""}`}
-            disabled={loadingProjects}
-          >
-            <option value="">
-              {loadingProjects
-                ? "Loading project codes..."
-                : "Select project code"}
-            </option>
-            {projectOptions.map((projectOption) => (
-              <option
-                key={projectOption.id}
-                value={String(projectOption.code || "")}
-              >
-                {projectOption.code}
+              disabled={loadingProjects}
+            >
+              <option value="">
+                {loadingProjects
+                  ? "Loading project codes..."
+                  : "Select project code"}
               </option>
-            ))}
-          </select>
-          {!selectedProjectCode && !loadingProjects && (
-            <p className="mt-1 text-xs text-yellow-600">
-              <em>Choose a project code to populate the student list.</em>
-            </p>
-          )}
-        </label>
-
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-gray-700">
-            Certificate
-          </span>
-          <select
-            value={selectedCertificateId}
-            onChange={(event) => setSelectedCertificateId(event.target.value)}
-            className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors border-[#D7E2F1]
-              ${selectedProjectCode && !selectedCertificateId && !loadingStudents ? "ring-2 ring-yellow-300 border-yellow-500" : ""}`}
-            disabled={
-              !selectedProjectCode || loadingStudents || shouldShowAllStudents
-            }
-          >
-            <option value="">
-              {!selectedProjectCode
-                ? "Select project code first"
-                : loadingStudents
-                  ? "Loading certificates..."
-                  : shouldShowAllStudents
-                    ? "No certificates enrolled"
-                    : "Select certificate"}
-            </option>
-            {certificateOptions.map((certificate) => (
-              <option key={certificate.id} value={String(certificate.id || "")}>
-                {certificate.name || certificate.id}
-              </option>
-            ))}
-          </select>
-          {shouldShowAllStudents && (
-            <p className="mt-1 text-xs text-blue-600">
-              <em>
-                No certificates are enrolled for this project code. Showing full
-                student list.
-              </em>
-            </p>
-          )}
-          {selectedProjectCode &&
-            !selectedCertificateId &&
-            !loadingStudents &&
-            !shouldShowAllStudents && (
+              {projectOptions.map((projectOption) => (
+                <option
+                  key={projectOption.id}
+                  value={String(projectOption.code || "")}
+                >
+                  {projectOption.code}
+                </option>
+              ))}
+            </select>
+            {!selectedProjectCode && !loadingProjects && (
               <p className="mt-1 text-xs text-yellow-600">
-                <em>Select a certificate to view the student master list.</em>
+                <em>Choose a project code to populate the student list.</em>
               </p>
             )}
-        </label>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#0B2A4A]">
+              Certificate
+            </span>
+            <select
+              value={selectedCertificateId}
+              onChange={(event) => setSelectedCertificateId(event.target.value)}
+              className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors border-[#D7E2F1]
+              ${selectedProjectCode && !selectedCertificateId && !loadingStudents ? "ring-2 ring-yellow-300 border-yellow-500" : ""}`}
+              disabled={
+                !selectedProjectCode || loadingStudents || shouldShowAllStudents
+              }
+            >
+              <option value="">
+                {!selectedProjectCode
+                  ? "Select project code first"
+                  : loadingStudents
+                    ? "Loading certificates..."
+                    : shouldShowAllStudents
+                      ? "No certificates enrolled"
+                      : "Select certificate"}
+              </option>
+              {certificateOptions.map((certificate) => (
+                <option
+                  key={certificate.id}
+                  value={String(certificate.id || "")}
+                >
+                  {certificate.name || certificate.id}
+                </option>
+              ))}
+            </select>
+            {shouldShowAllStudents && (
+              <p className="mt-1 text-xs text-blue-600">
+                <em>
+                  No certificates are enrolled for this project code. Showing
+                  full student list.
+                </em>
+              </p>
+            )}
+            {selectedProjectCode &&
+              !selectedCertificateId &&
+              !loadingStudents &&
+              !shouldShowAllStudents && (
+                <p className="mt-1 text-xs text-yellow-600">
+                  <em>Select a certificate to view the student master list.</em>
+                </p>
+              )}
+          </label>
+        </div>
       </div>
 
       {selectedProjectCode &&
         (selectedCertificateId || shouldShowAllStudents) && (
-          <div className="bg-white rounded-xl shadow border">
-            <div className="p-6 border-b">
-              <h2 className="text-lg font-semibold">Student Master List</h2>
+          <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+            <div className="mb-2 px-3">
+              <h2 className="text-lg font-semibold text-[#0B2A4A]">
+                Student Master List
+              </h2>
             </div>
 
-            <div className="p-6 overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="overflow-x-auto rounded-xl border border-[#D7E2F1] bg-white">
+              <table className="min-w-full divide-y divide-[#E6EDF6]">
+                <thead className="bg-[#F5F8FD]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Student ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Project Code
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Email Id
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Current Year
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Certificates
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
                       Result Status
                     </th>
                   </tr>
                 </thead>
 
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-[#E6EDF6] bg-white">
                   {(loadingProjects || loadingStudents) && (
                     <tr className="bg-gray-50">
                       <td
@@ -436,13 +445,13 @@ export default function Students() {
                     <tr
                       key={`${student.projectCode || student.projectId || "NA"}-${student.id || student.docId || student.email || student.name}`}
                       onClick={() => setSelectedStudent(student)}
-                      className="hover:bg-gray-100 cursor-pointer transition"
+                      className="cursor-pointer transition hover:bg-gray-50"
                       style={{ pageBreakInside: "avoid", breakInside: "avoid" }}
                     >
-                      <td className="px-6 py-4 wrap-break-word font-medium text-sm text-gray-900">
+                      <td className="wrap-break-word px-6 py-4 text-sm font-medium text-[#0B2A4A]">
                         {student.id}
                       </td>
-                      <td className="px-6 py-4 wrap-break-word text-sm text-gray-900">
+                      <td className="wrap-break-word px-6 py-4 text-sm text-[#0B2A4A]">
                         {student.name}
                       </td>
                       <td
@@ -454,7 +463,7 @@ export default function Students() {
                       >
                         {student.projectCode || "-"}
                       </td>
-                      <td className="px-6 py-4 wrap-break-word text-sm text-gray-900">
+                      <td className="wrap-break-word px-6 py-4 text-sm text-[#0B2A4A]">
                         {student.email}
                       </td>
                       <td className="px-6 py-4 wrap-break-word">
@@ -462,10 +471,10 @@ export default function Students() {
                           {student.currentYear || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 wrap-break-word text-sm text-gray-900">
+                      <td className="wrap-break-word px-6 py-4 text-sm text-[#0B2A4A]">
                         {student.enrolledCertificates || "-"}
                       </td>
-                      <td className="px-6 py-4 wrap-break-word text-sm text-gray-900">
+                      <td className="wrap-break-word px-6 py-4 text-sm text-[#0B2A4A]">
                         {student.certificateStatusSummary || "-"}
                       </td>
                     </tr>

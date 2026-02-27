@@ -204,233 +204,247 @@ export default function CertificateConfig() {
 
   return (
     <SuperAdminLayout>
-      <div className="space-y-6 p-2 sm:p-2 md:p-3 lg:p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">
-            Certifications Configuration
-          </h1>
+      <div className="px-4 py-5 sm:px-5 sm:py-6 lg:px-6">
+        <div className="w-full space-y-5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
+              Certifications Configuration
+            </h1>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefreshEnrolledCounts}
-              disabled={
-                loading || refreshingCounts || certifications.length === 0
-              }
-              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm disabled:opacity-60"
-            >
-              {refreshingCounts
-                ? "Refreshing counts..."
-                : "Refresh Enrolled Counts"}
-            </button>
-            <button
-              onClick={() => setShowAddOrganizationModal(true)}
-              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
-            >
-              + Add New Organisation
-            </button>
-            <button
-              onClick={() => setShowEditOrganizationModal(true)}
-              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
-            >
-              ✏️ Edit Organisation
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm"
-            >
-              + Add New Certificate
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="rounded-md bg-red-100 px-4 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        {successMessage && (
-          <div className="rounded-md bg-green-100 px-4 py-2 text-sm text-green-700">
-            {successMessage}
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-gray-300 rounded-2xl p-6 flex items-end gap-6">
-          {/* Organisation */}
-          <div className="flex-1">
-            <label className="text-sm font-medium">Organisation</label>
-            <select
-              value={filters.platform}
-              onChange={(e) =>
-                setFilters({ ...filters, platform: e.target.value })
-              }
-              className="w-full mt-1 h-9 rounded bg-white px-3"
-            >
-              {platforms.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
+            <div className="flex flex-nowrap items-center gap-1.5">
+              <button
+                onClick={handleRefreshEnrolledCounts}
+                disabled={
+                  loading || refreshingCounts || certifications.length === 0
+                }
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8] disabled:opacity-60"
+              >
+                {refreshingCounts
+                  ? "Refreshing counts..."
+                  : "Refresh Enrolled Counts"}
+              </button>
+              <button
+                onClick={() => setShowAddOrganizationModal(true)}
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+              >
+                + Add New Organisation
+              </button>
+              <button
+                onClick={() => setShowEditOrganizationModal(true)}
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+              >
+                ✏️ Edit Organisation
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+              >
+                + Add New Certificate
+              </button>
+            </div>
           </div>
 
-          {/* Level */}
-          <div className="flex-1">
-            <label className="text-sm font-medium">Level</label>
-            <select
-              value={filters.level}
-              onChange={(e) =>
-                setFilters({ ...filters, level: e.target.value })
-              }
-              className="w-full mt-1 h-9 rounded bg-white px-3"
-            >
-              {levels.map((l) => (
-                <option key={l}>{l}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Domain */}
-          <div className="flex-1">
-            <label className="text-sm font-medium">Domain</label>
-            <select
-              value={filters.domain}
-              onChange={(e) =>
-                setFilters({ ...filters, domain: e.target.value })
-              }
-              className="w-full mt-1 h-9 rounded bg-white px-3"
-            >
-              {domains.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={resetFilters}
-            className="bg-[#0B2A4A] text-white px-5 py-2 rounded-lg"
-          >
-            Reset
-          </button>
-        </div>
-
-        {/* Table Header */}
-        <div className="grid grid-cols-6 text-sm font-semibold px-6">
-          <span>Organisation</span>
-          <span>Certificate Name</span>
-          <span>Domain</span>
-          <span>Exam Code</span>
-          <span>Level</span>
-          <span className="text-right">Enrolled</span>
-        </div>
-
-        {/* Table Body */}
-        <div className="bg-gray-300 rounded-2xl p-6 space-y-4">
-          {loading && (
-            <p className="text-center text-gray-600">
-              Loading certifications...
-            </p>
+          {error && (
+            <div className="rounded-md bg-red-100 px-4 py-2 text-sm text-red-700">
+              {error}
+            </div>
           )}
-          {filteredCertifications.length === 0 && (
-            <p className="text-center text-gray-600">No certifications found</p>
+          {successMessage && (
+            <div className="rounded-md bg-green-100 px-4 py-2 text-sm text-green-700">
+              {successMessage}
+            </div>
           )}
 
-          {filteredCertifications.map((c) => (
-            <div
-              key={c.id}
-              className="bg-white rounded-xl px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 relative"
-            >
-              <div className="grid grid-cols-6 w-full text-sm">
-                <span className="flex items-center gap-2">
-                  {organizationByName.get(
-                    String(c.domain || "")
-                      .trim()
-                      .toLowerCase(),
-                  )?.logoUrl ? (
-                    <img
-                      src={
-                        organizationByName.get(
-                          String(c.domain || "")
-                            .trim()
-                            .toLowerCase(),
-                        )?.logoUrl
-                      }
-                      alt={`${c.domain || "Organisation"} logo`}
-                      className="h-6 w-6 rounded object-contain bg-gray-50 border"
-                    />
-                  ) : null}
-                  <span>{c.domain}</span>
-                </span>
-                <span>{c.name}</span>
-                <span>{c.platform}</span>
-                <span>{c.examCode}</span>
-                <span>{c.level}</span>
-                <span className="text-right">
-                  {c.enrolledCount ?? 0} students
-                </span>
+          {/* Filters */}
+          <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+            <div className="flex flex-wrap items-end gap-4">
+              {/* Organisation */}
+              <div className="w-full min-w-45 flex-1">
+                <label className="text-sm font-medium text-[#0B2A4A]">
+                  Organisation
+                </label>
+                <select
+                  value={filters.platform}
+                  onChange={(e) =>
+                    setFilters({ ...filters, platform: e.target.value })
+                  }
+                  className="mt-2 block h-10 w-full rounded-lg border border-[#CBD8EA] bg-white px-3 text-sm outline-none"
+                >
+                  {platforms.map((p) => (
+                    <option key={p}>{p}</option>
+                  ))}
+                </select>
               </div>
 
+              {/* Level */}
+              <div className="w-full min-w-45 flex-1">
+                <label className="text-sm font-medium text-[#0B2A4A]">
+                  Level
+                </label>
+                <select
+                  value={filters.level}
+                  onChange={(e) =>
+                    setFilters({ ...filters, level: e.target.value })
+                  }
+                  className="mt-2 block h-10 w-full rounded-lg border border-[#CBD8EA] bg-white px-3 text-sm outline-none"
+                >
+                  {levels.map((l) => (
+                    <option key={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Domain */}
+              <div className="w-full min-w-45 flex-1">
+                <label className="text-sm font-medium text-[#0B2A4A]">
+                  Domain
+                </label>
+                <select
+                  value={filters.domain}
+                  onChange={(e) =>
+                    setFilters({ ...filters, domain: e.target.value })
+                  }
+                  className="mt-2 block h-10 w-full rounded-lg border border-[#CBD8EA] bg-white px-3 text-sm outline-none"
+                >
+                  {domains.map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
               <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedCertificate(c);
-                  setOpenMenuId(openMenuId === c.id ? null : c.id);
-                }}
-                className="ml-4 text-gray-600 hover:text-black"
-                title="Manage certificate"
+                onClick={resetFilters}
+                className="ml-auto inline-flex h-10 items-center rounded-lg bg-[#003B7A] px-4 text-sm font-semibold text-white"
               >
-                <Pencil size={16} />
+                Reset
               </button>
-              {openMenuId === c.id && (
-                <div className="absolute right-12 mt-1 w-48 bg-white rounded-xl shadow-lg border z-20">
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setEditingCertificate(c);
-                      setShowAddModal(true);
-                      setOpenMenuId(null);
-                    }}
-                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 border-b"
-                  >
-                    ✏️ Edit Certificate
-                  </button>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedCertificate(c);
-                      setShowDeclareResultModal(true);
-                      setOpenMenuId(null);
-                    }}
-                    className="w-full px-4 py-2 text-sm text-left hover:bg-blue-50 border-b"
-                  >
-                    📋 Declare Result
-                  </button>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedCertificate(c);
-                      setShowEnrollModal(true);
-                      setOpenMenuId(null);
-                    }}
-                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 border-b"
-                  >
-                    🏆 Enroll Project Code
-                  </button>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleSoftDeleteCertificate(c);
-                    }}
-                    disabled={deletingCertificateId === c.id}
-                    className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 disabled:opacity-60"
-                  >
-                    {deletingCertificateId === c.id
-                      ? "Deleting..."
-                      : "🗑️ Soft Delete"}
-                  </button>
-                </div>
-              )}
             </div>
-          ))}
+          </div>
+
+          {/* Table Header */}
+          <div className="mb-2 grid grid-cols-6 px-3 text-sm font-semibold text-[#0B2A4A]">
+            <span>Organisation</span>
+            <span>Certificate Name</span>
+            <span>Domain</span>
+            <span>Exam Code</span>
+            <span>Level</span>
+            <span className="text-right">Enrolled</span>
+          </div>
+
+          {/* Table Body */}
+          <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+            <div className="space-y-2.5">
+              {loading && (
+                <p className="text-center text-gray-600">
+                  Loading certifications...
+                </p>
+              )}
+              {filteredCertifications.length === 0 && (
+                <p className="text-center text-gray-600">
+                  No certifications found
+                </p>
+              )}
+
+              {filteredCertifications.map((c) => (
+                <div
+                  key={c.id}
+                  className="relative flex cursor-pointer items-center justify-between rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
+                >
+                  <div className="grid w-full grid-cols-6 text-sm">
+                    <span className="flex items-center gap-2">
+                      {organizationByName.get(
+                        String(c.domain || "")
+                          .trim()
+                          .toLowerCase(),
+                      )?.logoUrl ? (
+                        <img
+                          src={
+                            organizationByName.get(
+                              String(c.domain || "")
+                                .trim()
+                                .toLowerCase(),
+                            )?.logoUrl
+                          }
+                          alt={`${c.domain || "Organisation"} logo`}
+                          className="h-6 w-6 rounded object-contain bg-gray-50 border"
+                        />
+                      ) : null}
+                      <span>{c.domain}</span>
+                    </span>
+                    <span>{c.name}</span>
+                    <span>{c.platform}</span>
+                    <span>{c.examCode}</span>
+                    <span>{c.level}</span>
+                    <span className="text-right">
+                      {c.enrolledCount ?? 0} students
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSelectedCertificate(c);
+                      setOpenMenuId(openMenuId === c.id ? null : c.id);
+                    }}
+                    className="ml-4 text-gray-600 hover:text-black"
+                    title="Manage certificate"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  {openMenuId === c.id && (
+                    <div className="absolute right-12 mt-1 w-48 bg-white rounded-xl shadow-lg border z-20">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingCertificate(c);
+                          setShowAddModal(true);
+                          setOpenMenuId(null);
+                        }}
+                        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 border-b"
+                      >
+                        ✏️ Edit Certificate
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedCertificate(c);
+                          setShowDeclareResultModal(true);
+                          setOpenMenuId(null);
+                        }}
+                        className="w-full px-4 py-2 text-sm text-left hover:bg-blue-50 border-b"
+                      >
+                        📋 Declare Result
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedCertificate(c);
+                          setShowEnrollModal(true);
+                          setOpenMenuId(null);
+                        }}
+                        className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 border-b"
+                      >
+                        🏆 Enroll Project Code
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleSoftDeleteCertificate(c);
+                        }}
+                        disabled={deletingCertificateId === c.id}
+                        className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        {deletingCertificateId === c.id
+                          ? "Deleting..."
+                          : "🗑️ Soft Delete"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

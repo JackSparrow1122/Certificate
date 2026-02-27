@@ -368,7 +368,7 @@ export default function Dashboard() {
                   />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -380,7 +380,7 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="projectId" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Bar dataKey="count" fill={ACCENT_BLUE} radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -392,7 +392,7 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="organization" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Bar dataKey="count" fill={SIDEBAR_BLUE} radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -416,7 +416,7 @@ export default function Dashboard() {
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip cursor={false} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>

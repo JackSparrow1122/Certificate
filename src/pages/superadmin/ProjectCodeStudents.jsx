@@ -152,7 +152,7 @@ export default function ProjectCodeStudents() {
             </h2>
             <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
               <div className="flex flex-wrap items-end gap-4">
-                <label className="w-full min-w-[180px] flex-1 text-sm font-medium text-[#0B2A4A]">
+                <label className="w-full min-w-45 flex-1 text-sm font-medium text-[#0B2A4A]">
                   Roll No.
                   <input
                     type="text"
@@ -163,7 +163,7 @@ export default function ProjectCodeStudents() {
                     className="mt-2 block h-10 w-full rounded-lg border border-[#CBD8EA] bg-white px-3 text-sm outline-none"
                   />
                 </label>
-                <label className="w-full min-w-[180px] flex-1 text-sm font-medium text-[#0B2A4A]">
+                <label className="w-full min-w-45 flex-1 text-sm font-medium text-[#0B2A4A]">
                   Name
                   <input
                     type="text"
@@ -224,7 +224,7 @@ export default function ProjectCodeStudents() {
                       }
                     }
                   }}
-                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition hover:border-[#BCD0E7]"
+                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
                 >
                   <p className="pointer-events-none justify-self-start text-left font-medium text-[#0B2A4A]">
                     {student.name || "-"}
