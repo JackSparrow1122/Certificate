@@ -129,7 +129,7 @@ export default function StudentDashboard() {
           : {};
 
       const certificateResultEntries = Object.entries(resultMap).filter(
-        ([, entry]) => entry && typeof entry === "object",
+        ([, entry]) => entry && typeof entry === "object" && !entry?.isDeleted,
       );
 
       const legacyCertificateResult =
