@@ -196,6 +196,15 @@ button:not(aside button):active:not(:disabled) {
   z-index: 10;
 }
 
+.student-navbar-card:hover,
+.student-navbar-card:active,
+.student-navbar-card:focus,
+.student-navbar-card:focus-within {
+  transform: none !important;
+  box-shadow: none !important;
+  z-index: auto !important;
+}
+
 /* 3. Inputs, Selects, Textareas */
 input,
 select,
