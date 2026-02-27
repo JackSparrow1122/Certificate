@@ -64,12 +64,14 @@ function CollegeAdminLayout() {
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-[#F3F6FA]">
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/40 md:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+      <div
+        className={`fixed inset-0 z-30 bg-black/40 transition-opacity duration-300 md:hidden ${
+          mobileMenuOpen
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
 
       <CollegeAdminSidebar
         mobileMenuOpen={mobileMenuOpen}

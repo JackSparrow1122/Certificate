@@ -345,6 +345,7 @@ export default function AdminDashboard() {
                 dataKey="count"
                 fill="#1D5FA8"
                 radius={[10, 10, 0, 0]}
+                rootTabIndex={-1}
                 isAnimationActive={!isLayoutResizing}
                 animationDuration={220}
                 animationEasing="ease-out"
@@ -362,6 +363,7 @@ export default function AdminDashboard() {
                 nameKey="name"
                 innerRadius={60}
                 outerRadius={92}
+                rootTabIndex={-1}
                 isAnimationActive={!isLayoutResizing}
                 animationDuration={220}
                 animationEasing="ease-out"
@@ -386,6 +388,7 @@ export default function AdminDashboard() {
                 dataKey="value"
                 nameKey="name"
                 outerRadius={92}
+                rootTabIndex={-1}
                 label={!isLayoutResizing}
                 isAnimationActive={!isLayoutResizing}
                 animationDuration={220}
