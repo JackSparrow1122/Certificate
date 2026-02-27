@@ -154,7 +154,7 @@ export default function Colleges() {
         isOpen={deleteConfirm.isOpen}
         title="Delete College"
         message={`Are you sure you want to delete ${deleteConfirm.college?.college_name}? This action cannot be undone.`}
-        warning="Please contact the IT Team before deleting a college to ensure all associated data has been properly backed up."
+        warning="Please contact the IT Team before deleting a college."
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
         loading={deleteConfirm.loading}
