@@ -1,7 +1,7 @@
 import AdminActionsMenu from "./AdminActionsMenu";
 import { Shield } from "lucide-react";
 
-export default function AdminCard({ admin, onEdit }) {
+export default function AdminCard({ admin, onEdit, onDelete }) {
   const isSuperAdmin = admin.role === "superAdmin";
   const roleBgColor = isSuperAdmin ? "bg-purple-100" : "bg-blue-100";
   const roleTextColor = isSuperAdmin ? "text-purple-600" : "text-blue-600";
@@ -13,7 +13,7 @@ export default function AdminCard({ admin, onEdit }) {
       <div className="absolute top-4 right-4">
         <AdminActionsMenu
           onEdit={() => onEdit(admin)}
-          onDelete={() => alert("Delete " + admin.name)}
+          onDelete={() => onDelete(admin)}
         />
       </div>
 
