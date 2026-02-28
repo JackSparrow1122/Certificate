@@ -15,6 +15,11 @@ body {
   overflow-x: hidden;
 }
 
+/* Certificate carousel – hidden scrollbar */
+.cert-carousel::-webkit-scrollbar {
+  display: none;
+}
+
 /* Global portal scrollbar (all three portals) */
 :where(
   html,
