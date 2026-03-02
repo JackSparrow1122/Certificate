@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import random
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -85,6 +86,12 @@ def random_marks(low: float, high: float) -> float:
     return round(random.uniform(low, high), 2)
 
 
+def generate_unique_email(name: str) -> str:
+    email_local = name.lower().replace(" ", ".")
+    unique_part = uuid.uuid4().hex[:8]  # guaranteed unique
+    return f"{email_local}.{unique_part}@example.com"
+
+
 def build_row(sn_value: str) -> list:
     name = random_name()
     birth = random_birth_date()
@@ -97,8 +104,7 @@ def build_row(sn_value: str) -> list:
     tenth_marks = random_marks(60, 98)
     twelfth_marks = random_marks(55, 97)
 
-    email_local = name.lower().replace(" ", ".")
-    email = f"{email_local}.{sn_value.lower()}@example.com"
+    email = generate_unique_email(name)
 
     graduation_course = random.choice(["B.E.", "B.Tech", "B.Sc", "BCA"])
     graduation_specialization = random.choice(
@@ -107,7 +113,6 @@ def build_row(sn_value: str) -> list:
     graduation_passing_year = twelfth_year + random.randint(3, 4)
     graduation_marks = random_marks(58, 92)
 
-    # Keep diploma/post-grad fields mostly blank so rows stay realistic for mixed profiles.
     diploma_course = ""
     diploma_specialization = ""
     diploma_passing_year = ""
@@ -153,7 +158,11 @@ def write_xlsx(output_path: Path, rows: int, sn_prefix: str, start_number: int) 
     sheet.append(REQUIRED_HEADERS)
 
     for i in range(rows):
-        sn_value = f"{sn_prefix}{start_number + i:04d}" if sn_prefix else str(start_number + i)
+        sn_value = (
+            f"{sn_prefix}{start_number + i:04d}"
+            if sn_prefix
+            else str(start_number + i)
+        )
         sheet.append(build_row(sn_value))
 
     workbook.save(output_path)
