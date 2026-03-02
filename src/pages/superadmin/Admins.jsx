@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AdminCard from "../../components/superadmin/AdminCard";
 import AddAdminModal from "../../components/superadmin/AddAdminModal";
-import { getAllAdmins } from "../../../services/userService";
+import { getAllAdmins, deleteCollegeAdmin as deleteAdmin } from "../../../services/userService";
 import { getCollegeByCode } from "../../../services/collegeService";
 import { useAuth } from "../../context/AuthContext";
 
@@ -57,6 +57,20 @@ export default function Admins() {
 
   const handleEdit = (admin) => {
     setEditingAdmin(admin);
+  };
+
+  const handleDelete = async (admin) => {
+    if (window.confirm(`Are you sure you want to remove access for admin ${admin.name}?`)) {
+      try {
+        setLoading(true);
+        await deleteAdmin(admin.uid);
+        await fetchAdmins();
+      } catch (err) {
+        console.error("Error deleting admin:", err);
+        setError("Failed to delete admin. Please try again.");
+        setLoading(false);
+      }
+    }
   };
 
   // Sort admins based on sortBy criteria
@@ -198,7 +212,7 @@ export default function Admins() {
         {!loading && admins.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedAdmins.map((admin) => (
-              <AdminCard key={admin.uid} admin={admin} onEdit={handleEdit} />
+              <AdminCard key={admin.uid} admin={admin} onEdit={handleEdit} onDelete={handleDelete} />
             ))}
           </div>
         )}
