@@ -59,16 +59,23 @@ export default function AssignCertificateModal({
         return;
       }
 
-      // Extract rows
+      // Extract rows — a single EXAM_CODE cell may contain multiple codes
+      // separated by commas, e.g. "AZ-900, SC-900, DP-900"
       const extracted = [];
       rows.forEach((row) => {
         const email = String(row[emailKey] || "")
           .trim()
           .toLowerCase();
-        const examCode = String(row[examCodeKey] || "").trim();
-        if (email && examCode) {
-          extracted.push({ email, examCode });
-        }
+        const rawCodes = String(row[examCodeKey] || "").trim();
+        if (!email || !rawCodes) return;
+
+        rawCodes
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean)
+          .forEach((examCode) => {
+            extracted.push({ email, examCode });
+          });
       });
 
       if (extracted.length === 0) {
