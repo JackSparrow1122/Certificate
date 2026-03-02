@@ -14,26 +14,32 @@ import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 
+// Extract current year from the 3rd segment of a project code like "COLLEGE/BATCH/YEAR"
+function getCurrentYearFromProjectCode(projectCode) {
+  const parts = String(projectCode || "")
+    .split("/")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return parts.length >= 3 ? parts[2] : "";
+}
+
 // Helper function to extract display fields from nested student data
-function extractStudentDisplayData(student) {
+function extractStudentDisplayData(student, projectCodeStr) {
   const enrollmentStatus = student.enrollmentStatus || null;
   // _enrollments = all certificate enrollments for this student (when no cert filter)
   const allEnrollments = Array.isArray(student._enrollments)
     ? student._enrollments
     : [];
+  const official = student.OFFICIAL_DETAILS || {};
   return {
     id: student.id,
     docId: student.docId || student.id,
-    name: student.OFFICIAL_DETAILS?.["FULL NAME OF STUDENT"] || "-",
-    dob: student.OFFICIAL_DETAILS?.["BIRTH DATE"] || "-",
-    tenthPercentage: student.TENTH_DETAILS?.["10th OVERALL MARKS %"] || "-",
-    twelfthOrDiplomaPercentage:
-      student.TWELFTH_DETAILS?.["12th OVERALL MARKS %"] ||
-      student.DIPLOMA_DETAILS?.["DIPLOMA OVERALL MARKS %"] ||
+    name: official["FULL NAME OF STUDENT"] || "-",
+    email:
+      student.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
+    currentYear:
+      getCurrentYearFromProjectCode(projectCodeStr || student.projectCode) ||
       "-",
-    ugPercentage:
-      student.GRADUATION_DETAILS?.["GRADUATION OVERALL MARKS %"] || "-",
-    pgPercentage: student.POST_GRADUATION_DETAILS?.["OVERALL MARKS %"] || "-",
     enrollmentStatus,
     allEnrollments,
   };
@@ -220,7 +226,7 @@ export default function ProjectCodeStudents() {
   };
 
   const filteredStudents = students
-    .map(extractStudentDisplayData)
+    .map((s) => extractStudentDisplayData(s, projectCode?.code))
     .filter((student) => {
       const rollNo = String(student.id || "");
       const name = String(student.name || "");
@@ -313,14 +319,11 @@ export default function ProjectCodeStudents() {
           </section>
 
           <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
-            <div className="mb-2 grid grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_1.5fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
-              <p>Student Name</p>
-              <p>Roll No.</p>
-              <p>DOB</p>
-              <p>10th %tage</p>
-              <p>12th/Diploma %tage</p>
-              <p>UG %tage</p>
-              <p>PG %tage</p>
+            <div className="mb-2 grid grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
+              <p>Student ID</p>
+              <p>Name</p>
+              <p>Email ID</p>
+              <p>Current Year</p>
               <p>Result Status</p>
               <p />
             </div>
@@ -353,17 +356,18 @@ export default function ProjectCodeStudents() {
                       }
                     }
                   }}
-                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_1.5fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
+                  className="grid cursor-pointer grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
                 >
                   <p className="pointer-events-none justify-self-start text-left font-medium text-[#0B2A4A]">
-                    {student.name || "-"}
+                    {student.id || "-"}
                   </p>
-                  <p>{student.id || "-"}</p>
-                  <p>{student.dob || "-"}</p>
-                  <p>{student.tenthPercentage ?? "-"}</p>
-                  <p>{student.twelfthOrDiplomaPercentage ?? "-"}</p>
-                  <p>{student.ugPercentage ?? "-"}</p>
-                  <p>{student.pgPercentage ?? "-"}</p>
+                  <p>{student.name || "-"}</p>
+                  <p className="truncate">{student.email || "-"}</p>
+                  <p>
+                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
+                      {student.currentYear || "-"}
+                    </span>
+                  </p>
                   <div>
                     {certificateId && student.enrollmentStatus ? (
                       <span
