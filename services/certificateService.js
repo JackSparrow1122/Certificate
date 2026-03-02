@@ -387,6 +387,35 @@ export const enrollStudentsIntoCertificate = async ({
 // Uses collectionGroup index on certificate_enrollments.projectCode (deployed)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Get distinct project codes that have at least one enrollment for a cert
+// Single collectionGroup query — replaces N+1 pattern in DeclareResultModal
+// ---------------------------------------------------------------------------
+
+export const getEnrolledProjectCodesForCertificate = async (certificateId) => {
+  if (isLocalDbMode()) return [];
+  try {
+    const q = query(
+      collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
+      where("certificateId", "==", String(certificateId || "").trim()),
+    );
+    const snapshot = await getDocs(q);
+    const codes = new Set();
+    snapshot.forEach((d) => {
+      if (d.data().isDeleted === true) return;
+      const pc = String(d.data().projectCode || "").trim();
+      if (pc) codes.add(pc);
+    });
+    return Array.from(codes).sort();
+  } catch (error) {
+    console.error(
+      "Error getting enrolled project codes for certificate:",
+      error,
+    );
+    throw error;
+  }
+};
+
 export const getCertificatesForProjectCode = async (projectCode) => {
   try {
     const normalizedProjectCode = String(projectCode || "").trim();
@@ -616,37 +645,24 @@ export const declareResultsForCertificate = async ({
 
     for (const projectCode of projectCodes) {
       const normalizedProjectCode = String(projectCode).trim();
-      const projectDocId = codeToDocId(normalizedProjectCode);
 
-      const studentsList = collection(
-        db,
-        STUDENTS_COLLECTION,
-        projectDocId,
-        "students_list",
+      // Query only the enrolled students for this cert+project — no full scan
+      const enrollmentsQuery = query(
+        collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
+        where("certificateId", "==", certificateId),
+        where("projectCode", "==", normalizedProjectCode),
       );
-      const studentsSnapshot = await getDocs(studentsList);
+      const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
 
-      for (const studentDoc of studentsSnapshot.docs) {
-        const studentData = studentDoc.data();
-        const studentEmail = String(
-          studentData.OFFICIAL_DETAILS?.["EMAIL_ID"] || studentData.email || "",
-        )
+      enrollmentsSnapshot.forEach((enrollmentDoc) => {
+        const enrollmentData = enrollmentDoc.data();
+        if (enrollmentData.isDeleted === true) return;
+
+        const studentEmail = String(enrollmentData.email || "")
           .trim()
           .toLowerCase();
 
-        const enrollmentRef = doc(
-          db,
-          STUDENTS_COLLECTION,
-          projectDocId,
-          "students_list",
-          studentDoc.id,
-          CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
-          certificateId,
-        );
-        const enrollmentSnap = await getDoc(enrollmentRef);
-
-        if (!enrollmentSnap.exists()) continue;
-
+        // Determine status: use emailStatusMap if email present, else defaultStatus
         let status = defaultStatus;
         if (studentEmail && emailStatusMap.has(studentEmail)) {
           status = emailStatusMap.get(studentEmail) || defaultStatus;
@@ -654,7 +670,7 @@ export const declareResultsForCertificate = async ({
 
         ops.push({
           type: "update",
-          ref: enrollmentRef,
+          ref: enrollmentDoc.ref,
           data: {
             status,
             resultDeclaredAt: new Date(),
@@ -663,7 +679,7 @@ export const declareResultsForCertificate = async ({
         });
 
         status === "passed" ? passedCount++ : failedCount++;
-      }
+      });
     }
 
     await commitInChunks(ops);

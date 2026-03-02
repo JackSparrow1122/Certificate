@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { read, utils } from "xlsx";
 import {
-  getCertificatesForProjectCode,
+  getEnrolledProjectCodesForCertificate,
   declareResultsForCertificate,
 } from "../../../services/certificateService";
-import { getAllProjectCodesFromStudents } from "../../../services/studentService";
 
 export default function DeclareResultModal({
   certificate,
@@ -25,25 +24,11 @@ export default function DeclareResultModal({
       setLoading(true);
       setError(null);
       try {
-        // Get all project codes from the students collection, then filter to
-        // those that have at least one student enrolled in this certificate.
-        const allProjectCodes = await getAllProjectCodesFromStudents();
-        // For each project code, check if the certificate has enrollments
-        // We'll use a lighter approach: query certificate_enrollments collectionGroup
-        const { getCertificatesForProjectCode: getCertsForPC } =
-          await import("../../../services/certificateService");
-
-        const codesWithCert = [];
-        for (const pc of allProjectCodes) {
-          const certs = await getCertsForPC(pc);
-          if (certs.some((c) => c.id === certificate.id)) {
-            codesWithCert.push(pc);
-          }
-        }
-
-        setProjectCodes(codesWithCert);
-
-        if (codesWithCert.length === 0) {
+        const codes = await getEnrolledProjectCodesForCertificate(
+          certificate.id,
+        );
+        setProjectCodes(codes);
+        if (codes.length === 0) {
           setError(
             "No project codes have students enrolled in this certificate",
           );
