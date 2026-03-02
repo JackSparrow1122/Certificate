@@ -27,6 +27,9 @@ const SuperAdminProjectCodes = lazy(
 const CollegeProjectCodes = lazy(
   () => import("./pages/superadmin/CollegeProjectCodes"),
 );
+const ProjectCodeCertificates = lazy(
+  () => import("./pages/superadmin/ProjectCodeCertificates"),
+);
 const ProjectCodeStudents = lazy(
   () => import("./pages/superadmin/ProjectCodeStudents"),
 );
@@ -49,7 +52,6 @@ const ProjectStudents = lazy(
   () => import("./pages/college-admin/ProjectStudents"),
 );
 const Certificates = lazy(() => import("./pages/college-admin/Certificates"));
-const Exams = lazy(() => import("./pages/college-admin/Exams"));
 const CollegeAdminHelp = lazy(() => import("./pages/college-admin/Help"));
 const CollegeAdminProfile = lazy(() => import("./pages/college-admin/Profile"));
 
@@ -125,6 +127,10 @@ export default function App() {
               element={<CollegeProjectCodes />}
             />
             <Route
+              path="project-codes/:projectId/certificates"
+              element={<ProjectCodeCertificates />}
+            />
+            <Route
               path="project-codes/:projectId/students"
               element={<ProjectCodeStudents />}
             />
@@ -173,7 +179,6 @@ export default function App() {
             <Route path="students/:studentId" element={<StudentDetails />} />
             <Route path="projects/:projectId" element={<ProjectStudents />} />
             <Route path="certificates" element={<Certificates />} />
-            <Route path="exams" element={<Exams />} />
             <Route path="help" element={<CollegeAdminHelp />} />
             <Route path="profile" element={<CollegeAdminProfile />} />
           </Route>

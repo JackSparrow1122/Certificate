@@ -61,7 +61,7 @@ const toDisplayStudent = (student) => {
       student?.fullName ||
       "-",
     email:
-      student?.email || official["EMAIL ID"] || official["EMAIL ID."] || "-",
+      student?.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
     currentYear:
       currentYearFromCode ||
       student?.currentYear ||

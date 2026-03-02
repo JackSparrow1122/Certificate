@@ -10,6 +10,11 @@ import {
   getCollegeByCode,
 } from "../../../services/collegeService";
 import {
+  cacheAgeLabel,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -67,6 +72,7 @@ export default function AdminDashboard() {
   const [collegeInfo, setCollegeInfo] = useState({ name: "", logo: "" });
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState({ cachedAt: 0, isStale: false });
 
   useEffect(() => {
     let resizeTimer;
@@ -87,6 +93,20 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     let mounted = true;
+    const CA_CACHE_KEY = `college_admin_dashboard_${collegeCode}`;
+
+    // Hydrate from cache immediately — prevents blank graphs on reconnect
+    const cached = getCached(CA_CACHE_KEY);
+    if (cached?.data && collegeCode) {
+      const d = cached.data;
+      setStudents(d.students || []);
+      setProjects(d.projects || []);
+      setProjectStudentCounts(d.projectStudentCounts || {});
+      setCertifications(d.certifications || []);
+      setCollegeInfo(d.collegeInfo || { name: "", logo: "" });
+      setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
+    }
+
     const load = async () => {
       try {
         if (!collegeCode) {
@@ -188,7 +208,7 @@ export default function AdminDashboard() {
         setProjects(normalizedProjects);
         setProjectStudentCounts(countsByProject);
         setCertifications(Array.from(certificateNames));
-        setCollegeInfo({
+        const newCollegeInfo = {
           name: String(
             college?.college_name || profile?.collegeName || collegeCode || "",
           ).trim(),
@@ -198,15 +218,22 @@ export default function AdminDashboard() {
               college?.logo ||
               "",
           ),
-        });
+        };
+        setCollegeInfo(newCollegeInfo);
         setLogoLoadFailed(false);
+
+        // Write fresh data to cache
+        setCached(CA_CACHE_KEY, {
+          students: studentsForCollege,
+          projects: normalizedProjects,
+          projectStudentCounts: countsByProject,
+          certifications: Array.from(certificateNames),
+          collegeInfo: newCollegeInfo,
+        });
+        setCacheInfo({ cachedAt: Date.now(), isStale: false });
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
-        if (!mounted) return;
-        setStudents([]);
-        setProjects([]);
-        setProjectStudentCounts({});
-        setCertifications([]);
+        // Do NOT zero out state here — cached values stay visible when offline
       }
     };
     load();
@@ -295,6 +322,12 @@ export default function AdminDashboard() {
             <p className="mt-1 text-sm text-gray-600">
               Monitor enrollments, performance trends, and certification health.
             </p>
+            {cacheInfo.cachedAt > 0 && (
+              <p className="mt-1 text-xs text-gray-400">
+                {cacheInfo.isStale ? "⚠\uFE0F " : ""}Last updated:{" "}
+                {cacheAgeLabel(cacheInfo.cachedAt)}
+              </p>
+            )}
           </div>
           <div className="hidden md:flex md:items-center">
             {collegeInfo.logo && !logoLoadFailed ? (

@@ -29,6 +29,12 @@ import {
   getDbMode,
   setDbMode,
 } from "../../../services/dbModeService";
+import {
+  cacheAgeLabel,
+  clearAllDashboardCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 const SIDEBAR_BLUE = "#0B2A4A";
 const ACCENT_BLUE = "#1D5FA8";
@@ -76,6 +82,8 @@ const isCollegeAdminRole = (roleValue) => {
 };
 
 export default function Dashboard() {
+  const SA_CACHE_KEY = "superadmin_dashboard";
+
   const [students, setStudents] = useState([]);
   const [admins, setAdmins] = useState([]);
   const [certifications, setCertifications] = useState([]);
@@ -84,6 +92,7 @@ export default function Dashboard() {
   const [totalStudentsCount, setTotalStudentsCount] = useState(0);
   const [dbMode, setDbModeState] = useState(getDbMode());
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState({ cachedAt: 0, isStale: false });
 
   useEffect(() => {
     let resizeTimer;
@@ -126,19 +135,15 @@ export default function Dashboard() {
       requests.map((request) => request.run()),
     );
 
-    const nextData = {
-      students: [],
-      totalStudentsCount: 0,
-      admins: [],
-      certifications: [],
-      colleges: [],
-      projectCodes: [],
-    };
+    // Only collect keys where the fetch actually succeeded
+    const freshData = {};
+    let anyFulfilled = false;
 
     settled.forEach((result, index) => {
       const request = requests[index];
       if (result.status === "fulfilled") {
-        nextData[request.key] = result.value || [];
+        freshData[request.key] = result.value ?? [];
+        anyFulfilled = true;
         return;
       }
 
@@ -159,17 +164,44 @@ export default function Dashboard() {
       }
     });
 
-    setStudents(nextData.students);
-    setTotalStudentsCount(Number(nextData.totalStudentsCount || 0));
-    setAdmins(nextData.admins);
-    setCertifications(nextData.certifications);
-    setColleges(nextData.colleges);
-    setProjectCodes(nextData.projectCodes);
+    // Completely offline — preserve whatever cache-hydrated state is already showing
+    if (!anyFulfilled) return;
 
-    if (nextData.students.length === 0 && nextData.projectCodes.length > 0) {
+    // Apply only successfully fetched keys; cached values for failed keys stay intact
+    if ("students" in freshData) setStudents(freshData.students);
+    if ("totalStudentsCount" in freshData)
+      setTotalStudentsCount(Number(freshData.totalStudentsCount || 0));
+    if ("admins" in freshData) setAdmins(freshData.admins);
+    if ("certifications" in freshData)
+      setCertifications(freshData.certifications);
+    if ("colleges" in freshData) setColleges(freshData.colleges);
+    if ("projectCodes" in freshData) setProjectCodes(freshData.projectCodes);
+
+    // Write to cache when we got all core keys (not partial/degraded)
+    const allCoreFetched =
+      "students" in freshData &&
+      "totalStudentsCount" in freshData &&
+      "colleges" in freshData &&
+      "projectCodes" in freshData;
+    if (allCoreFetched) {
+      setCached(SA_CACHE_KEY, {
+        students: freshData.students,
+        totalStudentsCount: freshData.totalStudentsCount,
+        admins: freshData.admins ?? [],
+        certifications: freshData.certifications ?? [],
+        colleges: freshData.colleges,
+        projectCodes: freshData.projectCodes,
+      });
+      setCacheInfo({ cachedAt: Date.now(), isStale: false });
+    }
+
+    const nextProjectCodes = freshData.projectCodes ?? [];
+    const nextStudents = freshData.students ?? [];
+
+    if (nextStudents.length === 0 && nextProjectCodes.length > 0) {
       try {
         const projectStudentGroups = await Promise.allSettled(
-          nextData.projectCodes.slice(0, 15).map((projectCodeRow) =>
+          nextProjectCodes.slice(0, 15).map((projectCodeRow) =>
             getStudentsByProject(String(projectCodeRow?.code || "").trim(), {
               maxDocs: 200,
             }),
@@ -199,9 +231,23 @@ export default function Dashboard() {
   useEffect(() => {
     let mounted = true;
 
+    // Hydrate from cache immediately so graphs are never blank on reconnect
+    const cached = getCached(SA_CACHE_KEY);
+    if (cached?.data) {
+      const d = cached.data;
+      setStudents(d.students || []);
+      setTotalStudentsCount(Number(d.totalStudentsCount || 0));
+      setAdmins(d.admins || []);
+      setCertifications(d.certifications || []);
+      setColleges(d.colleges || []);
+      setProjectCodes(d.projectCodes || []);
+      setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
+    }
+
     const handleDbModeChange = (event) => {
       const mode = event?.detail?.mode || getDbMode();
       setDbModeState(mode);
+      clearAllDashboardCache();
       if (!mounted) return;
       loadDashboardData();
     };
@@ -345,7 +391,13 @@ export default function Dashboard() {
 
   return (
     <SuperAdminLayout>
-      <section className="mb-4 flex justify-end gap-2">
+      <section className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        {cacheInfo.cachedAt > 0 && (
+          <span className="mr-auto text-xs text-gray-400">
+            {cacheInfo.isStale ? "⚠\uFE0F " : ""}Last updated:{" "}
+            {cacheAgeLabel(cacheInfo.cachedAt)}
+          </span>
+        )}
         <button
           type="button"
           onClick={handleResetLocalDb}

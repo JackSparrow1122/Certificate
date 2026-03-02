@@ -1,22 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { getStudentsByProject } from "../../../services/studentService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
-import { getCertificatesByIds } from "../../../services/certificateService";
+import {
+  getAllCertificates,
+  getCertificateEnrollmentStatsByProject,
+} from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
-
-const getResultStatus = (value) => {
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase();
-  if (["passed", "pass", "completed", "certified"].includes(normalized)) {
-    return "passed";
-  }
-  if (["failed", "fail"].includes(normalized)) {
-    return "failed";
-  }
-  return "enrolled";
-};
 
 export default function Certificates() {
   const { profile } = useAuth();
@@ -25,7 +14,9 @@ export default function Certificates() {
   )
     .trim()
     .toUpperCase();
-  const [students, setStudents] = useState([]);
+  // Map<certId, { id, name, examCode, enrolledCount, passedCount, failedCount }>
+  // aggregated from the lightweight certificate_enrollments subcollection
+  const [certStatsMap, setCertStatsMap] = useState(new Map());
   const [certifications, setCertifications] = useState([]);
   const [organizations, setOrganizations] = useState([]);
 
@@ -35,58 +26,56 @@ export default function Certificates() {
       try {
         if (!collegeCode) {
           if (!mounted) return;
-          setStudents([]);
+          setCertStatsMap(new Map());
           return;
         }
 
         const projects = await getProjectCodesByCollege(collegeCode);
-        const studentGroups = await Promise.all(
-          (projects || []).map((project) =>
-            getStudentsByProject(String(project?.code || "").trim()),
-          ),
-        );
-        const s = studentGroups.flatMap((group) => group || []);
-        const certificateIds = [
-          ...new Set(
-            (s || []).flatMap((student) => {
-              const fromArray = Array.isArray(student?.certificateIds)
-                ? student.certificateIds
-                : [];
-              const fromResults =
-                student?.certificateResults &&
-                typeof student.certificateResults === "object"
-                  ? Object.keys(student.certificateResults)
-                  : [];
-              return [...fromArray, ...fromResults]
-                .map((id) => String(id || "").trim())
-                .filter(Boolean);
-            }),
-          ),
-        ];
-        let c = [];
-        if (certificateIds.length > 0) {
-          try {
-            c = await getCertificatesByIds(certificateIds);
-          } catch (certificateError) {
-            console.warn(
-              "Unable to fetch certificate metadata; falling back to student result data:",
-              certificateError,
-            );
-          }
-        }
+        const projectCodes = (projects || [])
+          .map((p) => String(p?.code || "").trim())
+          .filter(Boolean);
 
-        let orgRows = [];
-        try {
-          orgRows = await getAllOrganizations();
-        } catch (organizationError) {
-          console.warn(
-            "Unable to fetch organization metadata; proceeding with certificate data only:",
-            organizationError,
-          );
-        }
+        // Run all three fetches in parallel:
+        // 1. Enrollment stats per project code (lightweight subcollection docs)
+        // 2. Full certificate metadata for enrichment
+        // 3. Organization metadata
+        const [perProjectStats, allCerts, orgRows] = await Promise.all([
+          Promise.all(
+            projectCodes.map((code) =>
+              getCertificateEnrollmentStatsByProject(code).catch((err) => {
+                console.warn(`Cert stats failed for ${code}:`, err);
+                return new Map();
+              }),
+            ),
+          ),
+          getAllCertificates().catch((err) => {
+            console.warn("Unable to fetch certificate metadata:", err);
+            return [];
+          }),
+          getAllOrganizations().catch((err) => {
+            console.warn("Unable to fetch organization metadata:", err);
+            return [];
+          }),
+        ]);
+
+        // Merge per-project stats into one map, accumulating counts
+        const merged = new Map();
+        perProjectStats.forEach((statsMap) => {
+          statsMap.forEach((stat, certId) => {
+            const existing = merged.get(certId);
+            if (!existing) {
+              merged.set(certId, { ...stat });
+            } else {
+              existing.enrolledCount += stat.enrolledCount;
+              existing.passedCount += stat.passedCount;
+              existing.failedCount += stat.failedCount;
+            }
+          });
+        });
+
         if (!mounted) return;
-        setStudents(s || []);
-        setCertifications(c || []);
+        setCertStatsMap(merged);
+        setCertifications(allCerts || []);
         setOrganizations(orgRows || []);
       } catch (error) {
         console.error("Failed to load certificate data:", error);
@@ -100,137 +89,47 @@ export default function Certificates() {
 
   const certificateRows = useMemo(() => {
     const metaById = new Map(
-      (certifications || []).map((certificate) => [
-        String(certificate?.id || "").trim(),
-        certificate,
-      ]),
-    );
-    const metaByName = new Map(
-      (certifications || []).map((certificate) => [
-        String(certificate?.name || "")
-          .trim()
-          .toLowerCase(),
-        certificate,
+      (certifications || []).map((cert) => [
+        String(cert?.id || "").trim(),
+        cert,
       ]),
     );
     const organizationByName = new Map(
       (organizations || [])
-        .filter((organization) => String(organization?.name || "").trim())
-        .map((organization) => [
-          String(organization.name || "")
+        .filter((org) => String(org?.name || "").trim())
+        .map((org) => [
+          String(org.name || "")
             .trim()
             .toLowerCase(),
-          organization,
+          org,
         ]),
     );
-    const byCertificate = new Map();
 
-    (students || []).forEach((student) => {
-      const results =
-        student?.certificateResults &&
-        typeof student.certificateResults === "object"
-          ? Object.values(student.certificateResults).filter(
-              (r) => !r?.isDeleted,
-            )
-          : [];
-
-      if (results.length > 0) {
-        results.forEach((result, index) => {
-          const name = String(result?.certificateName || "").trim();
-          if (!name) return;
-
-          const key =
-            String(result?.certificateId || "").trim() ||
-            `name:${name.toLowerCase()}`;
-          const metadata =
-            (result?.certificateId &&
-              metaById.get(String(result.certificateId).trim())) ||
-            metaByName.get(name.toLowerCase()) ||
-            null;
-          const current = byCertificate.get(key) || {
-            id: key,
-            name,
-            domain:
-              String(metadata?.platform || "").trim() ||
-              String(result?.platform || "").trim() ||
-              "-",
-            organization:
-              String(metadata?.domain || "").trim() ||
-              String(result?.domain || "").trim() ||
-              "-",
-            examCode:
-              String(metadata?.examCode || "").trim() ||
-              String(result?.examCode || "").trim() ||
-              "-",
-            level:
-              String(metadata?.level || "").trim() ||
-              String(result?.level || "").trim() ||
-              "-",
-            enrolledCount: 0,
-            passedCount: 0,
-            failedCount: 0,
-          };
-
-          current.enrolledCount += 1;
-          const resultStatus = getResultStatus(
-            result?.status || result?.result,
-          );
-          if (resultStatus === "passed") current.passedCount += 1;
-          if (resultStatus === "failed") current.failedCount += 1;
-          const orgLookupKey = String(current.organization || "")
-            .trim()
-            .toLowerCase();
-          const matchedOrganization =
-            orgLookupKey && organizationByName.get(orgLookupKey)
-              ? organizationByName.get(orgLookupKey)
-              : null;
-          if (matchedOrganization?.name) {
-            current.organization = String(matchedOrganization.name).trim();
-          }
-          if (index === 0) {
-            current.domain = current.domain || "-";
-            current.organization = current.organization || "-";
-            current.examCode = current.examCode || "-";
-            current.level = current.level || "-";
-          }
-          byCertificate.set(key, current);
-        });
-        return;
-      }
-
-      const legacyName = String(student?.certificate || "").trim();
-      if (!legacyName) return;
-      const key = `name:${legacyName.toLowerCase()}`;
-      const metadata = metaByName.get(legacyName.toLowerCase()) || null;
-      const current = byCertificate.get(key) || {
-        id: key,
-        name: legacyName,
-        domain: String(metadata?.platform || "").trim() || "-",
-        organization: String(metadata?.domain || "").trim() || "-",
-        examCode: String(metadata?.examCode || "").trim() || "-",
-        level: String(metadata?.level || "").trim() || "-",
-        enrolledCount: 0,
-        passedCount: 0,
-        failedCount: 0,
-      };
-      current.enrolledCount += 1;
-      const orgLookupKey = String(current.organization || "")
-        .trim()
-        .toLowerCase();
-      const matchedOrganization =
-        orgLookupKey && organizationByName.get(orgLookupKey)
-          ? organizationByName.get(orgLookupKey)
-          : null;
-      if (matchedOrganization?.name) {
-        current.organization = String(matchedOrganization.name).trim();
-      }
-      byCertificate.set(key, current);
-    });
-
-    return Array.from(byCertificate.values()).sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || "")),
-    );
-  }, [students, certifications, organizations]);
+    return Array.from(certStatsMap.values())
+      .map((stat) => {
+        const meta = metaById.get(stat.id) || null;
+        const rawOrg = String(meta?.domain || "").trim() || "-";
+        const orgLookupKey = rawOrg.toLowerCase();
+        const matchedOrg =
+          orgLookupKey && orgLookupKey !== "-"
+            ? organizationByName.get(orgLookupKey)
+            : null;
+        return {
+          id: stat.id,
+          name: String(meta?.name || stat.name || "").trim() || stat.id,
+          domain: String(meta?.platform || "").trim() || "-",
+          organization: matchedOrg?.name
+            ? String(matchedOrg.name).trim()
+            : rawOrg,
+          examCode: String(meta?.examCode || stat.examCode || "").trim() || "-",
+          level: String(meta?.level || "").trim() || "-",
+          enrolledCount: stat.enrolledCount,
+          passedCount: stat.passedCount,
+          failedCount: stat.failedCount,
+        };
+      })
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+  }, [certStatsMap, certifications, organizations]);
 
   const totalEnrolled = certificateRows.reduce(
     (sum, row) => sum + row.enrolledCount,

@@ -9,8 +9,6 @@ import {
   query,
   where,
   setDoc,
-  writeBatch,
-  increment,
   collectionGroup,
   documentId,
   limit,
@@ -36,9 +34,6 @@ import {
 } from "./localDbService";
 
 const STUDENTS_COLLECTION = "students";
-const CERTIFICATES_COLLECTION = "certificates";
-const CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION =
-  "certificateProjectEnrollments";
 const DEFAULT_PROJECT_STUDENTS_LIMIT = 5000;
 const DEFAULT_ALL_STUDENTS_LIMIT = 10000;
 const DEFAULT_PROJECT_STUDENTS_PAGE_SIZE = 50;
@@ -49,50 +44,6 @@ export const addStudent = async (studentData) => {
     return localAddStudent(studentData);
   }
   try {
-    const enrollmentMappingsQuery = query(
-      collection(db, CERTIFICATE_PROJECT_ENROLLMENTS_COLLECTION),
-      where("projectCode", "==", studentData.projectId),
-    );
-    const enrollmentMappingsSnapshot = await getDocs(enrollmentMappingsQuery);
-
-    const certificateIds = [
-      ...new Set(
-        enrollmentMappingsSnapshot.docs
-          .map((enrollmentDoc) => enrollmentDoc.data().certificateId)
-          .filter(Boolean),
-      ),
-    ];
-
-    const certificateDocs = await Promise.all(
-      certificateIds.map((certificateId) =>
-        getDoc(doc(db, CERTIFICATES_COLLECTION, certificateId)),
-      ),
-    );
-
-    const certificateNames = certificateDocs
-      .map((certificateDoc) =>
-        certificateDoc.exists() ? certificateDoc.data().name : "",
-      )
-      .filter(Boolean);
-
-    const certificateResults = certificateIds.reduce(
-      (acc, certificateId, index) => {
-        const certificateName = certificateNames[index] || "";
-        if (!certificateName) {
-          return acc;
-        }
-
-        acc[certificateId] = {
-          certificateId,
-          certificateName,
-          status: "enrolled",
-          updatedAt: new Date(),
-        };
-        return acc;
-      },
-      {},
-    );
-
     const projectDocId = codeToDocId(studentData.projectId);
     const projectRef = doc(db, STUDENTS_COLLECTION, projectDocId);
     await setDoc(
@@ -120,17 +71,14 @@ export const addStudent = async (studentData) => {
       gender: studentData.gender,
       dob: studentData.dob,
       projectId: studentData.projectId,
+      projectCode: studentData.projectId,
       courseYear: studentData.courseYear || "",
       collegeCode: studentData.collegeCode || "",
       course: studentData.course || "",
       semesterLabel: studentData.semesterLabel || "",
       trainingType: studentData.trainingType || "",
       currentSession: studentData.currentSession || "",
-      certificateIds,
-      enrolledCertificates: certificateNames.filter(Boolean),
-      certificate: certificateNames[0] || studentData.certificate || "",
-      certificateStatus: certificateIds.length > 0 ? "enrolled" : "",
-      certificateResults,
+      uid: studentData.uid || "",
       progress: studentData.progress || "0%",
       exams: studentData.exams || "0 / 0",
       tenthPercentage: studentData.tenthPercentage,
@@ -145,7 +93,7 @@ export const addStudent = async (studentData) => {
       OFFICIAL_DETAILS: {
         SN: String(studentData.id || ""),
         "FULL NAME OF STUDENT": studentData.name || "",
-        "EMAIL ID": studentData.email || "",
+        "EMAIL_ID": studentData.email || "",
         "MOBILE NO.": studentData.phone || "",
         "BIRTH DATE": studentData.dob || "",
         GENDER: studentData.gender || "",
@@ -157,16 +105,6 @@ export const addStudent = async (studentData) => {
         "12th OVERALL MARKS %": studentData.twelfthPercentage,
       },
     });
-
-    if (certificateIds.length > 0) {
-      const batch = writeBatch(db);
-      certificateIds.forEach((certificateId) => {
-        batch.update(doc(db, CERTIFICATES_COLLECTION, certificateId), {
-          enrolledCount: increment(1),
-        });
-      });
-      await batch.commit();
-    }
 
     console.log("Student added with ID:", studentData.id);
     return String(studentData.id);
@@ -541,7 +479,7 @@ export const getStudentByEmail = async (email) => {
       getDocs(
         query(
           collectionGroup(db, "students_list"),
-          where(new FieldPath("OFFICIAL_DETAILS", "EMAIL ID"), "==", rawEmail),
+          where(new FieldPath("OFFICIAL_DETAILS", "EMAIL_ID"), "==", rawEmail),
           limit(1),
         ),
       ),
@@ -572,10 +510,10 @@ export const getStudentByEmail = async (email) => {
       }
     }
 
-    // Fallback: try the legacy "EMAIL ID." field path
+    // Fallback: try the legacy "EMAIL_ID." field path
     const byOfficialEmailDotQuery = query(
       collectionGroup(db, "students_list"),
-      where(new FieldPath("OFFICIAL_DETAILS", "EMAIL ID."), "==", rawEmail),
+      where(new FieldPath("OFFICIAL_DETAILS", "EMAIL_ID."), "==", rawEmail),
       limit(1),
     );
     const officialEmailDotSnapshot = await getDocs(byOfficialEmailDotQuery);

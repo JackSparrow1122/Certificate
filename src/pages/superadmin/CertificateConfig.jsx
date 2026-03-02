@@ -3,7 +3,6 @@ import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { Pencil } from "lucide-react";
 import AddCertificateModal from "../../components/superadmin/AddCertificateModal";
 import AddOrganizationModal from "../../components/superadmin/AddOrganizationModal";
-import EnrollProjectCodeModal from "../../components/superadmin/EnrollProjectCodeModal";
 import DeclareResultModal from "../../components/superadmin/DeclareResultModal";
 import {
   getAllCertificates,
@@ -29,7 +28,7 @@ export default function CertificateConfig() {
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [showDeclareResultModal, setShowDeclareResultModal] = useState(false);
-  const [showEnrollModal, setShowEnrollModal] = useState(false);
+
   const [deletingCertificateId, setDeletingCertificateId] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const menuRef = useRef(null);
@@ -125,12 +124,6 @@ export default function CertificateConfig() {
     setSuccessMessage(
       "Certificate created. Click the certificate row to assign project codes.",
     );
-    setTimeout(() => setSuccessMessage(""), 3000);
-  };
-
-  const handleEnrolled = async () => {
-    await fetchData();
-    setSuccessMessage("Project code enrolled. Matching students were updated.");
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
@@ -448,20 +441,6 @@ export default function CertificateConfig() {
                             </span>
                             Declare Result
                           </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedCertificate(c);
-                              setShowEnrollModal(true);
-                              setOpenMenuId(null);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-[#F0F5FF]"
-                          >
-                            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E9EEF5] text-base">
-                              🏆
-                            </span>
-                            Enroll Project Code
-                          </button>
                           <div className="mx-3 my-1 border-t border-[#E9EEF5]" />
                           <button
                             onClick={(event) => {
@@ -524,20 +503,6 @@ export default function CertificateConfig() {
           onOrganizationUpdated={() => {
             setShowEditOrganizationModal(false);
             handleOrganizationUpdated();
-          }}
-        />
-      )}
-
-      {showEnrollModal && selectedCertificate && (
-        <EnrollProjectCodeModal
-          certificate={selectedCertificate}
-          projectCodes={projectCodes}
-          onClose={() => {
-            setShowEnrollModal(false);
-            setSelectedCertificate(null);
-          }}
-          onEnrolled={() => {
-            handleEnrolled();
           }}
         />
       )}

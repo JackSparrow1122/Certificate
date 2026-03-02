@@ -101,7 +101,7 @@ export default function StudentProfile() {
   const gender = officialDetails.GENDER || student?.gender || "-";
   const dob = officialDetails["BIRTH DATE"] || student?.dob || "-";
 
-  const email = officialDetails["EMAIL ID"] || student?.email || "-";
+  const email = officialDetails["EMAIL_ID"] || student?.email || "-";
   const phone = officialDetails["MOBILE NO."] || student?.phone || "-";
   const hometown = officialDetails.HOMETOWN || "-";
   const passingYear =

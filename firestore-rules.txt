@@ -48,8 +48,8 @@ service cloud.firestore {
 
     function sameAuthEmailFromStudentDoc(studentData) {
       return sameAuthEmail(studentData.email) ||
-        sameAuthEmail(studentData.OFFICIAL_DETAILS["EMAIL ID"]) ||
-        sameAuthEmail(studentData.OFFICIAL_DETAILS["EMAIL ID."]);
+        sameAuthEmail(studentData.OFFICIAL_DETAILS["EMAIL_ID"]) ||
+        sameAuthEmail(studentData.OFFICIAL_DETAILS["EMAIL_ID."]);
     }
 
     function projectDocBelongsToRequester(projectDocId) {
@@ -98,12 +98,8 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
-    match /certificateProjectEnrollments/{enrollmentId} {
-      allow read: if isSuperAdmin() ||
-        (isCollegeAdmin() &&
-          projectCodeBelongsToRequester(resource.data.projectCode));
-      allow create, update, delete: if isSuperAdmin();
-    }
+    // certificateProjectEnrollments collection REMOVED — replaced by
+    // students/{projectDocId}/students_list/{studentId}/certificate_enrollments/{certId}
 
     match /certificates/{certificateId} {
       allow read: if isSignedIn();
@@ -126,6 +122,16 @@ service cloud.firestore {
             studentBelongsToRequester(resource.data, projectDocId)) ||
           sameAuthEmailFromStudentDoc(resource.data);
         allow create, update, delete: if isSuperAdmin();
+
+        match /certificate_enrollments/{certEnrollmentId} {
+          allow read: if isSuperAdmin() ||
+            (isCollegeAdmin() &&
+              projectDocBelongsToRequester(projectDocId)) ||
+            sameAuthEmailFromStudentDoc(
+              get(/databases/$(database)/documents/students/$(projectDocId)/students_list/$(studentId)).data
+            );
+          allow create, update, delete: if isSuperAdmin();
+        }
       }
     }
 

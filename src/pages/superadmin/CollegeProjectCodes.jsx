@@ -121,8 +121,8 @@ export default function CollegeProjectCodes() {
     return matchesCode && matchesCourse && matchesYear && matchesType;
   });
 
-  const openStudentList = (projectId) => {
-    navigate(`/superadmin/project-codes/${projectId}/students`);
+  const openCertificateList = (projectId) => {
+    navigate(`/superadmin/project-codes/${projectId}/certificates`);
   };
 
   const handleSoftDeleteProjectCode = async () => {
@@ -290,7 +290,7 @@ export default function CollegeProjectCodes() {
                   key={row.id}
                   onClick={() => {
                     setSelectedProjectCode(row.id);
-                    openStudentList(row.id);
+                    openCertificateList(row.id);
                   }}
                   className={`grid w-full cursor-pointer grid-cols-[2fr_1.2fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition hover:border-[#BCD0E7] ${
                     selectedProjectCode === row.id

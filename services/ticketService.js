@@ -113,28 +113,40 @@ export const getHelpTickets = async ({ role, uid, email } = {}) => {
   if (normalizedRole === "collegeadmin") {
     const filteredCollection = collection(db, HELP_TICKETS_COLLECTION);
 
+    // Run uid and email queries in parallel and merge, avoids sequential fallback
+    const queries = [];
     if (normalizedUid) {
-      const uidSnapshot = await getDocs(
-        query(filteredCollection, where("createdByUid", "==", normalizedUid)),
-      );
-      return sortTicketsDesc(
-        uidSnapshot.docs.map((docSnap) => normalizeTicket(docSnap)),
-      );
-    }
-
-    if (normalizedEmail) {
-      const emailSnapshot = await getDocs(
-        query(
-          filteredCollection,
-          where("createdByEmail", "==", normalizedEmail),
+      queries.push(
+        getDocs(
+          query(filteredCollection, where("createdByUid", "==", normalizedUid)),
         ),
       );
-      return sortTicketsDesc(
-        emailSnapshot.docs.map((docSnap) => normalizeTicket(docSnap)),
+    }
+    if (normalizedEmail) {
+      queries.push(
+        getDocs(
+          query(
+            filteredCollection,
+            where("createdByEmail", "==", normalizedEmail),
+          ),
+        ),
       );
     }
 
-    return [];
+    if (queries.length === 0) return [];
+
+    const snapshots = await Promise.all(queries);
+    const seenIds = new Set();
+    const tickets = [];
+    snapshots.forEach((snap) => {
+      snap.docs.forEach((docSnap) => {
+        if (!seenIds.has(docSnap.id)) {
+          seenIds.add(docSnap.id);
+          tickets.push(normalizeTicket(docSnap));
+        }
+      });
+    });
+    return sortTicketsDesc(tickets);
   }
 
   const snapshot = await getDocs(

@@ -5,7 +5,10 @@ import {
   getStudentByDocId,
   getStudentByProjectAndId,
 } from "../../../services/studentService";
-import { getCertificatesByIds } from "../../../services/certificateService";
+import {
+  getCertificatesByIds,
+  getStudentCertificateHistory,
+} from "../../../services/certificateService";
 
 const toCanonicalKey = (label) =>
   String(label || "")
@@ -79,25 +82,58 @@ export default function StudentCertificateProgress() {
 
       setStudent(studentData);
 
-      const certificateIds = Array.isArray(studentData.certificateIds)
-        ? studentData.certificateIds
-        : [];
-      if (certificateIds.length === 0) {
-        setCertificates([]);
-      } else {
+      // Use UID-based multi-year certificate history if available,
+      // otherwise fall back to legacy certificateIds array.
+      const uid = studentData.uid || "";
+      if (uid) {
         try {
-          const enrolledCertificates =
-            await getCertificatesByIds(certificateIds);
-          setCertificates(enrolledCertificates);
-        } catch (certificateError) {
-          console.error(
-            "Failed to load certificates for student:",
-            certificateError,
+          const enrollments = await getStudentCertificateHistory(uid);
+          // enrollments = [{certificateId, certificateName, status, projectCode, ...}]
+          setCertificates(
+            enrollments.map((e) => ({
+              id: e.certificateId || e.id,
+              name: e.certificateName || "",
+              examCode: e.examCode || "",
+              platform: e.platform || "",
+              status: e.status || "enrolled",
+              projectCode: e.projectCode || "",
+              enrolledAt: e.enrolledAt,
+            })),
           );
+        } catch (certErr) {
+          console.error("Failed to load certificate history:", certErr);
           setCertificates([]);
           setCertificateWarning(
-            "Student profile loaded, but certificate details could not be loaded.",
+            "Student profile loaded, but certificate history could not be loaded.",
           );
+        }
+      } else {
+        // Legacy fallback — use certificateIds if present
+        const certificateIds = Array.isArray(studentData.certificateIds)
+          ? studentData.certificateIds
+          : [];
+        if (certificateIds.length === 0) {
+          setCertificates([]);
+        } else {
+          try {
+            const enrolledCertificates =
+              await getCertificatesByIds(certificateIds);
+            setCertificates(
+              enrolledCertificates.map((c) => ({
+                ...c,
+                status: "enrolled",
+              })),
+            );
+          } catch (certificateError) {
+            console.error(
+              "Failed to load certificates for student:",
+              certificateError,
+            );
+            setCertificates([]);
+            setCertificateWarning(
+              "Student profile loaded, but certificate details could not be loaded.",
+            );
+          }
         }
       }
     } catch (fetchError) {
@@ -160,7 +196,7 @@ export default function StudentCertificateProgress() {
                   officialDetails["BIRTH DATE"] || student?.dob || "-";
 
                 const email =
-                  officialDetails["EMAIL ID"] || student?.email || "-";
+                  officialDetails["EMAIL_ID"] || student?.email || "-";
                 const phone =
                   officialDetails["MOBILE NO."] || student?.phone || "-";
                 const hometown = officialDetails.HOMETOWN || "-";
@@ -280,46 +316,32 @@ export default function StudentCertificateProgress() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {certificates.map((certificate) =>
-                      // Prefer per-certificate status map; fallback to legacy single result field.
-                      (() => {
-                        const statusFromMap =
-                          student.certificateResults?.[certificate.id]?.status;
-                        const statusFromLegacy =
-                          student.certificateResult?.certificateId ===
-                          certificate.id
-                            ? student.certificateResult?.status
-                            : null;
-                        const status =
-                          statusFromMap ||
-                          statusFromLegacy ||
-                          (Array.isArray(student.certificateIds) &&
-                          student.certificateIds.includes(certificate.id)
-                            ? "enrolled"
-                            : "-");
+                    {certificates.map((certificate) => {
+                      const status = certificate.status || "enrolled";
 
-                        return (
-                          <div
-                            key={certificate.id}
-                            className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr] gap-4 rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] px-4 py-3"
-                          >
-                            <p className="font-medium text-gray-900">
-                              {certificate.name || "-"}
-                            </p>
-                            <p className="text-gray-800">
-                              {certificate.platform || "-"}
-                            </p>
-                            <p className="text-gray-800 capitalize">{status}</p>
-                            <p className="text-gray-800">
-                              {student.progress || "0%"}
-                            </p>
-                            <p className="text-gray-800">
-                              {student.exams || "0 / 0"}
-                            </p>
-                          </div>
-                        );
-                      })(),
-                    )}
+                      return (
+                        <div
+                          key={certificate.id}
+                          className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr] gap-4 rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] px-4 py-3"
+                        >
+                          <p className="font-medium text-gray-900">
+                            {certificate.name || "-"}
+                          </p>
+                          <p className="text-gray-800">
+                            {certificate.platform ||
+                              certificate.examCode ||
+                              "-"}
+                          </p>
+                          <p className="text-gray-800 capitalize">{status}</p>
+                          <p className="text-gray-800">
+                            {certificate.projectCode || "-"}
+                          </p>
+                          <p className="text-gray-800">
+                            {certificate.examCode || "-"}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </section>

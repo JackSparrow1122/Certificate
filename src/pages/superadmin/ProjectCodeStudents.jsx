@@ -1,10 +1,11 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getProjectCodeById } from "../../../services/projectCodeService";
 import {
   getStudentsByProject,
   updateStudent,
 } from "../../../services/studentService";
+import { getStudentsByCertificateInProject } from "../../../services/certificateService";
 import { Pencil, RotateCcw } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
@@ -31,6 +32,8 @@ function extractStudentDisplayData(student) {
 export default function ProjectCodeStudents() {
   const navigate = useNavigate();
   const { projectId } = useParams();
+  const location = useLocation();
+  const certificateId = location.state?.certificateId || null;
   const [projectCode, setProjectCode] = useState(null);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,12 +51,11 @@ export default function ProjectCodeStudents() {
 
   useEffect(() => {
     fetchData();
-  }, [projectId]);
+  }, [projectId, certificateId]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      // First get the project code details
       const projectData = await getProjectCodeById(projectId);
       if (!projectData) {
         setError("Project code not found");
@@ -61,12 +63,20 @@ export default function ProjectCodeStudents() {
       }
       setProjectCode(projectData);
 
-      // Then get students for this project code
-      const studentsData = await getStudentsByProject(projectData.code);
+      // If a certificateId filter is present, fetch only enrolled students
+      let studentsData;
+      if (certificateId) {
+        studentsData = await getStudentsByCertificateInProject(
+          certificateId,
+          projectData.code,
+        );
+      } else {
+        studentsData = await getStudentsByProject(projectData.code);
+      }
       setStudents(studentsData);
-    } catch (error) {
+    } catch (err) {
       setError("Failed to load data");
-      console.error(error);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -110,7 +120,7 @@ export default function ProjectCodeStudents() {
     setEditingStudent(raw);
     setEditForm({
       fullName: raw.OFFICIAL_DETAILS?.["FULL NAME OF STUDENT"] || "",
-      email: raw.OFFICIAL_DETAILS?.["EMAIL ID"] || "",
+      email: raw.OFFICIAL_DETAILS?.["EMAIL_ID"] || "",
       mobile: raw.OFFICIAL_DETAILS?.["MOBILE NO."] || "",
       dob: raw.OFFICIAL_DETAILS?.["BIRTH DATE"] || "",
       gender: raw.OFFICIAL_DETAILS?.["GENDER"] || "",
@@ -145,7 +155,7 @@ export default function ProjectCodeStudents() {
         OFFICIAL_DETAILS: {
           ...editingStudent.OFFICIAL_DETAILS,
           "FULL NAME OF STUDENT": editForm.fullName,
-          "EMAIL ID": editForm.email,
+          "EMAIL_ID": editForm.email,
           "MOBILE NO.": editForm.mobile,
           "BIRTH DATE": editForm.dob,
           GENDER: editForm.gender,
@@ -212,15 +222,20 @@ export default function ProjectCodeStudents() {
                 type="button"
                 onClick={() =>
                   navigate(
-                    `/superadmin/colleges/${projectCode?.collegeId || ""}/project-codes`,
+                    `/superadmin/project-codes/${projectId}/certificates`,
                   )
                 }
                 className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
               >
-                ← Back to Project Codes
+                ← Back to Certificates
               </button>
               <h1 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
                 Students List
+                {certificateId && (
+                  <span className="ml-2 text-lg text-gray-500 font-normal">
+                    (filtered by certificate)
+                  </span>
+                )}
               </h1>
             </div>
             <div className="flex gap-3">
