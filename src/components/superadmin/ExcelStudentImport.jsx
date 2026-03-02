@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { db } from "../../firebase/config";
-import { writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import {
+  writeBatch,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { codeToDocId } from "../../utils/projectCodeUtils";
 import { getStudentsByProject } from "../../../services/studentService";
 import { createStudentAuthUser } from "../../../services/userService";
@@ -8,7 +13,7 @@ import { createStudentAuthUser } from "../../../services/userService";
 const REQUIRED_HEADERS = [
   "SN",
   "FULL NAME OF STUDENT",
-  "EMAIL ID",
+  "EMAIL_ID",
   "MOBILE NO.",
   "BIRTH DATE",
   "GENDER",
@@ -36,6 +41,29 @@ function normalizeHeader(h) {
     .trim()
     .replace(/\s+/g, " ")
     .toUpperCase();
+}
+
+// After building a headerMap, alias legacy column names to their current equivalents.
+// Handles Excel/CSV files still exported with "EMAIL ID" (space) as the column header.
+function applyHeaderAliases(headerMap) {
+  if (headerMap["EMAIL ID"] && !headerMap["EMAIL_ID"]) {
+    headerMap["EMAIL_ID"] = headerMap["EMAIL ID"];
+  }
+  if (headerMap["EMAIL ID."] && !headerMap["EMAIL_ID."]) {
+    headerMap["EMAIL_ID."] = headerMap["EMAIL ID."];
+  }
+  return headerMap;
+}
+
+// Allow "EMAIL ID" (legacy) to count as satisfying the "EMAIL_ID" requirement.
+function resolveHeadersForValidation(normalizedHeaders) {
+  if (
+    normalizedHeaders.includes("EMAIL ID") &&
+    !normalizedHeaders.includes("EMAIL_ID")
+  ) {
+    return [...normalizedHeaders, "EMAIL_ID"];
+  }
+  return normalizedHeaders;
 }
 
 function buildNested(obj, keyMap) {
@@ -75,7 +103,9 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
           throw new Error("CSV is empty");
         }
 
-        const headers = Object.keys(rows[0]).map(normalizeHeader);
+        const headers = resolveHeadersForValidation(
+          Object.keys(rows[0]).map(normalizeHeader),
+        );
         const missing = REQUIRED_HEADERS.filter(
           (h) => !headers.includes(normalizeHeader(h)),
         );
@@ -91,6 +121,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         Object.keys(rows[0]).forEach((orig) => {
           headerMap[normalizeHeader(orig)] = orig;
         });
+        applyHeaderAliases(headerMap);
 
         await processRows(
           rows,
@@ -145,7 +176,9 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
           throw new Error("Excel is empty");
         }
 
-        const headers = Object.keys(rows[0]).map(normalizeHeader);
+        const headers = resolveHeadersForValidation(
+          Object.keys(rows[0]).map(normalizeHeader),
+        );
         const missing = REQUIRED_HEADERS.filter(
           (h) => !headers.includes(normalizeHeader(h)),
         );
@@ -162,6 +195,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         Object.keys(rows[0]).forEach((orig) => {
           headerMap[normalizeHeader(orig)] = orig;
         });
+        applyHeaderAliases(headerMap);
 
         // Duplicate detection before importing (email & phone)
         await detectAndImport({
@@ -184,11 +218,15 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       headerCells.forEach((orig) => {
         headerMap[normalizeHeader(orig)] = orig;
       });
+      applyHeaderAliases(headerMap);
 
       // Check for missing columns
+      const resolvedMapKeys = resolveHeadersForValidation(
+        Object.keys(headerMap),
+      );
       const missing = REQUIRED_HEADERS.filter(
         (h) =>
-          !Object.keys(headerMap).some(
+          !resolvedMapKeys.some(
             (key) => normalizeHeader(key) === normalizeHeader(h),
           ),
       );
@@ -237,7 +275,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
   }) {
     try {
       // Primary keys
-      const emailKey = headerMap[normalizeHeader("EMAIL ID")] || "EMAIL ID";
+      const emailKey = headerMap[normalizeHeader("EMAIL_ID")] || "EMAIL_ID";
       const phoneKey = headerMap[normalizeHeader("MOBILE NO.")] || "MOBILE NO.";
       const nameKey =
         headerMap[normalizeHeader("FULL NAME OF STUDENT")] ||
@@ -250,10 +288,10 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       try {
         if (projectCode) {
           const existing = await getStudentsByProject(projectCode, {
-            maxDocs: 5000,
+            maxDocs: 1500,
           });
           existing.forEach((s) => {
-            const e = s.OFFICIAL_DETAILS?.["EMAIL ID"] || s.email || null;
+            const e = s.OFFICIAL_DETAILS?.["EMAIL_ID"] || s.email || null;
             const p = s.OFFICIAL_DETAILS?.["MOBILE NO."] || s.phone || null;
             if (e) existingEmails.add(String(e).trim().toLowerCase());
             if (p) existingPhones.add(String(p).trim());
@@ -627,7 +665,7 @@ async function processRows(
               SN: headerMap["SN"] || "SN",
               "FULL NAME OF STUDENT":
                 headerMap["FULL NAME OF STUDENT"] || "FULL NAME OF STUDENT",
-              "EMAIL ID": headerMap["EMAIL ID"] || "EMAIL ID",
+              EMAIL_ID: headerMap["EMAIL_ID"] || "EMAIL_ID",
               "MOBILE NO.": headerMap["MOBILE NO."] || "MOBILE NO.",
               "BIRTH DATE": headerMap["BIRTH DATE"] || "BIRTH DATE",
               GENDER: headerMap["GENDER"] || "GENDER",
@@ -717,8 +755,8 @@ async function processRows(
                   ? String(official["FULL NAME OF STUDENT"])
                   : "",
               email:
-                official && official["EMAIL ID"]
-                  ? String(official["EMAIL ID"]).trim().toLowerCase()
+                official && official["EMAIL_ID"]
+                  ? String(official["EMAIL_ID"]).trim().toLowerCase()
                   : "",
               mobile: official ? official["MOBILE NO."] : "",
               projectCode,
@@ -751,6 +789,23 @@ async function processRows(
               authSkippedExistingCount++;
             } else {
               authCreatedCount++;
+            }
+            // Write UID back to student doc in students_list
+            const uid = result.value?.uid;
+            if (uid && student.studentId) {
+              const studentDocRef = doc(
+                db,
+                "students",
+                projectDocId,
+                "students_list",
+                student.studentId,
+              );
+              updateDoc(studentDocRef, { uid }).catch((err) =>
+                console.warn(
+                  `Failed to write UID for student ${student.studentId}:`,
+                  err,
+                ),
+              );
             }
             return;
           }

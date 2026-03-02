@@ -413,7 +413,7 @@ export const localAddStudent = async (studentData) =>
       OFFICIAL_DETAILS: {
         SN: studentId,
         "FULL NAME OF STUDENT": studentData.name || "",
-        "EMAIL ID": studentData.email || "",
+        "EMAIL_ID": studentData.email || "",
         "MOBILE NO.": studentData.phone || "",
         "BIRTH DATE": studentData.dob || "",
         GENDER: studentData.gender || "",

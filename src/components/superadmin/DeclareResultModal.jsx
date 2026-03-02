@@ -1,15 +1,9 @@
 import { useState, useEffect } from "react";
 import { read, utils } from "xlsx";
-import { db } from "../../firebase/config";
 import {
-  collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-} from "firebase/firestore";
-import { codeToDocId } from "../../utils/projectCodeUtils";
-import { unassignProjectCodeFromCertificate } from "../../../services/certificateService";
+  getEnrolledProjectCodesForCertificate,
+  declareResultsForCertificate,
+} from "../../../services/certificateService";
 
 export default function DeclareResultModal({
   certificate,
@@ -24,22 +18,20 @@ export default function DeclareResultModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch enrolled project codes on mount
+  // Fetch project codes that have students enrolled in this certificate
   useEffect(() => {
     const fetchEnrolledProjectCodes = async () => {
       setLoading(true);
       setError(null);
       try {
-        const enrollmentsQuery = query(
-          collection(db, "certificateProjectEnrollments"),
-          where("certificateId", "==", certificate.id),
+        const codes = await getEnrolledProjectCodesForCertificate(
+          certificate.id,
         );
-        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-        const codes = enrollmentsSnapshot.docs.map((d) => d.data().projectCode);
         setProjectCodes(codes);
-
         if (codes.length === 0) {
-          setError("No project codes enrolled for this certificate");
+          setError(
+            "No project codes have students enrolled in this certificate",
+          );
         }
       } catch (err) {
         setError("Failed to fetch enrolled project codes");
@@ -131,7 +123,7 @@ export default function DeclareResultModal({
     }
   };
 
-  // Step 3: Process results - match emails and update students
+  // Step 3: Process results — use certificate_enrollments subcollection
   const handleDeclareResult = async () => {
     if (selectedProjectCodes.length === 0) {
       setError("Select at least one project code");
@@ -147,99 +139,28 @@ export default function DeclareResultModal({
     setError(null);
 
     try {
-      const BATCH_CHUNK_SIZE = 400;
-      const ops = [];
-      let passedCount = 0;
-      let failedCount = 0;
-
-      // Process each selected project code
-      for (const projectCode of selectedProjectCodes) {
-        const projectDocId = codeToDocId(projectCode);
-
-        // Fetch students in this project
-        const studentsList = collection(
-          db,
-          "students",
-          projectDocId,
-          "students_list",
-        );
-        const studentsSnapshot = await getDocs(studentsList);
-
-        studentsSnapshot.forEach((studentDoc) => {
-          const student = studentDoc.data();
-          const email = student.OFFICIAL_DETAILS?.["EMAIL ID"] || student.email;
-          const normalizedEmail = email
-            ? String(email).trim().toLowerCase()
-            : null;
-
-          // Determine pass/fail status
-          let status = "failed"; // default
-          if (normalizedEmail && excelData.emailMap.has(normalizedEmail)) {
-            if (excelData.hasStatus) {
-              // Use status from Excel
-              status = excelData.emailMap.get(normalizedEmail) || "failed";
-            } else {
-              // Only email provided - mark as passed if in list
-              status = "passed";
-            }
-          }
-
-          ops.push({
-            ref: studentDoc.ref,
-            data: {
-              certificateStatus: status,
-              certificateResult: {
-                certificateId: certificate.id,
-                certificateName: certificate.name,
-                status,
-                isDeleted: false,
-                declaredAt: new Date(),
-              },
-              certificateResults: {
-                ...(student.certificateResults &&
-                typeof student.certificateResults === "object"
-                  ? student.certificateResults
-                  : {}),
-                [certificate.id]: {
-                  certificateId: certificate.id,
-                  certificateName: certificate.name,
-                  status,
-                  isDeleted: false,
-                  declaredAt: new Date(),
-                },
-              },
-              updatedAt: new Date(),
-            },
-          });
-
-          status === "passed" ? passedCount++ : failedCount++;
-        });
-      }
-
-      // Commit in chunks of BATCH_CHUNK_SIZE
-      for (let i = 0; i < ops.length; i += BATCH_CHUNK_SIZE) {
-        const chunk = ops.slice(i, i + BATCH_CHUNK_SIZE);
-        const batch = writeBatch(db);
-        for (const op of chunk) {
-          batch.update(op.ref, op.data);
+      // Build emailStatusMap for the service function
+      const emailStatusMap = new Map();
+      for (const [email, status] of excelData.emailMap.entries()) {
+        if (excelData.hasStatus) {
+          emailStatusMap.set(email, status || "failed");
+        } else {
+          // email present = passed
+          emailStatusMap.set(email, "passed");
         }
-        await batch.commit();
       }
 
-      await Promise.all(
-        selectedProjectCodes.map((projectCode) =>
-          unassignProjectCodeFromCertificate({
-            certificateId: certificate.id,
-            certificateName: certificate.name,
-            projectCode,
-            preserveStudentCertificateData: true,
-          }),
-        ),
-      );
+      const result = await declareResultsForCertificate({
+        certificateId: certificate.id,
+        certificateName: certificate.name,
+        projectCodes: selectedProjectCodes,
+        emailStatusMap,
+        defaultStatus: "failed",
+      });
 
       setResultSummary({
-        passedCount,
-        failedCount,
+        passedCount: result.passedCount,
+        failedCount: result.failedCount,
         projectCodes: selectedProjectCodes,
       });
 

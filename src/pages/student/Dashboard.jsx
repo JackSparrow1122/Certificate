@@ -107,7 +107,7 @@ export default function StudentDashboard() {
   const rollNo = officialDetails.SN || currentStudent?.id || "-";
   const gender = currentStudent?.gender || officialDetails.GENDER || "-";
   const dob = currentStudent?.dob || officialDetails["BIRTH DATE"] || "-";
-  const email = currentStudent?.email || officialDetails["EMAIL ID"] || "-";
+  const email = currentStudent?.email || officialDetails["EMAIL_ID"] || "-";
   const phone = currentStudent?.phone || officialDetails["MOBILE NO."] || "-";
   const passingYear =
     graduationDetails["GRADUATION PASSING YR"] ||
