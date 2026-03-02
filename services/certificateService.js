@@ -706,6 +706,49 @@ export const declareResultsForCertificate = async ({
   }
 };
 
+// ---------------------------------------------------------------------------
+// Get all certificate enrollments for a project, grouped by studentId
+// Returns Map<studentId, [{certificateId, certificateName, examCode, status, ...}]>
+// ---------------------------------------------------------------------------
+
+export const getStudentEnrollmentsByProject = async (projectCode) => {
+  if (isLocalDbMode()) return new Map();
+  try {
+    const normalizedProjectCode = String(projectCode || "").trim();
+    if (!normalizedProjectCode) return new Map();
+    const projectDocId = codeToDocId(normalizedProjectCode);
+    const enrollmentsRef = collection(
+      db,
+      STUDENTS_COLLECTION,
+      projectDocId,
+      CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
+    );
+    const snapshot = await getDocs(enrollmentsRef);
+    const map = new Map();
+
+    snapshot.forEach((enrollDoc) => {
+      const d = enrollDoc.data();
+      if (d.isDeleted === true) return;
+      const studentId = String(d.studentId || "").trim();
+      if (!studentId) return;
+
+      if (!map.has(studentId)) map.set(studentId, []);
+      map.get(studentId).push({
+        certificateId: d.certificateId || "",
+        certificateName: d.certificateName || "",
+        examCode: d.examCode || "",
+        status: d.status || "enrolled",
+        isDeleted: false,
+      });
+    });
+
+    return map;
+  } catch (error) {
+    console.error("Error getting student enrollments by project:", error);
+    return new Map();
+  }
+};
+
 /**
  * Returns per-certificate enrollment stats (enrolled / passed / failed counts)
  * for a given project code, sourced from the lightweight

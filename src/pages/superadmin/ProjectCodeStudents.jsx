@@ -5,7 +5,10 @@ import {
   getStudentsByProject,
   updateStudent,
 } from "../../../services/studentService";
-import { getStudentsByCertificateInProject } from "../../../services/certificateService";
+import {
+  getStudentsByCertificateInProject,
+  getStudentEnrollmentsByProject,
+} from "../../../services/certificateService";
 import { Pencil, RotateCcw } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
@@ -13,6 +16,11 @@ import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImpo
 
 // Helper function to extract display fields from nested student data
 function extractStudentDisplayData(student) {
+  const enrollmentStatus = student.enrollmentStatus || null;
+  // _enrollments = all certificate enrollments for this student (when no cert filter)
+  const allEnrollments = Array.isArray(student._enrollments)
+    ? student._enrollments
+    : [];
   return {
     id: student.id,
     docId: student.docId || student.id,
@@ -26,6 +34,8 @@ function extractStudentDisplayData(student) {
     ugPercentage:
       student.GRADUATION_DETAILS?.["GRADUATION OVERALL MARKS %"] || "-",
     pgPercentage: student.POST_GRADUATION_DETAILS?.["OVERALL MARKS %"] || "-",
+    enrollmentStatus,
+    allEnrollments,
   };
 }
 
@@ -71,7 +81,15 @@ export default function ProjectCodeStudents() {
           projectData.code,
         );
       } else {
-        studentsData = await getStudentsByProject(projectData.code);
+        // Fetch all students + their enrollments in parallel
+        const [allStudents, enrollmentsMap] = await Promise.all([
+          getStudentsByProject(projectData.code),
+          getStudentEnrollmentsByProject(projectData.code),
+        ]);
+        studentsData = (allStudents || []).map((s) => {
+          const sid = s.docId || s.id || "";
+          return { ...s, _enrollments: enrollmentsMap.get(sid) || [] };
+        });
       }
       setStudents(studentsData);
     } catch (err) {
@@ -155,7 +173,7 @@ export default function ProjectCodeStudents() {
         OFFICIAL_DETAILS: {
           ...editingStudent.OFFICIAL_DETAILS,
           "FULL NAME OF STUDENT": editForm.fullName,
-          "EMAIL_ID": editForm.email,
+          EMAIL_ID: editForm.email,
           "MOBILE NO.": editForm.mobile,
           "BIRTH DATE": editForm.dob,
           GENDER: editForm.gender,
@@ -295,7 +313,7 @@ export default function ProjectCodeStudents() {
           </section>
 
           <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
-            <div className="mb-2 grid grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
+            <div className="mb-2 grid grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_1.5fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
               <p>Student Name</p>
               <p>Roll No.</p>
               <p>DOB</p>
@@ -303,6 +321,7 @@ export default function ProjectCodeStudents() {
               <p>12th/Diploma %tage</p>
               <p>UG %tage</p>
               <p>PG %tage</p>
+              <p>Result Status</p>
               <p />
             </div>
 
@@ -334,7 +353,7 @@ export default function ProjectCodeStudents() {
                       }
                     }
                   }}
-                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
+                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_1.5fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
                 >
                   <p className="pointer-events-none justify-self-start text-left font-medium text-[#0B2A4A]">
                     {student.name || "-"}
@@ -345,6 +364,45 @@ export default function ProjectCodeStudents() {
                   <p>{student.twelfthOrDiplomaPercentage ?? "-"}</p>
                   <p>{student.ugPercentage ?? "-"}</p>
                   <p>{student.pgPercentage ?? "-"}</p>
+                  <div>
+                    {certificateId && student.enrollmentStatus ? (
+                      <span
+                        className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
+                          student.enrollmentStatus === "passed"
+                            ? "bg-green-100 text-green-700"
+                            : student.enrollmentStatus === "failed"
+                              ? "bg-red-100 text-red-600"
+                              : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {student.enrollmentStatus.charAt(0).toUpperCase() +
+                          student.enrollmentStatus.slice(1)}
+                      </span>
+                    ) : student.allEnrollments.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {student.allEnrollments.map((e, idx) => {
+                          const statusColor =
+                            e.status === "passed"
+                              ? "bg-green-100 text-green-700"
+                              : e.status === "failed"
+                                ? "bg-red-100 text-red-600"
+                                : "bg-blue-100 text-blue-700";
+                          return (
+                            <span
+                              key={e.certificateId || idx}
+                              className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${statusColor}`}
+                            >
+                              {e.certificateName}:{" "}
+                              {e.status.charAt(0).toUpperCase() +
+                                e.status.slice(1)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </div>
                   <span
                     className="justify-self-end text-gray-400 hover:text-[#0B2A4A] transition-colors"
                     onClick={(e) =>
