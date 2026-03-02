@@ -284,6 +284,75 @@ export default function AdminDashboard() {
     };
   }, [students, projects, certifications, projectStudentCounts]);
 
+  const certificationData = useMemo(() => {
+    const statsByCertificate = {};
+
+    students.forEach((student) => {
+      const results =
+        student.certificateResults &&
+        typeof student.certificateResults === "object"
+          ? Object.values(student.certificateResults).filter(
+              (r) => !r?.isDeleted,
+            )
+          : [];
+
+      // Handle new structure with multiple certificate results
+      if (results.length > 0) {
+        results.forEach((result) => {
+          const certName = String(result?.certificateName || "").trim();
+          if (!certName) return;
+
+          if (!statsByCertificate[certName]) {
+            statsByCertificate[certName] = {
+              label: certName,
+              Enrolled: 0,
+              Passed: 0,
+              Failed: 0,
+            };
+          }
+
+          const s = String(result.status || result.result || "").toLowerCase();
+          if (["passed", "completed"].includes(s)) {
+            statsByCertificate[certName].Passed += 1;
+          } else if (s === "failed") {
+            statsByCertificate[certName].Failed += 1;
+          } else {
+            statsByCertificate[certName].Enrolled += 1;
+          }
+        });
+      }
+      // Handle legacy structure with a single certificate
+      const legacyCertName = String(student.certificate || "").trim();
+      if (legacyCertName && results.length === 0) {
+        if (!statsByCertificate[legacyCertName]) {
+          statsByCertificate[legacyCertName] = {
+            label: legacyCertName,
+            Enrolled: 0,
+            Passed: 0,
+            Failed: 0,
+          };
+        }
+        const s = String(
+          student.certificateStatus ||
+            student.certificateResult?.status ||
+            student.certificateResult?.result ||
+            "enrolled",
+        ).toLowerCase();
+        if (["passed", "completed"].includes(s)) {
+          statsByCertificate[legacyCertName].Passed += 1;
+        } else if (s === "failed") {
+          statsByCertificate[legacyCertName].Failed += 1;
+        } else {
+          statsByCertificate[legacyCertName].Enrolled += 1;
+        }
+      }
+    });
+
+    return Object.values(statsByCertificate).sort((a, b) =>
+      String(a.label).localeCompare(String(b.label)),
+    );
+  }, [students]);
+
   return (
     <div className="space-y-6">
       <section className="collegeadmin-navbar-card rounded-3xl border border-[#D7E2F1] bg-white px-6 py-7">
@@ -362,6 +431,50 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </Panel>
 
+        <Panel title="Certification Enrollment & Results">
+          <ResponsiveContainer width="100%" height={270} debounce={75}>
+            <BarChart
+              data={certificationData}
+              margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#e5e7eb"
+              />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} />
+              <Tooltip cursor={{ fill: "#f3f4f6" }} />
+              <Legend />
+              <Bar
+                dataKey="Enrolled"
+                name="Ongoing"
+                stackId="a"
+                fill="#1D5FA8"
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+              />
+              <Bar
+                dataKey="Passed"
+                stackId="a"
+                fill="#6BC7A7"
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+              />
+              <Bar
+                dataKey="Failed"
+                stackId="a"
+                fill="#EF4444"
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Student Progress Distribution">
           <ResponsiveContainer width="100%" height={270} debounce={75}>
             <PieChart>
@@ -385,9 +498,7 @@ export default function AdminDashboard() {
             </PieChart>
           </ResponsiveContainer>
         </Panel>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Course Share">
           <ResponsiveContainer width="100%" height={260} debounce={75}>
             <PieChart>
@@ -411,7 +522,9 @@ export default function AdminDashboard() {
             </PieChart>
           </ResponsiveContainer>
         </Panel>
+      </div>
 
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Recent Project Batches">
           <div className="space-y-3">
             {data.topProjects.map((project) => (
