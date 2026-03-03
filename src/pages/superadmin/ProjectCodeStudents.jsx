@@ -356,11 +356,7 @@ export default function ProjectCodeStudents() {
                       }
                     }
                   }}
-<<<<<<< HEAD
-                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
-=======
-                  className="grid cursor-pointer grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
->>>>>>> d3fd5265673b5713920e0afdc690a3a1fbb1e3b0
+                  className="grid cursor-pointer grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
                 >
                   <p className="pointer-events-none justify-self-start text-left font-medium text-[#0B2A4A]">
                     {student.id || "-"}
