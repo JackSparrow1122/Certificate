@@ -95,7 +95,7 @@ export default function ProjectCodeCertificates() {
                     `/superadmin/colleges/${projectCode?.collegeId || ""}/project-codes`,
                   )
                 }
-                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
+                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white"
               >
                 ← Back to Project Codes
               </button>
@@ -114,28 +114,28 @@ export default function ProjectCodeCertificates() {
                     state: { projectCode: projectCode?.code || "" },
                   })
                 }
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 View All Students
               </button>
               <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 + Bulk Add Students
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddStudentModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 + Add Student
               </button>
               <button
                 type="button"
                 onClick={() => setShowAssignModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 + Enroll Certificate
               </button>
@@ -152,7 +152,7 @@ export default function ProjectCodeCertificates() {
                 <button
                   type="button"
                   onClick={() => setShowImportModal(false)}
-                  className="rounded-lg p-1.5 text-[#415a77] hover:bg-[#D7E2F1] hover:text-[#0B2A4A] transition-colors"
+                  className="rounded-lg p-1.5 text-[#415a77] transition-colors"
                 >
                   ✕
                 </button>
@@ -178,7 +178,7 @@ export default function ProjectCodeCertificates() {
                 <div
                   key={cert.id}
                   onClick={() => openStudentList(cert.id)}
-                  className="grid w-full cursor-pointer grid-cols-[2fr_1.5fr_1fr_1fr] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition hover:border-[#BCD0E7] hover:bg-gray-50"
+                  className="grid w-full cursor-pointer grid-cols-[2fr_1.5fr_1fr_1fr] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition"
                 >
                   <p className="truncate font-medium">{cert.name || "-"}</p>
                   <p>{cert.examCode || "-"}</p>

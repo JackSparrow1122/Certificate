@@ -155,7 +155,7 @@ export default function StudentCertificateProgress() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="rounded-md bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
+            className="rounded-md bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white"
           >
             ← Back to Students
           </button>
@@ -355,7 +355,7 @@ export default function StudentCertificateProgress() {
 
 function ProfileItem({ label, value }) {
   return (
-    <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm transition hover:border-[#BCD0E7]">
+    <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm transition">
       <p className="text-xs uppercase tracking-wide text-[#0B2A4A]/60">
         {label}
       </p>

@@ -19,10 +19,10 @@ export default function Footer() {
         <div>
           <h4 className="text-white font-semibold mb-4">Product</h4>
           <ul className="space-y-2 text-sm">
-            <li className="hover:text-white cursor-pointer">Dashboard</li>
-            <li className="hover:text-white cursor-pointer">Certificates</li>
-            <li className="hover:text-white cursor-pointer">Students</li>
-            <li className="hover:text-white cursor-pointer">Reports</li>
+            <li className="cursor-pointer">Dashboard</li>
+            <li className="cursor-pointer">Certificates</li>
+            <li className="cursor-pointer">Students</li>
+            <li className="cursor-pointer">Reports</li>
           </ul>
         </div>
 
@@ -30,16 +30,16 @@ export default function Footer() {
         <div>
           <h4 className="text-white font-semibold mb-4">ERP Features</h4>
           <ul className="space-y-2 text-sm">
-            <li className="hover:text-white cursor-pointer">
+            <li className="cursor-pointer">
               Certificate Management
             </li>
-            <li className="hover:text-white cursor-pointer">
+            <li className="cursor-pointer">
               Student Progress Tracking
             </li>
-            <li className="hover:text-white cursor-pointer">
+            <li className="cursor-pointer">
               Role-Based Access
             </li>
-            <li className="hover:text-white cursor-pointer">
+            <li className="cursor-pointer">
               College & Department Mapping
             </li>
           </ul>
@@ -63,10 +63,10 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-center text-sm text-gray-400">
         <p>© 2026 ERP Certificate System. All rights reserved.</p>
         <div className="flex gap-4 mt-4 md:mt-0">
-          <span className="hover:text-white cursor-pointer">
+          <span className="cursor-pointer">
             Privacy Policy
           </span>
-          <span className="hover:text-white cursor-pointer">
+          <span className="cursor-pointer">
             Terms of Service
           </span>
         </div>

@@ -8,7 +8,7 @@ export default function CollegeCard({ college, onEdit, onDelete, onOpen }) {
       }}
       className={`relative rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-5 transition-all duration-200 ${
         onOpen
-          ? "cursor-pointer hover:border-[#BCD0E7] hover:bg-[#DCE7F3] hover:shadow-lg hover:-translate-y-0.5"
+          ? "cursor-pointer"
           : ""
       }`}
     >

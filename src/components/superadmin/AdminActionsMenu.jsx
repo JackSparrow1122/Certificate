@@ -18,8 +18,7 @@ export default function AdminActionsMenu({ onEdit, onDelete }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="h-8 w-8 rounded-full flex items-center justify-center
-                   hover:bg-gray-100 text-gray-600"
+        className="h-8 w-8 rounded-full flex items-center justify-center text-gray-600"
       >
         ⋮
       </button>
@@ -28,13 +27,13 @@ export default function AdminActionsMenu({ onEdit, onDelete }) {
         <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border z-20">
           <button
             onClick={onEdit}
-            className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+            className="w-full px-4 py-2 text-sm text-left"
           >
             ✏️ Edit User
           </button>
           <button
             onClick={onDelete}
-            className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50"
+            className="w-full px-4 py-2 text-sm text-left text-red-600"
           >
             🗑 Delete User
           </button>

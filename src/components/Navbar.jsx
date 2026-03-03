@@ -6,7 +6,7 @@ export default function Navbar() {
           🎓 ERP Certificate System
         </div>
 
-        <button className="bg-white text-[#062a4d] px-5 py-2 rounded-lg font-medium hover:bg-gray-100 transition">
+        <button className="bg-white text-[#062a4d] px-5 py-2 rounded-lg font-medium transition">
           Login →
         </button>
       </div>

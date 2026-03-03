@@ -61,7 +61,7 @@ export default function StudentModal({ student, onClose }) {
         {/* CLOSE */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          className="absolute top-4 right-4 text-gray-400"
         >
           ✕
         </button>

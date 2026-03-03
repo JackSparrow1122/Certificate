@@ -291,7 +291,7 @@ export default function AssignCertificateModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-md p-1.5 text-gray-400"
             disabled={loading}
           >
             ✕
@@ -328,7 +328,7 @@ export default function AssignCertificateModal({
             accept=".xlsx,.xls,.csv"
             onChange={handleFileChange}
             disabled={loading}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[#0B2A4A] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-[#0f355b]"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[#0B2A4A] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
           />
         </div>
 
@@ -378,7 +378,7 @@ export default function AssignCertificateModal({
             <button
               type="button"
               onClick={handleReset}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
             >
               Reset
             </button>
@@ -386,7 +386,7 @@ export default function AssignCertificateModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
             disabled={loading}
           >
             {results ? "Close" : "Cancel"}
@@ -396,7 +396,7 @@ export default function AssignCertificateModal({
               type="button"
               onClick={handleExcelUpload}
               disabled={loading || !file}
-              className="rounded-lg bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0f355b] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Processing…" : "Assign"}
             </button>

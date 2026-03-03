@@ -223,7 +223,7 @@ export default function CertificateConfig() {
                 disabled={
                   loading || refreshingCounts || certifications.length === 0
                 }
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8] disabled:opacity-60"
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] disabled:opacity-60"
               >
                 {refreshingCounts
                   ? "Refreshing counts..."
@@ -231,19 +231,19 @@ export default function CertificateConfig() {
               </button>
               <button
                 onClick={() => setShowAddOrganizationModal(true)}
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A]"
               >
                 + Add New Organisation
               </button>
               <button
                 onClick={() => setShowEditOrganizationModal(true)}
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A]"
               >
                 ✏️ Edit Organisation
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A]"
               >
                 + Add New Certificate
               </button>
@@ -353,7 +353,7 @@ export default function CertificateConfig() {
               {filteredCertifications.map((c) => (
                 <div
                   key={c.id}
-                  className={`relative flex cursor-pointer items-center justify-between rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none! ${openMenuId === c.id ? "z-50" : "z-0"}`}
+                  className={`relative flex cursor-pointer items-center justify-between rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors ${openMenuId === c.id ? "z-50" : "z-0"}`}
                 >
                   <div className="grid w-full grid-cols-6 text-sm">
                     <span className="flex items-center gap-2">
@@ -399,7 +399,7 @@ export default function CertificateConfig() {
                       className={`ml-4 flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                         openMenuId === c.id
                           ? "bg-[#0B2A4A] text-white"
-                          : "text-[#415a77] hover:bg-[#E9EEF5] hover:text-[#0B2A4A]"
+                          : "text-[#415a77]"
                       }`}
                       title="Manage certificate"
                     >
@@ -420,7 +420,7 @@ export default function CertificateConfig() {
                               setShowAddModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-[#F0F5FF]"
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
                           >
                             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E9EEF5] text-base">
                               ✏️
@@ -434,7 +434,7 @@ export default function CertificateConfig() {
                               setShowDeclareResultModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-[#F0F5FF]"
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
                           >
                             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E9EEF5] text-base">
                               📋
@@ -448,7 +448,7 @@ export default function CertificateConfig() {
                               handleSoftDeleteCertificate(c);
                             }}
                             disabled={deletingCertificateId === c.id}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-500 transition-colors disabled:opacity-50"
                           >
                             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-base">
                               🗑️

@@ -225,7 +225,7 @@ export default function ProjectCodeStudents() {
                     `/superadmin/project-codes/${projectId}/certificates`,
                   )
                 }
-                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
+                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white"
               >
                 ← Back to Certificates
               </button>
@@ -242,14 +242,14 @@ export default function ProjectCodeStudents() {
               <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 + Bulk Add Students
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddStudentModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 + Add New Student
               </button>
@@ -334,7 +334,7 @@ export default function ProjectCodeStudents() {
                       }
                     }
                   }}
-                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors hover:bg-gray-50 hover:transform-none! hover:shadow-none!"
+                  className="grid cursor-pointer grid-cols-[2fr_1.3fr_1.3fr_1.1fr_1.6fr_1fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
                 >
                   <p className="pointer-events-none justify-self-start text-left font-medium text-[#0B2A4A]">
                     {student.name || "-"}
@@ -346,7 +346,7 @@ export default function ProjectCodeStudents() {
                   <p>{student.ugPercentage ?? "-"}</p>
                   <p>{student.pgPercentage ?? "-"}</p>
                   <span
-                    className="justify-self-end text-gray-400 hover:text-[#0B2A4A] transition-colors"
+                    className="justify-self-end text-gray-400 transition-colors"
                     onClick={(e) =>
                       handleEditClick(e, student.docId || student.id)
                     }
@@ -395,7 +395,7 @@ export default function ProjectCodeStudents() {
               <button
                 type="button"
                 onClick={() => setEditingStudent(null)}
-                className="rounded-lg p-1.5 text-[#415a77] hover:bg-[#D7E2F1] hover:text-[#0B2A4A] transition-colors"
+                className="rounded-lg p-1.5 text-[#415a77] transition-colors"
               >
                 ✕
               </button>
@@ -705,14 +705,14 @@ export default function ProjectCodeStudents() {
                 <button
                   type="button"
                   onClick={() => setEditingStudent(null)}
-                  className="rounded-lg border border-[#CBD8EA] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] hover:bg-[#D7E2F1] transition-colors"
+                  className="rounded-lg border border-[#CBD8EA] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editLoading}
-                  className="rounded-lg bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0f355b] disabled:opacity-60 transition-colors"
+                  className="rounded-lg bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors"
                 >
                   {editLoading ? "Saving..." : "Save Changes"}
                 </button>
@@ -731,7 +731,7 @@ export default function ProjectCodeStudents() {
           <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-md z-10">
             <button
               onClick={() => setShowImportModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              className="absolute top-4 right-4 text-gray-400"
             >
               ✕
             </button>

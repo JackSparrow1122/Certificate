@@ -298,14 +298,14 @@ export default function AddAdminModal({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-[#0B2A4A] text-white rounded-lg hover:bg-[#0B2A4A]/90 disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-[#0B2A4A] text-white rounded-lg disabled:opacity-50"
             >
               {loading
                 ? isEdit

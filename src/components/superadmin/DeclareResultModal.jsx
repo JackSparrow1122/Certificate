@@ -188,7 +188,7 @@ export default function DeclareResultModal({
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400"
           >
             ✕
           </button>
@@ -215,7 +215,7 @@ export default function DeclareResultModal({
                 projectCodes.map((code) => (
                   <label
                     key={code}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded"
+                    className="flex items-center gap-2 cursor-pointer p-2 rounded"
                   >
                     <input
                       type="checkbox"
@@ -243,14 +243,14 @@ export default function DeclareResultModal({
             <div className="flex gap-3 pt-4">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700"
               >
                 Cancel
               </button>
               <button
                 onClick={() => setStep("upload")}
                 disabled={selectedProjectCodes.length === 0 || loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
               >
                 Next
               </button>
@@ -307,14 +307,14 @@ export default function DeclareResultModal({
                   setExcelData(null);
                 }}
                 disabled={loading}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep("confirm")}
                 disabled={!excelData || loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
               >
                 {loading ? "Processing..." : "Next"}
               </button>
@@ -356,14 +356,14 @@ export default function DeclareResultModal({
                   setStep("upload");
                 }}
                 disabled={loading}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50"
               >
                 Back
               </button>
               <button
                 onClick={handleDeclareResult}
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50"
               >
                 {loading ? "Processing..." : "Declare Results"}
               </button>
@@ -400,7 +400,7 @@ export default function DeclareResultModal({
 
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md"
             >
               Close
             </button>

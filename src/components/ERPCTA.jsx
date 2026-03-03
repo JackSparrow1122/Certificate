@@ -22,7 +22,7 @@ export default function ERPCTA() {
           {/* LOGIN BUTTON */}
           <button
             onClick={() => navigate("/college-admin")}
-            className="px-10 py-3 bg-[#062a4d] text-white font-semibold rounded-lg hover:bg-[#041f38] transition"
+            className="px-10 py-3 bg-[#062a4d] text-white font-semibold rounded-lg transition"
           >
             Login →
           </button>

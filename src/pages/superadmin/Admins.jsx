@@ -170,7 +170,7 @@ export default function Admins() {
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-[#0B2A4A] text-white px-4 py-2 rounded-lg hover:bg-[#0B2A4A]/90"
+              className="bg-[#0B2A4A] text-white px-4 py-2 rounded-lg"
             >
               + Add Admin
             </button>

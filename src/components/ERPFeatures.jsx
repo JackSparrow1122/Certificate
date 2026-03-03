@@ -41,7 +41,7 @@ export default function ERPFeatures() {
           {features.map((f) => (
             <div
               key={f.title}
-              className="bg-white border rounded-2xl p-8 shadow-sm hover:shadow-md transition"
+              className="bg-white border rounded-2xl p-8 shadow-sm transition"
             >
               <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-[#062a4d] text-white text-xl mb-6">
                 {f.icon}

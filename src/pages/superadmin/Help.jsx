@@ -244,7 +244,7 @@ export default function SuperAdminHelp() {
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   activeStatus === status
                     ? "bg-white text-[#1b2a46] shadow"
-                    : "text-[#6b7b90] hover:bg-white/70"
+                    : "text-[#6b7b90]"
                 }`}
               >
                 {statusTabLabel(status)}

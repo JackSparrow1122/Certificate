@@ -143,7 +143,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(true)}
-                  className="text-sm text-[#0F2B46] hover:underline font-medium"
+                  className="text-sm text-[#0F2B46] font-medium"
                 >
                   Forgot Password?
                 </button>
@@ -154,7 +154,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0F2B46] hover:bg-[#123a5c] disabled:bg-gray-400 text-white py-2.5 rounded-lg font-medium transition"
+              className="w-full bg-[#0F2B46] disabled:bg-gray-400 text-white py-2.5 rounded-lg font-medium transition"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
@@ -214,14 +214,14 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={closeForgotModal}
-                      className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={resetLoading}
-                      className="px-5 py-2.5 rounded-lg bg-[#0B2A4A] text-white text-sm font-medium hover:bg-[#0f355b] disabled:opacity-60 transition-colors"
+                      className="px-5 py-2.5 rounded-lg bg-[#0B2A4A] text-white text-sm font-medium disabled:opacity-60 transition-colors"
                     >
                       {resetLoading ? "Sending..." : "Send Reset Link"}
                     </button>
@@ -236,7 +236,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={closeForgotModal}
-                  className="px-6 py-2.5 rounded-lg bg-[#0B2A4A] text-white text-sm font-medium hover:bg-[#0f355b] transition-colors"
+                  className="px-6 py-2.5 rounded-lg bg-[#0B2A4A] text-white text-sm font-medium transition-colors"
                 >
                   Done
                 </button>

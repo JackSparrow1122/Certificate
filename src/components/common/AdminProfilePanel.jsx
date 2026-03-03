@@ -200,7 +200,7 @@ export default function AdminProfilePanel({ roleLabel = "Admin" }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-[#0B2A4A] px-4 py-2.5 text-base font-semibold text-white transition hover:bg-[#113A63] disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full rounded-xl bg-[#0B2A4A] px-4 py-2.5 text-base font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? "Updating..." : "Update Password"}
           </button>

@@ -401,7 +401,7 @@ export default function StudentDashboard() {
               type="button"
               onClick={() => scrollCerts("prev")}
               disabled={certLoading || enrolledCertificates.length === 0}
-              className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-full border border-[#D7E2F1] bg-white shadow-sm text-[#1D5FA8] transition hover:bg-[#EEF3FA] disabled:opacity-30 disabled:cursor-not-allowed z-10"
+              className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-full border border-[#D7E2F1] bg-white shadow-sm text-[#1D5FA8] transition disabled:opacity-30 disabled:cursor-not-allowed z-10"
               aria-label="Previous certificate"
             >
               <ChevronLeft size={20} />
@@ -440,7 +440,7 @@ export default function StudentDashboard() {
               type="button"
               onClick={() => scrollCerts("next")}
               disabled={certLoading || enrolledCertificates.length === 0}
-              className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-full border border-[#D7E2F1] bg-white shadow-sm text-[#1D5FA8] transition hover:bg-[#EEF3FA] disabled:opacity-30 disabled:cursor-not-allowed z-10"
+              className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-full border border-[#D7E2F1] bg-white shadow-sm text-[#1D5FA8] transition disabled:opacity-30 disabled:cursor-not-allowed z-10"
               aria-label="Next certificate"
             >
               <ChevronRight size={20} />

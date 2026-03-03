@@ -122,7 +122,7 @@ export default function EnrollProjectCodeModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
+          className="absolute right-4 top-4 text-gray-400"
         >
           ✕
         </button>
@@ -156,7 +156,7 @@ export default function EnrollProjectCodeModal({
                         type="button"
                         onClick={() => handleUnassign(code)}
                         disabled={Boolean(removingCode)}
-                        className="rounded-full px-1 text-blue-900 hover:bg-blue-200 disabled:opacity-60"
+                        className="rounded-full px-1 text-blue-900 disabled:opacity-60"
                         title={`Remove ${code}`}
                       >
                         {removingCode === code ? "..." : "x"}

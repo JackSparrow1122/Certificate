@@ -175,7 +175,7 @@ export default function CollegeProjectCodes() {
               <button
                 type="button"
                 onClick={() => navigate("/superadmin/colleges")}
-                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#0f355b]"
+                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white"
               >
                 ← Back to Colleges
               </button>
@@ -189,7 +189,7 @@ export default function CollegeProjectCodes() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowAddProjectModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A] hover:bg-[#cdd9e8]"
+                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
               >
                 + Add New Project Code
               </button>
@@ -292,7 +292,7 @@ export default function CollegeProjectCodes() {
                     setSelectedProjectCode(row.id);
                     openCertificateList(row.id);
                   }}
-                  className={`grid w-full cursor-pointer grid-cols-[2fr_1.2fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition hover:border-[#BCD0E7] ${
+                  className={`grid w-full cursor-pointer grid-cols-[2fr_1.2fr_1fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition ${
                     selectedProjectCode === row.id
                       ? "ring-2 ring-[#003B7A]/20"
                       : ""
@@ -308,7 +308,7 @@ export default function CollegeProjectCodes() {
                       openDeleteConfirm(row);
                     }}
                     disabled={deletingProjectId === row.id}
-                    className="justify-self-center text-red-600 hover:text-red-700 disabled:opacity-50"
+                    className="justify-self-center text-red-600 disabled:opacity-50"
                     title="Soft delete project code"
                   >
                     <Trash2 size={16} />

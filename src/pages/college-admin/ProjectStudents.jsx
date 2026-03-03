@@ -49,7 +49,7 @@ export default function ProjectStudents() {
               <tr
                 key={s.id}
                 onClick={() => setSelectedStudent(s)}
-                className="bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                className="bg-gray-50 cursor-pointer"
               >
                 <td className="px-3 py-3 font-medium">{s.id}</td>
                 <td className="px-3">{s.name}</td>

@@ -147,7 +147,7 @@ export default function AddOrganizationModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400"
           >
             ✕
           </button>

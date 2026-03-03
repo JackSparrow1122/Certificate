@@ -365,7 +365,7 @@ export default function StudentProfile() {
             <button
               type="submit"
               disabled={passwordLoading}
-              className="rounded-xl bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#113A63] disabled:cursor-not-allowed disabled:opacity-70"
+              className="rounded-xl bg-[#0B2A4A] px-5 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70"
             >
               {passwordLoading ? "Updating..." : "Update Password"}
             </button>
@@ -380,7 +380,7 @@ export default function StudentProfile() {
 
 function ProfileItem({ label, value }) {
   return (
-    <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm transition hover:border-[#BCD0E7]">
+    <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm transition">
       <p className="text-xs uppercase tracking-wide text-[#0B2A4A]/60">
         {label}
       </p>

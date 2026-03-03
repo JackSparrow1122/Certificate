@@ -634,7 +634,7 @@ export default function Students() {
                     <button
                       type="button"
                       onClick={handleIdSortClick}
-                      className="flex items-center gap-2 px-1 py-0.5 hover:text-[#1D5FA8] transition-colors"
+                      className="flex items-center gap-2 px-1 py-0.5 transition-colors"
                       title={
                         sortField === "id"
                           ? idSortDir === "asc"
@@ -670,7 +670,7 @@ export default function Students() {
                     <button
                       type="button"
                       onClick={handleResultSortClick}
-                      className="flex items-center gap-2 px-1 py-0.5 hover:text-[#1D5FA8] transition-colors"
+                      className="flex items-center gap-2 px-1 py-0.5 transition-colors"
                       title={
                         sortField !== "result"
                           ? "Sort by Result Status"
@@ -758,7 +758,7 @@ export default function Students() {
                     <tr
                       key={`${student.projectCode || student.projectId || "NA"}-${student.id || student.docId || student.email || student.name}`}
                       onClick={() => setSelectedStudent(student)}
-                      className="cursor-pointer transition hover:bg-gray-50"
+                      className="cursor-pointer transition"
                       style={{ pageBreakInside: "avoid", breakInside: "avoid" }}
                     >
                       <td className="wrap-break-word px-6 py-4 text-sm font-medium text-[#0B2A4A]">

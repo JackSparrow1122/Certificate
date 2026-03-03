@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 
 export default function ProjectCodeRow({ row }) {
   return (
-    <tr className="border-b border-[#E6EDF6] transition hover:bg-[#FAFCFF] last:border-none">
+    <tr className="border-b border-[#E6EDF6] transition last:border-none">
       {/* Project Code */}
       <td className="px-6 py-4 text-sm font-semibold text-[#0B2A4A]">{row.code}</td>
 
@@ -42,7 +42,7 @@ export default function ProjectCodeRow({ row }) {
 
       {/* Delete */}
       <td className="px-6 py-4 text-right">
-        <button className="text-red-500 hover:text-red-600">
+        <button className="text-red-500">
           <Trash2 size={16} />
         </button>
       </td>

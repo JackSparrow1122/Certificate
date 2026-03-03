@@ -93,7 +93,7 @@ export default function AddCertificateModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
+          className="absolute right-4 top-4 text-gray-400"
         >
           ✕
         </button>

@@ -35,14 +35,14 @@ export default function ConfirmDialog({
           <button
             onClick={onCancel}
             disabled={loading}
-            className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-50 transition-colors"
+            className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium disabled:opacity-50 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+            className="px-5 py-2.5 rounded-lg bg-red-600 text-white font-medium disabled:opacity-50 transition-colors"
           >
             {loading ? "Deleting..." : "Delete"}
           </button>

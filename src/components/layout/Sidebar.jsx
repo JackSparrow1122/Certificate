@@ -104,8 +104,8 @@ export default function Sidebar() {
           onClick={handleProfileClick}
           className={`mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
             expanded
-              ? "rounded-2xl bg-white/12 p-3.5 gap-3 justify-center hover:bg-white/20"
-              : "rounded-xl p-2 justify-center hover:bg-white/10"
+              ? "rounded-2xl bg-white/12 p-3.5 gap-3 justify-center"
+              : "rounded-xl p-2 justify-center"
           }`}
           title="Open Profile"
         >
@@ -135,7 +135,7 @@ export default function Sidebar() {
                 ${
                   isActive
                     ? "bg-white text-[#0B2A4A] font-semibold shadow"
-                    : "text-white/90 hover:bg-white/10"
+                    : "text-white/90"
                 }`
               }
             >
@@ -150,7 +150,7 @@ export default function Sidebar() {
       <div className="px-3 py-6 border-t border-white/10">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-4 px-4 py-3 rounded-xl text-white/80 hover:bg-white/10 hover:text-red-400 transition w-full"
+          className="flex items-center gap-4 px-4 py-3 rounded-xl text-white/80 transition w-full"
         >
           <LogOut size={22} />
           {expanded && <span>Sign Out</span>}

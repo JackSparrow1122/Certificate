@@ -97,7 +97,7 @@ export default function AddProjectCodeModal({
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 z-10">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          className="absolute top-4 right-4 text-gray-400"
         >
           ✕
         </button>
@@ -185,14 +185,14 @@ export default function AddProjectCodeModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
             >
               {loading ? "Adding..." : "Add Project Code"}
             </button>

@@ -203,7 +203,7 @@ export default function Help() {
           className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
             activeTab === "create"
               ? "bg-white text-gray-900 shadow"
-              : "text-gray-500 hover:bg-white/60"
+              : "text-gray-500"
           }`}
         >
           Raise New Ticket
@@ -214,7 +214,7 @@ export default function Help() {
           className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
             activeTab === "tickets"
               ? "bg-white text-gray-900 shadow"
-              : "text-gray-500 hover:bg-white/60"
+              : "text-gray-500"
           }`}
         >
           {myTicketsLabel}
@@ -327,7 +327,7 @@ export default function Help() {
             <button
               type="submit"
               disabled={creating}
-              className="h-9 w-full rounded-md bg-[#0B2A4A] text-sm font-medium text-white hover:bg-[#13385d] disabled:opacity-60"
+              className="h-9 w-full rounded-md bg-[#0B2A4A] text-sm font-medium text-white disabled:opacity-60"
             >
               {creating ? "Creating..." : "Create Support Ticket"}
             </button>

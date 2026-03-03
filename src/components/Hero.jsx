@@ -22,10 +22,10 @@ export default function Hero() {
         </p>
 
         <div className="mt-8 flex justify-center gap-4">
-          <button className="bg-[#062a4d] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#041f38] transition">
+          <button className="bg-[#062a4d] text-white px-8 py-3 rounded-lg font-semibold transition">
             Get Started
           </button>
-          <button className="border border-gray-300 px-8 py-3 rounded-lg font-semibold hover:bg-gray-50 transition">
+          <button className="border border-gray-300 px-8 py-3 rounded-lg font-semibold transition">
             Learn More
           </button>
         </div>

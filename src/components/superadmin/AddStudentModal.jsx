@@ -347,14 +347,14 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-gray-300 px-5 py-2 text-base font-medium text-gray-900 hover:bg-gray-400"
+              className="rounded-xl bg-gray-300 px-5 py-2 text-base font-medium text-gray-900"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-gray-300 px-6 py-2 text-base font-medium text-gray-900 hover:bg-gray-400 disabled:opacity-60"
+              className="rounded-xl bg-gray-300 px-6 py-2 text-base font-medium text-gray-900 disabled:opacity-60"
             >
               {loading ? "Adding..." : "ADD"}
             </button>

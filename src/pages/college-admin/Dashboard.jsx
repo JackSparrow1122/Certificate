@@ -65,6 +65,36 @@ export default function AdminDashboard() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const hasPassedCertificate = (student) => {
+    const results =
+      student?.certificateResults &&
+      typeof student.certificateResults === "object"
+        ? Object.values(student.certificateResults).filter((r) => !r?.isDeleted)
+        : [];
+
+    if (
+      results.some((result) =>
+        ["passed", "completed"].includes(
+          String(result?.status || result?.result || "").toLowerCase(),
+        ),
+      )
+    ) {
+      return true;
+    }
+
+    return ["passed", "completed"].includes(
+      String(
+        student?.certificateStatus ||
+          student?.certificateResult?.status ||
+          student?.certificateResult?.result ||
+          "",
+      ).toLowerCase(),
+    );
+  };
+
+  const getStudentProgress = (student) =>
+    hasPassedCertificate(student) ? 100 : parseProgress(student?.progress);
+
   const [students, setStudents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [projectStudentCounts, setProjectStudentCounts] = useState({});
@@ -268,7 +298,7 @@ export default function AdminDashboard() {
     ];
 
     students.forEach((student) => {
-      const progress = parseProgress(student.progress);
+      const progress = getStudentProgress(student);
       if (progress <= 40) progressBands[0].value += 1;
       else if (progress <= 70) progressBands[1].value += 1;
       else progressBands[2].value += 1;
@@ -278,7 +308,7 @@ export default function AdminDashboard() {
       students.length > 0
         ? Math.round(
             students.reduce(
-              (sum, student) => sum + parseProgress(student.progress),
+              (sum, student) => sum + getStudentProgress(student),
               0,
             ) / students.length,
           )
@@ -380,6 +410,69 @@ export default function AdminDashboard() {
     );
   }, [students]);
 
+  const splitCertificateLabel = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return [""];
+
+    const words = text.split(/\s+/);
+    const lines = [];
+    const maxCharsPerLine = 14;
+    const maxLines = 2;
+    let currentLine = "";
+
+    words.forEach((word) => {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (candidate.length <= maxCharsPerLine) {
+        currentLine = candidate;
+        return;
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    });
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    if (lines.length > maxLines) {
+      const clamped = lines.slice(0, maxLines);
+      const last = clamped[maxLines - 1];
+      clamped[maxLines - 1] =
+        last.length > maxCharsPerLine - 1
+          ? `${last.slice(0, maxCharsPerLine - 1)}…`
+          : `${last}…`;
+      return clamped;
+    }
+
+    return lines;
+  };
+
+  const renderCertificateTick = ({ x, y, payload }) => {
+    const lines = splitCertificateLabel(payload?.value);
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={16}
+          textAnchor="middle"
+          fill="#4b5563"
+          fontSize={12}
+        >
+          {lines.map((line, index) => (
+            <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 0 : 13}>
+              {line}
+            </tspan>
+          ))}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <section className="collegeadmin-navbar-card rounded-3xl border border-[#D7E2F1] bg-white px-6 py-7">
@@ -416,7 +509,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Enrollments"
           value={data.totalEnrollments}
@@ -439,7 +532,7 @@ export default function AdminDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <Panel title="Enrollment by Course">
           <ResponsiveContainer width="100%" height={270} debounce={75}>
             <BarChart data={data.barData} barSize={42}>
@@ -468,17 +561,25 @@ export default function AdminDashboard() {
           <ResponsiveContainer width="100%" height={270} debounce={75}>
             <BarChart
               data={certificationData}
-              margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+              barCategoryGap="22%"
+              maxBarSize={54}
+              margin={{ top: 24, right: 20, left: 0, bottom: 28 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
                 stroke="#e5e7eb"
               />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                height={48}
+                tickMargin={4}
+                tick={renderCertificateTick}
+              />
               <YAxis allowDecimals={false} />
               <Tooltip cursor={{ fill: "#f3f4f6" }} />
-              <Legend />
+              <Legend verticalAlign="top" align="right" />
               <Bar
                 dataKey="Enrolled"
                 name="Ongoing"
@@ -507,7 +608,7 @@ export default function AdminDashboard() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <Panel title="Student Progress Distribution">
           <ResponsiveContainer width="100%" height={270} debounce={75}>
             <PieChart>
@@ -557,7 +658,7 @@ export default function AdminDashboard() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <Panel title="Recent Project Batches">
           <div className="space-y-3">
             {data.topProjects.map((project) => (
@@ -610,14 +711,14 @@ export default function AdminDashboard() {
 
 function StatCard({ title, value, icon }) {
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-[#0B2A4A]/70">{title}</p>
-        <span className="rounded-lg bg-[#0B2A4A]/10 p-2 text-[#0B2A4A]">
+        <p className="text-xs font-medium text-[#0B2A4A]/70">{title}</p>
+        <span className="rounded-lg bg-[#0B2A4A]/10 p-1.5 text-[#0B2A4A]">
           {icon}
         </span>
       </div>
-      <h2 className="mt-2 text-2xl font-semibold text-[#0B2A4A]">{value}</h2>
+      <h2 className="mt-2 text-xl font-semibold text-[#0B2A4A]">{value}</h2>
     </div>
   );
 }

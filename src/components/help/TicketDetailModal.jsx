@@ -51,7 +51,7 @@ export default function TicketDetailModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+          className="absolute right-4 top-4 text-gray-400"
         >
           <X size={18} />
         </button>
@@ -181,7 +181,7 @@ export function TicketViewActionButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-[#2f3f59] hover:text-[#0B2A4A]"
+      className="text-[#2f3f59]"
       title="View ticket"
     >
       <Eye size={16} />

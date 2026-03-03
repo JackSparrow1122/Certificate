@@ -401,14 +401,14 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={handleResetLocalDb}
-          className="rounded-lg border border-[#D7E2F1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] shadow-sm hover:bg-[#F5F9FF]"
+          className="rounded-lg border border-[#D7E2F1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] shadow-sm"
         >
           Reset Local DB
         </button>
         <button
           type="button"
           onClick={handleToggleDbMode}
-          className="rounded-lg border border-[#D7E2F1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] shadow-sm hover:bg-[#F5F9FF]"
+          className="rounded-lg border border-[#D7E2F1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] shadow-sm"
         >
           DB Mode: {dbMode === DB_MODES.LOCAL ? "Local" : "Production"}
         </button>
