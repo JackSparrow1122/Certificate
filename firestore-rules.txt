@@ -99,7 +99,7 @@ service cloud.firestore {
     }
 
     // certificateProjectEnrollments collection REMOVED — replaced by
-    // students/{projectDocId}/students_list/{studentId}/certificate_enrollments/{certId}
+    // students/{projectDocId}/certificate_enrollments/{enrollmentDocId}
 
     match /certificates/{certificateId} {
       allow read: if isSignedIn();
@@ -116,6 +116,16 @@ service cloud.firestore {
         (isCollegeAdmin() && projectDocBelongsToRequester(projectDocId));
       allow create, update, delete: if isSuperAdmin();
 
+      // Flat certificate_enrollments subcollection directly under project doc
+      match /certificate_enrollments/{enrollmentDocId} {
+        allow read: if isSuperAdmin() ||
+          (isCollegeAdmin() &&
+            projectDocBelongsToRequester(projectDocId)) ||
+          (isSignedIn() &&
+            sameAuthEmail(resource.data.email));
+        allow create, update, delete: if isSuperAdmin();
+      }
+
       match /students_list/{studentId} {
         allow read: if isSuperAdmin() ||
           (isCollegeAdmin() &&
@@ -123,6 +133,7 @@ service cloud.firestore {
           sameAuthEmailFromStudentDoc(resource.data);
         allow create, update, delete: if isSuperAdmin();
 
+        // Legacy nested path — kept for backward compat reads only
         match /certificate_enrollments/{certEnrollmentId} {
           allow read: if isSuperAdmin() ||
             (isCollegeAdmin() &&

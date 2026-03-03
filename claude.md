@@ -1,7 +1,7 @@
 # Claude Project Notes — ERP Certificate (Gryphon Academy)
 
 > This file is updated ruthlessly after every mistake, correction, or project-specific insight.
-> Last updated: 2026-03-02
+> Last updated: 2026-03-04
 
 ---
 
@@ -24,9 +24,10 @@
 
 ### What was added
 
-- **`certificate_enrollments`** subcollection under `students/{projectDocId}/students_list/{studentId}/`
-  - Doc ID = certificateId
+- **`certificate_enrollments`** flat subcollection under `students/{projectDocId}/` (NOT nested under each student)
+  - Doc ID = `{studentId}_{certificateId}`
   - Fields: `certificateId`, `certificateName`, `examCode`, `email`, `studentId`, `projectCode`, `collegeCode`, `uid`, `status` (enrolled/passed/failed/unenrolled), `isDeleted`, `enrolledAt`, `updatedAt`, `resultDeclaredAt`
+  - **Path changed on 2026-03-04**: was `students/{projectDocId}/students_list/{studentId}/certificate_enrollments/{certId}`, now `students/{projectDocId}/certificate_enrollments/{studentId}_{certificateId}` (flat, no collectionGroup queries needed for per-project lookups)
 - **`uid`** field on student docs in `students_list` — links student across years/project codes
 - **`ProjectCodeCertificates.jsx`** — new page: College → Project Codes → **Certificates** → Students
 - **`AssignCertificateModal.jsx`** — new component: Excel upload with EMAIL + EXAM_CODE columns to assign certs to students
@@ -42,21 +43,22 @@ Colleges → CollegeProjectCodes → ProjectCodeCertificates → ProjectCodeStud
 
 ## Firestore Collections Map
 
-| Collection                                                                  | Key fields queried                                               |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `users`                                                                     | `email`, `role`, `collegeCode`                                   |
-| `student_users`                                                             | `email`, `projectCode`                                           |
-| `helpTickets`                                                               | `createdByUid`, `createdByEmail`, `updatedAt`                    |
-| `helpTickets/{id}/remarks`                                                  | `createdAt`                                                      |
-| `students` (top-level, project docs)                                        | `projectCode`, `collegeCode`                                     |
-| `students/{projectDocId}/students_list`                                     | `email`, `OFFICIAL_DETAILS.EMAIL_ID`, `id`, `uid`, `projectCode` |
-| `students/{projectDocId}/students_list/{studentId}/certificate_enrollments` | `certificateId`, `projectCode`, `uid`, `status`, `email`         |
-| `certificates`                                                              | `examCode`, `isActive`                                           |
-| `projectCodes`                                                              | `collegeId`, `code`                                              |
-| `organizations`                                                             | `normalizedName`                                                 |
-| `college`                                                                   | `college_name`                                                   |
+| Collection                                        | Key fields queried                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------- |
+| `users`                                           | `email`, `role`, `collegeCode`                                        |
+| `student_users`                                   | `email`, `projectCode`                                                |
+| `helpTickets`                                     | `createdByUid`, `createdByEmail`, `updatedAt`                         |
+| `helpTickets/{id}/remarks`                        | `createdAt`                                                           |
+| `students` (top-level, project docs)              | `projectCode`, `collegeCode`                                          |
+| `students/{projectDocId}/students_list`           | `email`, `OFFICIAL_DETAILS.EMAIL_ID`, `id`, `uid`, `projectCode`      |
+| `students/{projectDocId}/certificate_enrollments` | `certificateId`, `studentId`, `projectCode`, `uid`, `status`, `email` |
+| `certificates`                                    | `examCode`, `isActive`                                                |
+| `projectCodes`                                    | `collegeId`, `code`                                                   |
+| `organizations`                                   | `normalizedName`                                                      |
+| `college`                                         | `college_name`                                                        |
 
-> **REMOVED**: `certificateProjectEnrollments` collection — replaced by `certificate_enrollments` subcollection
+> **REMOVED**: `certificateProjectEnrollments` collection — replaced by `certificate_enrollments` flat subcollection under project doc
+> **PATH CHANGE (2026-03-04)**: `certificate_enrollments` moved from nested under each student to flat under project doc
 
 ---
 
@@ -83,13 +85,19 @@ Collection group: students_list | certificateIds CONTAINS (legacy)
 Collection group: students_list | id ASC
 ```
 
-#### 3. `certificate_enrollments` — collectionGroup indexes (NEW)
+#### 3. `certificate_enrollments` — indexes
+
+Since `certificate_enrollments` is now a flat subcollection under each project doc, most queries are direct collection queries (not collectionGroup). CollectionGroup indexes are only needed for cross-project queries:
 
 ```
+# Direct collection indexes (auto-indexed by Firestore for single fields):
+certificate_enrollments | certificateId ASC
+certificate_enrollments | studentId ASC
+certificate_enrollments | email ASC
+
+# CollectionGroup indexes (only for cross-project queries like getCertificateEnrollmentCounts, softDeleteCertificate):
 Collection group: certificate_enrollments | certificateId ASC
-Collection group: certificate_enrollments | projectCode ASC
 Collection group: certificate_enrollments | uid ASC
-Collection group: certificate_enrollments | certificateId ASC, projectCode ASC (composite)
 ```
 
 ### Optional / Nice-to-have
@@ -118,18 +126,21 @@ File: `firestore.indexes.json` at project root (already created).
 
 ## Service Layer Changes
 
-### `certificateService.js` (fully rewritten)
+### `certificateService.js` (fully rewritten, ~810 lines)
 
-- **Kept**: `getAllCertificates`, `getCertificatesByIds`, `createCertificateAndEnrollStudents`, `updateCertificate`, `commitInChunks`
-- **Rewritten**: `getCertificateEnrollmentCounts` → queries `collectionGroup("certificate_enrollments")`
-- **Rewritten**: `softDeleteCertificate` → marks enrollment docs as `isDeleted:true`
-- **NEW**: `enrollStudentsIntoCertificate({certificateId, certificateName, examCode, projectCode, studentEmails})`
-- **NEW**: `getCertificatesForProjectCode(projectCode)` → collectionGroup query on `certificate_enrollments`
-- **NEW**: `getStudentsByCertificateInProject(certificateId, projectCode)`
-- **NEW**: `getStudentCertificateHistory(uid)` → cross-year cert data via UID
-- **NEW**: `unenrollStudentsFromCertificate({certificateId, projectCode, studentEmails})`
-- **NEW**: `declareResultsForCertificate({certificateId, certificateName, projectCodes, emailStatusMap, defaultStatus})`
+- **Kept**: `getAllCertificates({ includeInactive })`, `getCertificatesByIds`, `createCertificateAndEnrollStudents`, `updateCertificate`, `commitInChunks`
+- **Rewritten**: `getCertificateEnrollmentCounts` → queries `collectionGroup("certificate_enrollments")` (cross-project)
+- **Rewritten**: `softDeleteCertificate` → marks enrollment docs as `isDeleted:true` via collectionGroup (cross-project)
+- **NEW**: `enrollStudentsIntoCertificate({certificateId, certificateName, examCode, projectCode, studentEmails})` — writes to flat path `students/{projectDocId}/certificate_enrollments/{studentId}_{certificateId}`
+- **NEW**: `getCertificatesForProjectCode(projectCode)` → direct collection query on flat subcollection (no collectionGroup needed)
+- **NEW**: `getStudentsByCertificateInProject(certificateId, projectCode)` → direct collection query filtered by `certificateId`
+- **NEW**: `getStudentCertificateHistory(uid)` → cross-year cert data via UID (collectionGroup)
+- **NEW**: `unenrollStudentsFromCertificate({certificateId, projectCode, studentEmails})` → direct collection query
+- **NEW**: `declareResultsForCertificate({certificateId, certificateName, projectCodes, emailStatusMap, defaultStatus})` → direct collection query per projectCode
+- **NEW**: `getStudentEnrollmentsByProject(projectCode)` → returns `Map<studentId, enrollments[]>` from flat subcollection; used by both college-admin and superadmin Students pages
+- **NEW**: `getCertificateEnrollmentStatsByProject(projectCode)` → enrollment counts per certificate for a project
 - **REMOVED**: `enrollProjectCodeIntoCertificate`, `getAssignedProjectCodesForCertificate`, `getCertificatesByProjectCode` (old), `unassignProjectCodeFromCertificate`
+- **HELPER**: `normalizeExamCode()` — replaces Unicode dash variants (U+2010–U+2015, U+2212) with ASCII hyphen for exam code matching
 
 ### `studentService.js` (modified)
 
@@ -151,6 +162,39 @@ File: `firestore.indexes.json` at project root (already created).
 
 - Uses `getStudentCertificateHistory(uid)` for cross-year certificate data
 - Falls back to legacy `certificateIds` array if no `uid` present
+
+### College-Admin `Students.jsx` (updated 2026-03-04)
+
+- Imports `getStudentEnrollmentsByProject` from `certificateService`
+- Fetches enrollments in parallel: `Promise.all([getStudentsByProject, getStudentEnrollmentsByProject])`
+- Attaches `_enrollments` array to each student object
+- `toDisplayStudent` prefers `_enrollments` (new flat data), falls back to legacy `certificateResults`
+- `matchesCertificate` checks `_enrollments` first
+- Columns: Student ID (sortable) | Name | Email ID | Current Year | Result Status (sortable with cycle)
+
+### SuperAdmin `ProjectCodeStudents.jsx` (updated 2026-03-04)
+
+- Imports `getStudentEnrollmentsByProject` alongside `getStudentsByCertificateInProject`
+- Fetches enrollments in parallel when no certificate filter is active
+- `extractStudentDisplayData` includes `email`, `currentYear`, `enrollmentStatus`, `allEnrollments`
+- `getCurrentYearFromProjectCode()` helper extracts 3rd segment from project code string
+- Columns matched to college-admin layout: Student ID | Name | Email ID | Current Year | Result Status | Edit icon
+- Grid: `grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px]`
+- Result Status shows per-certificate enrollment badges (name: status) with color coding
+
+### `AssignCertificateModal.jsx` (recreated 2026-03-04)
+
+- Recreated after accidental terminal deletion
+- `normalizeExamCode()` for Unicode dash handling during exam code matching
+- `getAllCertificates({ includeInactive: true })` to match archived certs
+- Comma-separated exam codes support in Excel EXAM_CODE column
+- Proper `matchedCodes`/`unmatchedCodes` deduplication
+
+### Firestore Rules (updated 2026-03-04)
+
+- Added rule at `students/{projectDocId}/certificate_enrollments/{enrollmentDocId}` for the new flat subcollection path
+- Allows read for superAdmin, collegeAdmin (same college), or student whose email matches
+- Legacy nested path rule kept for backward compatibility
 
 ---
 
@@ -184,6 +228,11 @@ File: `firestore.indexes.json` at project root (already created).
 | 2026-03-02 | Single-field collection group indexes placed in `"indexes"` array caused `400: this index is not necessary`                                                                 | Moved single-field collection group entries to `"fieldOverrides"` array; only composite (2+ field) indexes belong in `"indexes"`                                                               |
 | 2026-03-02 | `OFFICIAL_DETAILS.EMAIL ID` field path (contains a space) rejected by Firebase CLI in `fieldOverrides` with regex validation error                                          | Renamed field key from `EMAIL ID` to `EMAIL_ID` across all JS/JSX/rules files via PowerShell global replace; added `OFFICIAL_DETAILS.EMAIL_ID` to `fieldOverrides` in `firestore.indexes.json` |
 | 2026-03-02 | Existing Firestore student docs still had old `OFFICIAL_DETAILS["EMAIL ID"]` key after code rename                                                                          | Ran `scripts/migrateEmailIdField.js` — updated 120 docs across 6 project codes in Firestore via batch writes; old key deleted, new `EMAIL_ID` key written atomically                           |
+| 2026-03-04 | `certificate_enrollments` nested under each student required collectionGroup queries for per-project lookups — slow and required manual index deploys                       | Restructured to flat subcollection `students/{projectDocId}/certificate_enrollments/{studentId}_{certificateId}` — direct collection queries, no collectionGroup needed for per-project ops    |
+| 2026-03-04 | Firestore rules only had old nested path — new flat path caused "Missing or insufficient permissions"                                                                       | Added Firestore rule at `students/{projectDocId}/certificate_enrollments/{enrollmentDocId}`; deployed via `firebase deploy --only firestore:rules`                                             |
+| 2026-03-04 | `AssignCertificateModal.jsx` accidentally deleted via terminal `Remove-Item`                                                                                                | Recreated from scratch with all improvements (normalizeExamCode, comma-separated codes, includeInactive, unmatchedCodes dedup)                                                                 |
+| 2026-03-04 | AZ-900 exam code not matching — Unicode dashes (–, —) from Excel copy-paste didn't match ASCII hyphens in Firestore                                                         | Added `normalizeExamCode()` helper that replaces Unicode dash variants with ASCII hyphen; applied in AssignCertificateModal matching logic                                                     |
+| 2026-03-04 | SuperAdmin ProjectCodeStudents had academic detail columns (DOB, 10th%, 12th%, UG%, PG%) instead of matching college-admin layout                                           | Changed columns to Student ID, Name, Email ID, Current Year, Result Status + Edit icon — matching college-admin Students page                                                                  |
 
 ---
 
@@ -199,3 +248,6 @@ File: `firestore.indexes.json` at project root (already created).
 - **Active Firebase account** for deploys is `ayushssonavane@gmail.com` (project owner); `sonavaneayush1@gmail.com` is a secondary account without deploy permissions — always check with `firebase login:list` before deploying
 - **`OFFICIAL_DETAILS.EMAIL_ID`** — field was renamed from `EMAIL ID` (with space) to `EMAIL_ID` (underscore) on 2026-03-02; all 120 Firestore student docs migrated via `scripts/migrateEmailIdField.js`; re-run this script if new legacy-format docs are imported
 - Single-field collection group indexes → `fieldOverrides` in `firestore.indexes.json`; composite indexes → `indexes` array
+- **`certificate_enrollments` flat path**: `students/{projectDocId}/certificate_enrollments/{studentId}_{certificateId}` — doc ID is composite; do NOT use collectionGroup for per-project queries (use direct collection reference instead)
+- **SuperAdmin and College-Admin Students columns are now identical**: Student ID | Name | Email ID | Current Year | Result Status — keep them in sync if either changes
+- **`normalizeExamCode()`** in `AssignCertificateModal.jsx` and `certificateService.js` — handles Unicode dashes from Excel; must be applied whenever comparing exam codes from user input

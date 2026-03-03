@@ -4,6 +4,7 @@ import {
   getStudentsByProject,
   getStudentsByProjectPage,
 } from "../../../services/studentService";
+import { getStudentEnrollmentsByProject } from "../../../services/certificateService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import StudentModal from "../../components/StudentModal";
 
@@ -26,13 +27,23 @@ const getCurrentYearFromProjectCode = (projectCode) => {
 
 const toDisplayStudent = (student) => {
   const official = student?.OFFICIAL_DETAILS || {};
-  const certificateResults =
+
+  // Prefer enrollment data from the new flat certificate_enrollments subcollection
+  const enrollments = Array.isArray(student?._enrollments)
+    ? student._enrollments
+    : [];
+
+  // Fallback to legacy certificateResults stored on the student doc
+  const legacyResults =
+    enrollments.length === 0 &&
     student?.certificateResults &&
     typeof student.certificateResults === "object"
       ? Object.values(student.certificateResults)
       : [];
 
-  const normalizedCertificates = certificateResults
+  const source = enrollments.length > 0 ? enrollments : legacyResults;
+
+  const normalizedCertificates = source
     .filter((result) => !result?.isDeleted)
     .map((result) => ({
       id: String(result?.certificateId || "").trim(),
@@ -123,39 +134,30 @@ const matchesCertificate = (student, certificate) => {
 
   if (!targetName) return false;
 
-  const certificateIds = Array.isArray(student?.certificateIds)
-    ? student.certificateIds.map((id) => String(id).trim())
+  // Check new flat enrollments first (_enrollments attached during load)
+  const enrollments = Array.isArray(student?._enrollments)
+    ? student._enrollments
     : [];
-  if (targetId && certificateIds.includes(targetId)) {
+  if (
+    enrollments.some(
+      (e) =>
+        e.certificateId === targetId ||
+        String(e.certificateName || "")
+          .trim()
+          .toLowerCase() === targetName,
+    )
+  ) {
     return true;
   }
 
-  const resultMap =
-    student?.certificateResults &&
-    typeof student.certificateResults === "object"
-      ? student.certificateResults
-      : {};
-
-  if (targetId && resultMap[targetId]) {
-    return true;
-  }
-
-  const resultNameMatch = Object.values(resultMap).some(
-    (entry) =>
-      String(entry?.certificateName || "")
-        .trim()
-        .toLowerCase() === targetName,
-  );
-  if (resultNameMatch) {
-    return true;
-  }
-
+  // Check certificateItems (computed by toDisplayStudent)
   const certificateItems = Array.isArray(student?.certificateItems)
     ? student.certificateItems
     : [];
   if (
     certificateItems.some(
       (item) =>
+        String(item.id || "").trim() === targetId ||
         String(item.name || "")
           .trim()
           .toLowerCase() === targetName,
@@ -285,12 +287,20 @@ export default function Students() {
         setLoadingStudents(true);
         setSelectedCertificateId("");
         setCurrentPage(1);
-        const studentsByProject = await getStudentsByProject(
-          selectedProjectCode,
-          { maxDocs: 5000 },
-        );
+        const [studentsByProject, enrollmentsMap] = await Promise.all([
+          getStudentsByProject(selectedProjectCode, { maxDocs: 5000 }),
+          getStudentEnrollmentsByProject(selectedProjectCode),
+        ]);
         if (!mounted) return;
-        const mappedStudents = (studentsByProject || []).map(toDisplayStudent);
+
+        // Attach enrollment data to each student object
+        const studentsWithEnrollments = (studentsByProject || []).map((s) => {
+          const studentId = s.docId || s.id || "";
+          const enrollments = enrollmentsMap.get(studentId) || [];
+          return { ...s, _enrollments: enrollments };
+        });
+
+        const mappedStudents = studentsWithEnrollments.map(toDisplayStudent);
         setProjectStudents(mappedStudents);
         setCertificateOptions(
           getCertificateOptionsFromStudents(mappedStudents),
