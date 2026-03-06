@@ -539,5 +539,5 @@ function StatusPills({ enrolledCount, passedCount, failedCount }) {
         </span>
       )}
     </div>
-  );
+  ); 
 }
