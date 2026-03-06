@@ -146,6 +146,26 @@ service cloud.firestore {
       }
     }
 
+    // CollectionGroup rule for students_list — required for collectionGroup queries
+    // (e.g. getAllStudents, getAllStudentsCount on Dashboard)
+    match /{path=**}/students_list/{studentId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          ("" + resource.data.collegeCode).lower() == requesterCollegeCode()) ||
+        sameAuthEmailFromStudentDoc(resource.data);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // CollectionGroup rule for certificate_enrollments — required for collectionGroup queries
+    // (e.g. getCertificateEnrollmentCounts, softDeleteCertificate across all projects)
+    match /{path=**}/certificate_enrollments/{enrollmentDocId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          ("" + resource.data.collegeCode).lower() == requesterCollegeCode()) ||
+        (isSignedIn() && sameAuthEmail(resource.data.email));
+      allow create, update, delete: if isSuperAdmin();
+    }
+
     match /college/{collegeCode} {
       allow read: if isSignedIn();
       allow create, update, delete: if isSuperAdmin();
