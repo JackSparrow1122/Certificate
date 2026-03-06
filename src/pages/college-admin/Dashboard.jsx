@@ -46,6 +46,14 @@ const normalizeCollegeLogoUrl = (value) => {
 
 const DASHBOARD_SAMPLE_PROJECT_LIMIT = 12;
 const DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT = 120;
+const extractPassYearFromProjectCode = (code) => {
+  const parts = String(code || "")
+    .split("/")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return "";
+  return parts[parts.length - 1];
+};
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -55,6 +63,9 @@ export default function AdminDashboard() {
   )
     .trim()
     .toUpperCase();
+  const [selectedYear, setSelectedYear] = useState("All");
+  const [selectedCourse, setSelectedCourse] = useState("All");
+  const [selectedPassYear, setSelectedPassYear] = useState("All");
 
   const parseProgress = (progressValue) => {
     const parsed = Number(
@@ -272,13 +283,87 @@ export default function AdminDashboard() {
     };
   }, [collegeCode]);
 
+  const courseOptions = useMemo(() => {
+    const courses = new Set(
+      projects.map((p) => String(p.course || p.courseCode || "").trim()).filter(Boolean),
+    );
+    return ["All", ...Array.from(courses).sort()];
+  }, [projects]);
+
+  const academicYears = useMemo(() => {
+    const years = new Set(
+      projects.map((p) => String(p.year || p.academicYear || "").trim()).filter(Boolean),
+    );
+    return ["All", ...Array.from(years).sort()];
+  }, [projects]);
+
+  const passYearOptions = useMemo(() => {
+    const years = new Set(
+      projects.map((p) => extractPassYearFromProjectCode(p.code)).filter(Boolean),
+    );
+    return ["All", ...Array.from(years).sort()];
+  }, [projects]);
+
   const data = useMemo(() => {
+    const projectMetaByCode = new Map(
+      projects.map((p) => [
+        String(p.code || "").trim(),
+        {
+          year: String(p.year || p.academicYear || "").trim(),
+          course: String(p.course || p.courseCode || "").trim(),
+          passYear: extractPassYearFromProjectCode(p.code),
+        },
+      ]),
+    );
+
+    const filteredProjects = projects.filter((p) => {
+      const meta = projectMetaByCode.get(String(p.code || "").trim()) || {
+        year: "",
+        course: "",
+        passYear: "",
+      };
+      const yearOk = selectedYear === "All" || meta.year === selectedYear;
+      const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
+      const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+      return yearOk && courseOk && passOk;
+    });
+
+    const filteredProjectCounts = Object.fromEntries(
+      Object.entries(projectStudentCounts).filter(([code]) => {
+        const meta = projectMetaByCode.get(String(code || "").trim()) || {
+          year: "",
+          course: "",
+          passYear: "",
+        };
+        const yearOk = selectedYear === "All" || meta.year === selectedYear;
+        const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
+        const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+        return yearOk && courseOk && passOk;
+      }),
+    );
+
+    const filteredStudents =
+      selectedYear === "All" && selectedCourse === "All" && selectedPassYear === "All"
+        ? students
+        : students.filter((student) => {
+            const projectCode = String(student.projectId || student.projectCode || "").trim();
+            const meta = projectMetaByCode.get(projectCode) || {
+              year: "",
+              course: "",
+              passYear: "",
+            };
+            const yearOk = selectedYear === "All" || meta.year === selectedYear;
+            const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
+            const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+            return yearOk && courseOk && passOk;
+          });
+
     const byCourse = {};
-    projects.forEach((p) => {
+    filteredProjects.forEach((p) => {
       const courseKey = p.course || p.courseCode || "Unknown";
       byCourse[courseKey] =
         (byCourse[courseKey] || 0) +
-        Number(projectStudentCounts[String(p.code || "").trim()] || 0);
+        Number(filteredProjectCounts[String(p.code || "").trim()] || 0);
     });
 
     const barData = Object.keys(byCourse).map((k) => ({
@@ -297,7 +382,7 @@ export default function AdminDashboard() {
       { name: "71-100%", value: 0 },
     ];
 
-    students.forEach((student) => {
+    filteredStudents.forEach((student) => {
       const progress = getStudentProgress(student);
       if (progress <= 40) progressBands[0].value += 1;
       else if (progress <= 70) progressBands[1].value += 1;
@@ -314,17 +399,17 @@ export default function AdminDashboard() {
           )
         : 0;
 
-    const topProjects = projects
+    const topProjects = filteredProjects
       .map((project) => ({
         ...project,
         totalStudents: Number(
-          projectStudentCounts[String(project.code || "").trim()] || 0,
+          filteredProjectCounts[String(project.code || "").trim()] || 0,
         ),
       }))
       .sort((a, b) => b.totalStudents - a.totalStudents)
       .slice(0, 5);
 
-    const totalEnrollments = Object.values(projectStudentCounts).reduce(
+    const totalEnrollments = Object.values(filteredProjectCounts).reduce(
       (sum, count) => sum + Number(count || 0),
       0,
     );
@@ -333,13 +418,13 @@ export default function AdminDashboard() {
       totalEnrollments,
       completionRate: `${avgProgress}%`,
       certificatesIssued: certifications.length,
-      activeProjectCodes: projects.length,
+      activeProjectCodes: filteredProjects.length,
       barData,
       pieData,
       progressBands,
       topProjects,
     };
-  }, [students, projects, certifications, projectStudentCounts]);
+  }, [students, projects, certifications, projectStudentCounts, selectedYear, selectedCourse, selectedPassYear]);
 
   const certificationData = useMemo(() => {
     const statsByCertificate = {};
@@ -507,6 +592,53 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+      </section>
+
+      <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#D7E2F1] bg-white px-4 py-3 text-sm text-[#0B2A4A] shadow-sm">
+        <label className="flex items-center gap-2">
+          <span className="font-medium">Current Year</span>
+          <select
+            className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+          >
+            {academicYears.map((year) => (
+              <option key={year} value={year}>
+                {year === "All" ? "All Years" : year}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-2">
+          <span className="font-medium">Course</span>
+          <select
+            className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+            value={selectedCourse}
+            onChange={(e) => setSelectedCourse(e.target.value)}
+          >
+            {courseOptions.map((course) => (
+              <option key={course} value={course}>
+                {course === "All" ? "All Courses" : course}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex items-center gap-2">
+          <span className="font-medium">Passing Year</span>
+          <select
+            className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+            value={selectedPassYear}
+            onChange={(e) => setSelectedPassYear(e.target.value)}
+          >
+            {passYearOptions.map((year) => (
+              <option key={year} value={year}>
+                {year === "All" ? "All Years" : year}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">

@@ -6,7 +6,7 @@ import {
   Clock3,
   Target,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentForAuthUser } from "../../../services/studentService";
 import { getCertificatesByIds } from "../../../services/certificateService";
@@ -66,6 +66,7 @@ export default function StudentDashboard() {
   const { user, profile } = useAuth();
   const [currentStudent, setCurrentStudent] = useState(null);
   const [enrolledCertificates, setEnrolledCertificates] = useState([]);
+  const [selectedYear, setSelectedYear] = useState("All Years");
   const [certLoading, setCertLoading] = useState(false);
   const certScrollRef = useRef(null);
 
@@ -139,6 +140,10 @@ export default function StudentDashboard() {
         setEnrolledCertificates([]);
         return;
       }
+
+      const projectYearTag = getCurrentYearFromProjectCode(
+        currentStudent.projectCode || currentStudent.projectId,
+      );
 
       const resultMap =
         currentStudent.certificateResults &&
@@ -322,7 +327,11 @@ export default function StudentDashboard() {
           });
         }
 
-        const finalList = Array.from(finalById.values());
+        const finalList = Array.from(finalById.values()).map((cert, index) => ({
+          ...cert,
+          yearTag: cert.yearTag || projectYearTag || currentYear || "",
+          id: cert.id || cert.certificateId || `cert-${index}`,
+        }));
 
         if (mounted) {
           setEnrolledCertificates(finalList);
@@ -341,7 +350,23 @@ export default function StudentDashboard() {
     };
   }, [currentStudent]);
 
-  const statusSummary = enrolledCertificates.reduce(
+  const certYearOptions = useMemo(() => {
+    const years = new Set(
+      enrolledCertificates
+        .map((cert) => String(cert.yearTag || "").trim())
+        .filter(Boolean),
+    );
+    return ["All Years", ...Array.from(years).sort()];
+  }, [enrolledCertificates]);
+
+  const filteredCertificates = useMemo(() => {
+    if (selectedYear === "All Years") return enrolledCertificates;
+    return enrolledCertificates.filter(
+      (cert) => String(cert.yearTag || "").trim() === selectedYear,
+    );
+  }, [enrolledCertificates, selectedYear]);
+
+  const statusSummary = filteredCertificates.reduce(
     (acc, certificate) => {
       const normalizedStatus = normalizeCertificateStatus(certificate.status);
       if (normalizedStatus === "passed") acc.passed += 1;
@@ -354,6 +379,20 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-7">
+      <section className="flex flex-wrap items-center justify-end gap-3 px-1">
+        <select
+          className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(e.target.value)}
+        >
+          {certYearOptions.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </section>
+
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Enrolled"
@@ -391,7 +430,7 @@ export default function StudentDashboard() {
               type="button"
               className="rounded-xl border border-[#1D5FA8] bg-white px-4 py-2 text-sm font-semibold text-[#1D5FA8]"
             >
-              {enrolledCertificates.length} enrolled
+              {filteredCertificates.length} shown
             </button>
           </div>
 
@@ -421,8 +460,8 @@ export default function StudentDashboard() {
                 <div className="flex min-h-[220px] w-full min-w-[270px] items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-gray-500">
                   Loading certificates...
                 </div>
-              ) : enrolledCertificates.length > 0 ? (
-                enrolledCertificates.map((certificate) => (
+              ) : filteredCertificates.length > 0 ? (
+                filteredCertificates.map((certificate) => (
                   <CertificateCard
                     key={certificate.id}
                     certificate={certificate}
