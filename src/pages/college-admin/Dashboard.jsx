@@ -68,7 +68,7 @@ const deriveCourseFromProjectCode = (code) => {
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
-  const COLORS = ["#0B2A4A", "#1D5FA8", "#6BC7A7", "#D29A2D"];
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444"];
   const collegeCode = String(
     profile?.collegeCode || profile?.college_code || "",
   )
@@ -632,8 +632,8 @@ export default function AdminDashboard() {
 
     const words = text.split(/\s+/);
     const lines = [];
-    const maxCharsPerLine = 14;
-    const maxLines = 2;
+    const maxCharsPerLine = 16;
+    const maxLines = 3;
     let currentLine = "";
 
     words.forEach((word) => {
@@ -657,8 +657,8 @@ export default function AdminDashboard() {
       const clamped = lines.slice(0, maxLines);
       const last = clamped[maxLines - 1];
       clamped[maxLines - 1] =
-        last.length > maxCharsPerLine - 1
-          ? `${last.slice(0, maxCharsPerLine - 1)}…`
+        last.length > maxCharsPerLine - 2
+          ? `${last.slice(0, maxCharsPerLine - 2)}…`
           : `${last}…`;
       return clamped;
     }
@@ -667,57 +667,55 @@ export default function AdminDashboard() {
   };
 
   const renderCertificateTick = ({ x, y, payload }) => {
-    const lines = splitCertificateLabel(payload?.value);
+    const text = String(payload?.value || "").trim();
 
     return (
       <g transform={`translate(${x},${y})`}>
         <text
           x={0}
           y={0}
-          dy={16}
-          textAnchor="middle"
-          fill="#4b5563"
-          fontSize={12}
+          dy={4}
+          textAnchor="end"
+          fill="#6B7280"
+          fontSize={11}
+          fontWeight={500}
+          transform="rotate(-45)"
         >
-          {lines.map((line, index) => (
-            <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 0 : 13}>
-              {line}
-            </tspan>
-          ))}
+          {text}
         </text>
       </g>
     );
   };
 
   return (
-    <div className="space-y-6">
-      <section className="collegeadmin-navbar-card rounded-3xl border border-[#D7E2F1] bg-white px-6 py-7">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-6 bg-gray-50">
+      <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-md">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-[#0B2A4A]">
-              College Admin Control Center
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              Dashboard
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Monitor enrollments, performance trends, and certification health.
+            <p className="mt-2 text-base text-gray-600">
+              Monitor enrollments, performance, and certification metrics
             </p>
             {cacheInfo.cachedAt > 0 && (
-              <p className="mt-1 text-xs text-gray-400">
-                {cacheInfo.isStale ? "⚠\uFE0F " : ""}Last updated:{" "}
+              <p className="mt-3 text-xs font-medium text-gray-500">
+                {cacheInfo.isStale ? "⚠️ " : "✓ "}
                 {cacheAgeLabel(cacheInfo.cachedAt)}
               </p>
             )}
           </div>
-          <div className="hidden md:flex md:items-center">
+          <div className="hidden md:flex md:items-center md:justify-center">
             {collegeInfo.logo && !logoLoadFailed ? (
               <img
                 src={collegeInfo.logo}
                 alt={collegeInfo.name || "College"}
-                className="max-h-24 w-auto max-w-104 rounded-lg"
+                className="max-h-20 w-auto max-w-48 object-contain"
                 referrerPolicy="no-referrer"
                 onError={() => setLogoLoadFailed(true)}
               />
             ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-[#0B2A4A] text-3xl font-bold text-white">
+              <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-xl font-bold text-white">
                 {String(collegeCode || "CLG").slice(0, 2)}
               </div>
             )}
@@ -725,11 +723,11 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#D7E2F1] bg-white px-4 py-3 text-sm text-[#0B2A4A] shadow-sm">
-        <label className="flex items-center gap-2">
-          <span className="font-medium">Current Year</span>
+      <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <label className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-700">Year</span>
           <select
-            className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
           >
@@ -741,10 +739,10 @@ export default function AdminDashboard() {
           </select>
         </label>
 
-        <label className="flex items-center gap-2">
-          <span className="font-medium">Course</span>
+        <label className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-700">Course</span>
           <select
-            className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedCourse}
             onChange={(e) => setSelectedCourse(e.target.value)}
           >
@@ -756,10 +754,10 @@ export default function AdminDashboard() {
           </select>
         </label>
 
-        <label className="flex items-center gap-2">
-          <span className="font-medium">Passing Year</span>
+        <label className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-700">Pass Year</span>
           <select
-            className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedPassYear}
             onChange={(e) => setSelectedPassYear(e.target.value)}
           >
@@ -772,91 +770,109 @@ export default function AdminDashboard() {
         </label>
       </section>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Enrollments"
           value={data.totalEnrollments}
-          icon={<Users size={18} />}
+          icon={<Users size={20} />}
+          color="blue"
         />
         <StatCard
           title="Avg Completion"
           value={data.completionRate}
-          icon={<BookOpenCheck size={18} />}
+          icon={<BookOpenCheck size={20} />}
+          color="emerald"
         />
         <StatCard
           title="Certificates"
           value={data.certificatesIssued}
-          icon={<Award size={18} />}
+          icon={<Award size={20} />}
+          color="amber"
         />
         <StatCard
           title="Project Codes"
           value={data.activeProjectCodes}
-          icon={<Layers3 size={18} />}
+          icon={<Layers3 size={20} />}
+          color="rose"
         />
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <Panel title="Enrollment by Course">
-          <ResponsiveContainer width="100%" height={270} debounce={75}>
-            <BarChart data={data.barData} barSize={42}>
+          <ResponsiveContainer width="100%" height={300} debounce={75}>
+            <BarChart data={data.barData} barSize={48}>
               <CartesianGrid
-                strokeDasharray="3 3"
+                strokeDasharray="4 4"
                 vertical={false}
-                stroke="#e5e7eb"
+                stroke="#E5E7EB"
               />
-              <XAxis dataKey="course" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} />
-              <Tooltip cursor={false} />
+              <XAxis dataKey="course" tick={{ fontSize: 13, fill: "#6B7280" }} />
+              <YAxis tick={{ fontSize: 13, fill: "#6B7280" }} allowDecimals={false} />
+              <Tooltip
+                cursor={{ fill: "#F3F4F6" }}
+                contentStyle={{
+                  backgroundColor: "white",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: "8px",
+                }}
+              />
               <Bar
                 dataKey="count"
-                fill="#1D5FA8"
-                radius={[10, 10, 0, 0]}
+                fill="#3B82F6"
+                radius={[12, 12, 0, 0]}
                 rootTabIndex={-1}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
+                animationDuration={400}
                 animationEasing="ease-out"
               />
             </BarChart>
           </ResponsiveContainer>
         </Panel>
 
-        <Panel title="Certification Enrollment & Results">
-          <ResponsiveContainer width="100%" height={270} debounce={75}>
+        <Panel title="Certification Results">
+          <ResponsiveContainer width="100%" height={340} debounce={75}>
             <BarChart
               data={certificationData}
-              barCategoryGap="22%"
+              barCategoryGap="18%"
               maxBarSize={54}
-              margin={{ top: 24, right: 20, left: 0, bottom: 28 }}
+              margin={{ top: 24, right: 24, left: 0, bottom: 60 }}
             >
               <CartesianGrid
-                strokeDasharray="3 3"
+                strokeDasharray="4 4"
                 vertical={false}
-                stroke="#e5e7eb"
+                stroke="#E5E7EB"
               />
               <XAxis
                 dataKey="label"
                 interval={0}
-                height={48}
-                tickMargin={4}
+                height={50}
+                tickMargin={8}
                 tick={renderCertificateTick}
               />
-              <YAxis allowDecimals={false} />
-              <Tooltip cursor={{ fill: "#f3f4f6" }} />
+              <YAxis tick={{ fontSize: 13, fill: "#6B7280" }} allowDecimals={false} />
+              <Tooltip
+                cursor={{ fill: "#F3F4F6" }}
+                contentStyle={{
+                  backgroundColor: "white",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: "8px",
+                }}
+              />
               <Legend verticalAlign="top" align="right" />
               <Bar
                 dataKey="Enrolled"
                 name="Ongoing"
                 stackId="a"
-                fill="#1D5FA8"
+                fill="#3B82F6"
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
+                animationDuration={400}
               />
               <Bar
                 dataKey="Passed"
                 stackId="a"
-                fill="#6BC7A7"
+                fill="#10B981"
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
+                animationDuration={400}
               />
               <Bar
                 dataKey="Failed"
@@ -864,7 +880,7 @@ export default function AdminDashboard() {
                 fill="#EF4444"
                 radius={[4, 4, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
+                animationDuration={400}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -873,93 +889,109 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <Panel title="Student Progress Distribution">
-          <ResponsiveContainer width="100%" height={270} debounce={75}>
+          <ResponsiveContainer width="100%" height={320} debounce={75}>
             <PieChart>
               <Pie
                 data={data.progressBands}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={60}
-                outerRadius={92}
+                innerRadius={70}
+                outerRadius={110}
                 rootTabIndex={-1}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
+                animationDuration={400}
                 animationEasing="ease-out"
               >
                 {data.progressBands.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip cursor={false} />
-              <Legend />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "white",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: "8px",
+                }}
+              />
+              <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         </Panel>
 
-        <Panel title="Course Share">
-          <ResponsiveContainer width="100%" height={260} debounce={75}>
+        <Panel title="Course Distribution">
+          <ResponsiveContainer width="100%" height={320} debounce={75}>
             <PieChart>
               <Pie
                 data={data.pieData}
                 dataKey="value"
                 nameKey="name"
-                outerRadius={92}
+                outerRadius={110}
                 rootTabIndex={-1}
-                label={!isLayoutResizing}
+                label
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
+                animationDuration={400}
                 animationEasing="ease-out"
               >
                 {data.pieData.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip cursor={false} />
-              <Legend />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "white",
+                  border: "1px solid #E5E7EB",
+                  borderRadius: "8px",
+                }}
+              />
+              <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         </Panel>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        <Panel title="Recent Project Batches">
+        <Panel title="Top Projects by Enrollment">
           <div className="space-y-3">
-            {data.topProjects.map((project) => (
+            {data.topProjects.map((project, idx) => (
               <div
                 key={project.id || project.code}
-                className="rounded-xl border border-[#D7E2F1] bg-[#F7FAFF] px-4 py-3"
+                className="group flex items-center justify-between rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-white px-4 py-3 transition hover:border-gray-300 hover:shadow-sm"
               >
-                <p className="text-sm font-semibold text-gray-900">
-                  {project.code || project.id}
-                </p>
-                <p className="text-xs text-gray-600">{project.course}</p>
-                <p className="mt-1 text-xs text-[#0B2A4A]">
-                  {project.totalStudents} students
-                </p>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">{project.code || project.id}</p>
+                  <p className="text-xs text-gray-600">{project.course}</p>
+                </div>
+                <div className="ml-4 flex items-center gap-2">
+                  <Users size={16} className="text-gray-400" />
+                  <span className="font-semibold text-gray-900">{project.totalStudents}</span>
+                </div>
               </div>
             ))}
           </div>
         </Panel>
       </div>
 
-      <Panel title="Live Student Tracking Table">
+      <Panel title="Project Codes Overview">
         <div className="overflow-x-auto">
-          <table className="min-w-160 w-full text-sm">
+          <table className="min-w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500">
-                <th className="py-2">Project Code</th>
-                <th>College</th>
-                <th>Course</th>
-                <th>Year</th>
+              <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">Project Code</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">College</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">Course</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">Year</th>
               </tr>
             </thead>
             <tbody>
-              {projects.map((p) => (
-                <tr key={p.id || p.code} className="border-t">
-                  <td className="py-2">{p.code || p.id}</td>
-                  <td>{p.college || "-"}</td>
-                  <td>{p.course || p.courseCode || "-"}</td>
-                  <td>{p.year || "-"}</td>
+              {projects.map((p, idx) => (
+                <tr
+                  key={p.id || p.code}
+                  className="border-b border-gray-100 transition hover:bg-gray-50"
+                >
+                  <td className="px-6 py-3 font-medium text-gray-900">{p.code || p.id}</td>
+                  <td className="px-6 py-3 text-gray-600">{p.college || "-"}</td>
+                  <td className="px-6 py-3 text-gray-600">{p.course || p.courseCode || "-"}</td>
+                  <td className="px-6 py-3 text-gray-600">{p.year || "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -972,24 +1004,31 @@ export default function AdminDashboard() {
 
 /* Helper Components */
 
-function StatCard({ title, value, icon }) {
+function StatCard({ title, value, icon, color = "blue" }) {
+  const colorClasses = {
+    blue: "from-blue-50 to-blue-100 text-blue-600 bg-blue-100",
+    emerald: "from-emerald-50 to-emerald-100 text-emerald-600 bg-emerald-100",
+    amber: "from-amber-50 to-amber-100 text-amber-600 bg-amber-100",
+    rose: "from-rose-50 to-rose-100 text-rose-600 bg-rose-100",
+  };
+
+  const iconBg = colorClasses[color] || colorClasses.blue;
+
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-[#0B2A4A]/70">{title}</p>
-        <span className="rounded-lg bg-[#0B2A4A]/10 p-1.5 text-[#0B2A4A]">
-          {icon}
-        </span>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</p>
+        <span className={`rounded-lg ${iconBg} p-2.5`}>{icon}</span>
       </div>
-      <h2 className="mt-2 text-xl font-semibold text-[#0B2A4A]">{value}</h2>
+      <h2 className="mt-4 text-3xl font-bold text-gray-900">{value}</h2>
     </div>
   );
 }
 
 function Panel({ title, children }) {
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
-      <h3 className="mb-4 text-base font-semibold text-[#0B2A4A]">{title}</h3>
+    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-semibold text-gray-900">{title}</h3>
       {children}
     </div>
   );
