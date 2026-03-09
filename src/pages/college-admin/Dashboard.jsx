@@ -183,16 +183,16 @@ export default function AdminDashboard() {
     const CA_CACHE_KEY = `college_admin_dashboard_${collegeCode}`;
 
     // Hydrate from cache immediately — prevents blank graphs on reconnect
-    const cached = getCached(CA_CACHE_KEY);
-    if (cached?.data && collegeCode) {
-      const d = cached.data;
-      setStudents(d.students || []);
-      setProjects(d.projects || []);
-      setProjectStudentCounts(d.projectStudentCounts || {});
-      setCertifications(d.certifications || []);
-      setCollegeInfo(d.collegeInfo || { name: "", logo: "" });
-      setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
-    }
+    // const cached = getCached(CA_CACHE_KEY);
+    // if (cached?.data && collegeCode) {
+    //   const d = cached.data;
+    //   setStudents(d.students || []);
+    //   setProjects(d.projects || []);
+    //   setProjectStudentCounts(d.projectStudentCounts || {});
+    //   setCertifications(d.certifications || []);
+    //   setCollegeInfo(d.collegeInfo || { name: "", logo: "" });
+    //   setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
+    // }
 
     const load = async () => {
       try {
@@ -501,15 +501,27 @@ export default function AdminDashboard() {
       );
     });
 
-    const barData = Array.from(byCourse.entries()).map(([course, count]) => ({
-      course,
-      count,
-    }));
+    const barData = Array.from(byCourse.entries())
+      .map(([course, count]) => ({
+        course,
+        count,
+      }))
+      .sort((a, b) => {
+        if (a.course === "Other") return 1;
+        if (b.course === "Other") return -1;
+        return a.course.localeCompare(b.course);
+      });
 
-    const pieData = Array.from(byCourse.entries()).map(([name, value]) => ({
-      name,
-      value,
-    }));
+    const pieData = Array.from(byCourse.entries())
+      .map(([name, value]) => ({
+        name,
+        value,
+      }))
+      .sort((a, b) => {
+        if (a.name === "Other") return 1;
+        if (b.name === "Other") return -1;
+        return a.name.localeCompare(b.name);
+      });
 
     // Compute progress using the richest available source: certificate stats first,
     // then fall back to sampled student docs. This avoids empty graphs when student
@@ -603,9 +615,30 @@ export default function AdminDashboard() {
 
   const certificationData = useMemo(() => {
     const statsByCertificate = {};
-
     const { filteredStudents, filteredCertStats } = filteredData;
+    const certsWithStats = new Set();
 
+    // 1. Merge in aggregated enrollment stats (per filtered project)
+    filteredCertStats.forEach((statsMap) => {
+      statsMap.forEach((stat, certId) => {
+        const label = String(stat.name || certId).trim();
+        certsWithStats.add(label);
+
+        if (!statsByCertificate[label]) {
+          statsByCertificate[label] = {
+            label: label,
+            Enrolled: 0,
+            Passed: 0,
+            Failed: 0,
+          };
+        }
+        statsByCertificate[label].Enrolled += stat.enrolledCount || 0;
+        statsByCertificate[label].Passed += stat.passedCount || 0;
+        statsByCertificate[label].Failed += stat.failedCount || 0;
+      });
+    });
+
+    // 2. Process students for legacy/missing stats (avoid double counting)
     filteredStudents.forEach((student) => {
       const results =
         student.certificateResults &&
@@ -615,11 +648,10 @@ export default function AdminDashboard() {
             )
           : [];
 
-      // Handle new structure with multiple certificate results
       if (results.length > 0) {
         results.forEach((result) => {
           const certName = String(result?.certificateName || "").trim();
-          if (!certName) return;
+          if (!certName || certsWithStats.has(certName)) return;
 
           if (!statsByCertificate[certName]) {
             statsByCertificate[certName] = {
@@ -640,9 +672,11 @@ export default function AdminDashboard() {
           }
         });
       }
-      // Handle legacy structure with a single certificate
+      
       const legacyCertName = String(student.certificate || "").trim();
       if (legacyCertName && results.length === 0) {
+        if (certsWithStats.has(legacyCertName)) return;
+
         if (!statsByCertificate[legacyCertName]) {
           statsByCertificate[legacyCertName] = {
             label: legacyCertName,
@@ -667,26 +701,9 @@ export default function AdminDashboard() {
       }
     });
 
-    // Merge in aggregated enrollment stats (per filtered project) to ensure bar chart shows data
-    filteredCertStats.forEach((statsMap) => {
-      statsMap.forEach((stat, certId) => {
-        if (!statsByCertificate[certId]) {
-          statsByCertificate[certId] = {
-            label: stat.name || certId,
-            Enrolled: 0,
-            Passed: 0,
-            Failed: 0,
-          };
-        }
-        statsByCertificate[certId].Enrolled += stat.enrolledCount || 0;
-        statsByCertificate[certId].Passed += stat.passedCount || 0;
-        statsByCertificate[certId].Failed += stat.failedCount || 0;
-      });
-    });
-
-    return Object.values(statsByCertificate).sort((a, b) =>
-      String(a.label).localeCompare(String(b.label)),
-    );
+    return Object.values(statsByCertificate)
+      .filter(c => (c.Enrolled + c.Passed + c.Failed) > 0)
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)));
   }, [filteredData]);
 
   // Calculate max total for consistent Y-axis scaling in certification chart
