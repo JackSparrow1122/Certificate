@@ -1056,28 +1056,6 @@ export default function AdminDashboard() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        <Panel title="Top Projects by Enrollment">
-          <div className="space-y-3">
-            {data.topProjects.map((project, idx) => (
-              <div
-                key={project.id || project.code}
-                className="group flex items-center justify-between rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-white px-4 py-3 transition hover:border-gray-300 hover:shadow-sm"
-              >
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{project.code || project.id}</p>
-                  <p className="text-xs text-gray-600">{project.course}</p>
-                </div>
-                <div className="ml-4 flex items-center gap-2">
-                  <Users size={16} className="text-gray-400" />
-                  <span className="font-semibold text-gray-900">{project.totalStudents}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
-
       <Panel title="Project Codes Overview">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -1087,6 +1065,7 @@ export default function AdminDashboard() {
                 <th className="px-6 py-3 text-left font-semibold text-gray-700">College</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700">Course</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700">Year</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">Enrollment</th>
               </tr>
             </thead>
             <tbody>
@@ -1099,6 +1078,9 @@ export default function AdminDashboard() {
                   <td className="px-6 py-3 text-gray-600">{p.college || "-"}</td>
                   <td className="px-6 py-3 text-gray-600">{p.course || p.courseCode || "-"}</td>
                   <td className="px-6 py-3 text-gray-600">{p.year || "-"}</td>
+                  <td className="px-6 py-3 font-semibold text-gray-900">
+                    {projectStudentCounts[String(p.code || "").trim()] || 0}
+                  </td>
                 </tr>
               ))}
             </tbody>
