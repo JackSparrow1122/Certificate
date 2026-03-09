@@ -316,6 +316,9 @@ export const createCollegeAdmin = async (adminData, collegeCode) => {
       createdAt: new Date(),
     });
 
+    // 3. Send password reset email so admin can set their own password
+    await sendPasswordResetEmail(secondaryAuth, normalizedEmail);
+
     console.log("College admin created:", uid);
     return uid;
   } catch (error) {
@@ -365,6 +368,9 @@ export const createSuperAdmin = async (adminData) => {
       deletedAt: null,
       createdAt: new Date(),
     });
+
+    // 3. Send password reset email so admin can set their own password
+    await sendPasswordResetEmail(secondaryAuth, normalizedEmail);
 
     console.log("Super admin created:", uid);
     return uid;

@@ -59,14 +59,12 @@ const extractPassYearFromProjectCode = (code) => {
 const deriveCourseFromProjectCode = (code) => {
   const parts = String(code || "")
     .split("/")
-    .map((p) => p.trim())
+    .map((p) => p.trim().toUpperCase())
     .filter(Boolean);
-  const rawCourse = (parts[1] || "").toUpperCase();
-  if (!rawCourse) return "Other";
-  if (rawCourse.includes("MBA")) return "MBA";
-  if (rawCourse.includes("BBA")) return "BBA";
-  if (rawCourse.includes("ENGG") || rawCourse.includes("ENGINEERING")) return "ENGG";
-  return rawCourse;
+  if (parts.includes("MBA")) return "MBA";
+  if (parts.includes("BBA")) return "BBA";
+  if (parts.includes("ENGG") || parts.includes("ENGINEERING")) return "Engineering";
+  return "Other";
 };
 
 export default function AdminDashboard() {
@@ -351,9 +349,7 @@ export default function AdminDashboard() {
 
   const courseOptions = useMemo(() => {
     const courses = new Set(
-      projects
-        .map((p) => String(deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "").trim())
-        .filter(Boolean),
+      projects.map((p) => String(p.course || p.courseCode || "").trim()).filter(Boolean),
     );
     return ["All", ...Array.from(courses).sort()];
   }, [projects]);
@@ -377,7 +373,7 @@ export default function AdminDashboard() {
         String(p.code || "").trim(),
         {
           year: String(p.year || p.academicYear || "").trim(),
-          course: String(deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "").trim(),
+          course: String(p.course || p.courseCode || deriveCourseFromProjectCode(p.code)).trim(),
           passYear: extractPassYearFromProjectCode(p.code),
         },
       ]),
@@ -488,13 +484,15 @@ export default function AdminDashboard() {
 
     const byCourse = new Map();
     const normalizeCourse = (courseKey) => {
-      const val = String(courseKey || "").trim();
-      return val || "Other";
+      const lower = String(courseKey || "").toLowerCase();
+      if (lower.includes("mba")) return "MBA";
+      if (lower.includes("bba")) return "BBA";
+      if (lower.includes("eng")) return "Engineering";
+      return "Other";
     };
 
     filteredProjects.forEach((p) => {
-      const courseKey =
-        deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "Other";
+      const courseKey = deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "Other";
       const courseLabel = normalizeCourse(courseKey);
       const current = byCourse.get(courseLabel) || 0;
       byCourse.set(
@@ -503,23 +501,12 @@ export default function AdminDashboard() {
       );
     });
 
-    const reorder = (arr) =>
-      arr.sort((a, b) => {
-        const aOther = a[0] === "Other";
-        const bOther = b[0] === "Other";
-        if (aOther && !bOther) return 1;
-        if (!aOther && bOther) return -1;
-        return 0;
-      });
-
-    const orderedEntries = reorder(Array.from(byCourse.entries()));
-
-    const barData = orderedEntries.map(([course, count]) => ({
+    const barData = Array.from(byCourse.entries()).map(([course, count]) => ({
       course,
       count,
     }));
 
-    const pieData = orderedEntries.map(([name, value]) => ({
+    const pieData = Array.from(byCourse.entries()).map(([name, value]) => ({
       name,
       value,
     }));
@@ -770,18 +757,15 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">
               Dashboard{" "}
-              
+            
             </h1>
-           
-            <p className="mt-1 text-sm font-medium text-gray-700 leading-5">
-              Welcome Dr. Padma Adane,<br />
-              Dean<br />
-              School of Computer Science and Engineering<br />
-              Ramdeo Baba College of Engineering
+            <p className="mt-1 text-base font-semibold text-gray-700">
+              Welcome, {adminName}
+            </p>
+            <p className="mt-2 text-base text-gray-600">
             </p>
             
            
-            
           </div>
           <div className="hidden md:flex md:items-center md:justify-center">
             {collegeInfo.logo && !logoLoadFailed ? (
@@ -801,11 +785,11 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <label className="flex items-center gap-3">
+      <section className="grid w-full grid-cols-1 gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+        <label className="flex w-full items-center gap-3">
           <span className="text-sm font-semibold text-gray-700">Year</span>
           <select
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
           >
@@ -817,10 +801,10 @@ export default function AdminDashboard() {
           </select>
         </label>
 
-        <label className="flex items-center gap-3">
+        <label className="flex w-full items-center gap-3">
           <span className="text-sm font-semibold text-gray-700">Course</span>
           <select
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedCourse}
             onChange={(e) => setSelectedCourse(e.target.value)}
           >
@@ -832,10 +816,10 @@ export default function AdminDashboard() {
           </select>
         </label>
 
-        <label className="flex items-center gap-3">
+        <label className="flex w-full items-center gap-3">
           <span className="text-sm font-semibold text-gray-700">Pass Year</span>
           <select
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             value={selectedPassYear}
             onChange={(e) => setSelectedPassYear(e.target.value)}
           >
