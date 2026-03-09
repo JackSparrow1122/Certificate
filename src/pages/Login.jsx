@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
+import { Eye, EyeOff } from "lucide-react";
 
 import { auth } from "../firebase/config";
 import { getDashboardByRole } from "../utils/roleRedirect";
@@ -15,6 +16,7 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -160,23 +162,32 @@ export default function Login() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
+              <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A4A] focus:border-transparent transition"
               />
-              <div className="mt-2 text-right">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotModal(true)}
-                  className="text-sm text-[#0B2A4A] font-medium hover:underline"
-                >
-                  Forgot Password?
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="mt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-sm text-[#0B2A4A] font-medium hover:underline"
+              >
+                Forgot Password?
+              </button>
+            </div>
             </div>
 
             {/* Button */}
