@@ -87,6 +87,9 @@ export default function AdminDashboard() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const passedStatuses = ["passed", "completed", "certified", "pass"];
+  const failedStatuses = ["failed", "fail"];
+
   const hasPassedCertificate = (student) => {
     const results =
       student?.certificateResults &&
@@ -96,7 +99,7 @@ export default function AdminDashboard() {
 
     if (
       results.some((result) =>
-        ["passed", "completed"].includes(
+        passedStatuses.includes(
           String(result?.status || result?.result || "").toLowerCase(),
         ),
       )
@@ -104,7 +107,7 @@ export default function AdminDashboard() {
       return true;
     }
 
-    return ["passed", "completed"].includes(
+    return passedStatuses.includes(
       String(
         student?.certificateStatus ||
           student?.certificateResult?.status ||
@@ -125,10 +128,17 @@ export default function AdminDashboard() {
               : [];
 
           const anyFailed = results.some((r) =>
-            ["failed"].includes(String(r?.status || r?.result || "").toLowerCase()),
+            failedStatuses.includes(String(r?.status || r?.result || "").toLowerCase()),
           );
 
-          if (anyFailed) return 50;
+          const legacyStatus = String(
+            student?.certificateStatus ||
+              student?.certificateResult?.status ||
+              student?.certificateResult?.result ||
+              "",
+          ).toLowerCase();
+
+          if (anyFailed || failedStatuses.includes(legacyStatus)) return 55; // failed means partial completion (41-70%)
           return parseProgress(student?.progress);
         })();
 
@@ -488,28 +498,68 @@ export default function AdminDashboard() {
       value: byCourse[k],
     }));
 
+    // Compute progress using the richest available source: certificate stats first,
+    // then fall back to sampled student docs. This avoids empty graphs when student
+    // sampling misses projects but enrollment stats exist.
     const progressBands = [
       { name: "0-40%", value: 0 },
       { name: "41-70%", value: 0 },
       { name: "71-100%", value: 0 },
     ];
 
-    filteredStudents.forEach((student) => {
-      const progress = getStudentProgress(student);
+    let avgProgress = 0;
+
+    const addToBands = (progress) => {
       if (progress <= 40) progressBands[0].value += 1;
       else if (progress <= 70) progressBands[1].value += 1;
       else progressBands[2].value += 1;
+    };
+
+    // 1) Prefer aggregated certificate enrollment stats if they have data
+    let statsTotal = 0;
+    let statsWeighted = 0;
+
+    filteredData.filteredCertStats.forEach((statsMap) => {
+      statsMap.forEach((stat) => {
+        const passedCount = Number(stat.passedCount || 0);
+        const failedCount = Number(stat.failedCount || 0);
+        const enrolledCount = Number(stat.enrolledCount || 0);
+        const ongoingCount = Math.max(0, enrolledCount - passedCount - failedCount);
+
+        if (passedCount > 0) {
+          addToBands(100);
+          statsWeighted += passedCount * 100;
+          statsTotal += passedCount;
+        }
+        if (failedCount > 0) {
+          addToBands(55);
+          statsWeighted += failedCount * 55;
+          statsTotal += failedCount;
+        }
+        if (ongoingCount > 0) {
+          addToBands(20);
+          statsWeighted += ongoingCount * 20;
+          statsTotal += ongoingCount;
+        }
+      });
     });
 
-    const avgProgress =
-      students.length > 0
-        ? Math.round(
-            students.reduce(
-              (sum, student) => sum + getStudentProgress(student),
-              0,
-            ) / students.length,
-          )
-        : 0;
+    if (statsTotal > 0) {
+      avgProgress = Math.round(statsWeighted / statsTotal);
+    } else {
+      // 2) Fall back to sampled students
+      filteredStudents.forEach((student) => addToBands(getStudentProgress(student)));
+
+      const total = filteredStudents.length;
+      if (total > 0) {
+        avgProgress = Math.round(
+          filteredStudents.reduce(
+            (sum, student) => sum + getStudentProgress(student),
+            0,
+          ) / total,
+        );
+      }
+    }
 
     const topProjects = filteredProjects
       .map((project) => ({

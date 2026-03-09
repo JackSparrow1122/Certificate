@@ -881,8 +881,10 @@ export const getCertificateEnrollmentStatsByProject = async (projectCode) => {
 
       current.enrolledCount += 1;
       const status = String(d.status || "").toLowerCase();
-      if (status === "passed") current.passedCount += 1;
-      if (status === "failed") current.failedCount += 1;
+      const isPass = ["passed", "completed", "certified", "pass"].includes(status);
+      const isFail = ["failed", "fail"].includes(status);
+      if (isPass) current.passedCount += 1;
+      if (isFail) current.failedCount += 1;
 
       statsMap.set(certId, current);
     });
