@@ -181,25 +181,70 @@ export default function StudentDashboard() {
       // Fallback: per-project enrollments for this student's project
       try {
         const enrollmentsMap = await getStudentEnrollmentsByProject(projectCode);
-        const enrollmentEntries = Array.from(enrollmentsMap.values()).filter(
-          (row) => String(row.studentId || "").trim() === String(currentStudent.id || currentStudent.docId || "").trim(),
+        const enrollmentEntries = enrollmentsMap.get(
+          String(currentStudent.id || currentStudent.docId || "").trim(),
         );
-        if (enrollmentEntries.length > 0) {
-          const mapped = enrollmentEntries.map((entry, idx) => ({
-            id: entry.certificateId || `enroll-${idx}`,
-            name: entry.certificateName || "Certificate",
-            platform: entry.platform || "Certification",
-            organizationName: entry.organizationName || entry.domain || "",
-            organizationLogoUrl: entry.organizationLogoUrl || "",
-            level: entry.level || "",
-            status: normalizeCertificateStatus(entry.status || "enrolled"),
-            yearTag: entry.yearTag || projectYearTag,
-          }));
+
+        if (enrollmentEntries && enrollmentEntries.length > 0) {
+          // Fetch all organizations for logos
+          let organizations = [];
+          try {
+            organizations = await getAllOrganizations();
+          } catch (organizationError) {
+            console.warn(
+              "Unable to fetch organization metadata; proceeding without logos:",
+              organizationError,
+            );
+          }
+          const organizationByName = new Map(
+            (organizations || [])
+              .filter((organization) => organization?.name)
+              .map((organization) => [
+                String(organization.name || "")
+                  .trim()
+                  .toLowerCase(),
+                organization,
+              ]),
+          );
+
+          // Fetch full certificate details for platform, level, domain
+          const certIds = enrollmentEntries.map((e) => e.certificateId);
+          let linkedCertificates = [];
+          try {
+            linkedCertificates = await getCertificatesByIds(certIds);
+          } catch (certificateError) {
+            console.warn(
+              "Unable to fetch certificate metadata; falling back to enrollment data:",
+              certificateError,
+            );
+          }
+          const certDataMap = new Map(linkedCertificates.map((c) => [c.id, c]));
+
+          const mapped = enrollmentEntries.map((entry, idx) => {
+            const certDoc = certDataMap.get(entry.certificateId) || {};
+            const orgName = certDoc.domain || entry.organizationName || "";
+
+            return {
+              id: entry.certificateId || `enroll-${idx}`,
+              name: certDoc.name || entry.certificateName || "Certificate",
+              platform: certDoc.platform || "Certification",
+              organizationName: orgName,
+              organizationLogoUrl:
+                organizationByName.get(String(orgName).trim().toLowerCase())
+                  ?.logoUrl || "",
+              level: certDoc.level || "",
+              status: normalizeCertificateStatus(entry.status || "enrolled"),
+              yearTag: entry.yearTag || projectYearTag,
+            };
+          });
           setEnrolledCertificates(mapped);
           return;
         }
       } catch (err) {
-        console.warn("Enrollment lookup failed, fallback to legacy results", err);
+        console.warn(
+          "Enrollment lookup failed, fallback to legacy results",
+          err,
+        );
       }
 
       const resultMap =
