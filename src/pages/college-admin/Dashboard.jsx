@@ -501,12 +501,23 @@ export default function AdminDashboard() {
       );
     });
 
-    const barData = Array.from(byCourse.entries()).map(([course, count]) => ({
+    const reorder = (arr) =>
+      arr.sort((a, b) => {
+        const aOther = a[0] === "Other";
+        const bOther = b[0] === "Other";
+        if (aOther && !bOther) return 1;
+        if (!aOther && bOther) return -1;
+        return 0;
+      });
+
+    const orderedEntries = reorder(Array.from(byCourse.entries()));
+
+    const barData = orderedEntries.map(([course, count]) => ({
       course,
       count,
     }));
 
-    const pieData = Array.from(byCourse.entries()).map(([name, value]) => ({
+    const pieData = orderedEntries.map(([name, value]) => ({
       name,
       value,
     }));
