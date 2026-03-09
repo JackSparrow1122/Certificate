@@ -8,6 +8,7 @@ import {
 import { auth } from "../firebase/config";
 import { getDashboardByRole } from "../utils/roleRedirect";
 import { getAuthUserProfile } from "../utils/authProfileLookup";
+import logo from "../assets/logo.png";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -89,31 +90,59 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      {/* LEFT BLUE PANEL (blank as requested) */}
-      <div className="hidden lg:flex w-1/2 bg-[#0F2B46]" />
+      {/* LEFT BLUE PANEL - With Gryphon Branding */}
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-[#0B2A4A] to-[#1a3a5c] flex-col items-center justify-center px-8">
+        <div className="text-center space-y-6 max-w-md">
+          {/* Logo/Branding - Gryphon */}
+          <div className="rounded-xl p-6 inline-block shadow-lg">
+            <img src={logo} alt="Gryphon Logo" className="h-16 w-auto mx-auto" />
+          </div>
+
+          
+
+          {/* Tagline */}
+          <h2 className="text-2xl font-semibold text-blue-100">
+           Certificate Management Platform
+          </h2>
+
+          {/* Description */}
+          <p className="text-blue-100 text-base leading-relaxed">
+            Manage students, faculty, projects, and certifications. Access comprehensive dashboards to monitor academic progress and institutional performance with ease.
+          </p>
+
+          {/* Features List */}
+          <p className="text-blue-100 text-base leading-relaxed pt-4">
+            Student & Faculty Management. Project Tracking & Monitoring. Certificate Management.
+          </p>
+        </div>
+      </div>
 
       {/* RIGHT LOGIN PANEL */}
       <div className="flex flex-1 items-center justify-center bg-gray-50 px-6">
         <div className="w-full max-w-md">
           {/* Header */}
-          <h2 className="text-2xl font-semibold text-center text-gray-800">
+          <h2 className="text-3xl font-bold text-center text-gray-900">
             Welcome Back
           </h2>
-          <p className="text-center text-gray-500 mt-1 mb-8"></p>
+          <p className="text-center text-gray-600 mt-2 mb-8 text-sm">
+            Sign in to access your admin dashboard
+          </p>
 
           {/* Form */}
           <form
             onSubmit={handleSubmit}
-            className="space-y-5 bg-white p-8 rounded-xl shadow-sm border"
+            className="space-y-5 bg-white p-8 rounded-xl shadow-sm border border-gray-200"
           >
             {/* Error */}
             {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
+              <p className="text-red-500 text-sm text-center bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </p>
             )}
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
               </label>
               <input
@@ -122,13 +151,13 @@ export default function Login() {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0F2B46]"
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A4A] focus:border-transparent transition"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
               <input
@@ -137,13 +166,13 @@ export default function Login() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0F2B46]"
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A4A] focus:border-transparent transition"
               />
-              <div className="mt-1.5 text-right">
+              <div className="mt-2 text-right">
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(true)}
-                  className="text-sm text-[#0F2B46] font-medium"
+                  className="text-sm text-[#0B2A4A] font-medium hover:underline"
                 >
                   Forgot Password?
                 </button>
@@ -154,10 +183,13 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0F2B46] disabled:bg-gray-400 text-white py-2.5 rounded-lg font-medium transition"
+              className="w-full bg-[#0B2A4A] hover:bg-[#081f35] disabled:bg-gray-400 text-white py-2.5 rounded-lg font-semibold transition duration-200 mt-6"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
+
+
+           
           </form>
         </div>
       </div>
