@@ -59,12 +59,14 @@ const extractPassYearFromProjectCode = (code) => {
 const deriveCourseFromProjectCode = (code) => {
   const parts = String(code || "")
     .split("/")
-    .map((p) => p.trim().toUpperCase())
+    .map((p) => p.trim())
     .filter(Boolean);
-  if (parts.includes("MBA")) return "MBA";
-  if (parts.includes("BBA")) return "BBA";
-  if (parts.includes("ENGG") || parts.includes("ENGINEERING")) return "Engineering";
-  return "Other";
+  const rawCourse = (parts[1] || "").toUpperCase();
+  if (!rawCourse) return "Other";
+  if (rawCourse.includes("MBA")) return "MBA";
+  if (rawCourse.includes("BBA")) return "BBA";
+  if (rawCourse.includes("ENGG") || rawCourse.includes("ENGINEERING")) return "ENGG";
+  return rawCourse;
 };
 
 export default function AdminDashboard() {
@@ -349,7 +351,9 @@ export default function AdminDashboard() {
 
   const courseOptions = useMemo(() => {
     const courses = new Set(
-      projects.map((p) => String(p.course || p.courseCode || "").trim()).filter(Boolean),
+      projects
+        .map((p) => String(deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "").trim())
+        .filter(Boolean),
     );
     return ["All", ...Array.from(courses).sort()];
   }, [projects]);
@@ -373,7 +377,7 @@ export default function AdminDashboard() {
         String(p.code || "").trim(),
         {
           year: String(p.year || p.academicYear || "").trim(),
-          course: String(p.course || p.courseCode || deriveCourseFromProjectCode(p.code)).trim(),
+          course: String(deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "").trim(),
           passYear: extractPassYearFromProjectCode(p.code),
         },
       ]),
@@ -484,15 +488,13 @@ export default function AdminDashboard() {
 
     const byCourse = new Map();
     const normalizeCourse = (courseKey) => {
-      const lower = String(courseKey || "").toLowerCase();
-      if (lower.includes("mba")) return "MBA";
-      if (lower.includes("bba")) return "BBA";
-      if (lower.includes("eng")) return "Engineering";
-      return "Other";
+      const val = String(courseKey || "").trim();
+      return val || "Other";
     };
 
     filteredProjects.forEach((p) => {
-      const courseKey = deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "Other";
+      const courseKey =
+        deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "Other";
       const courseLabel = normalizeCourse(courseKey);
       const current = byCourse.get(courseLabel) || 0;
       byCourse.set(
