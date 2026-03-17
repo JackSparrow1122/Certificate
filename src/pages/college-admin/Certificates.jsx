@@ -331,7 +331,7 @@ export default function Certificates() {
         <StreamSummaryCard title="Other" breakdown={otherTotals} />
       </section>
 
-      <section className="rounded-xl bg-white p-6 shadow">
+      <section className="rounded-xl bg-white p-6 border border-[#012920] shadow">
         <h2 className="mb-4 text-lg font-semibold">Certificate Overview</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -513,16 +513,16 @@ export default function Certificates() {
 
 function StatCard({ title, value }) {
   return (
-    <div className="rounded-xl bg-white p-5 shadow">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
+    <div className="rounded-xl bg-white p-5 border border-1 border-[#012920]  shadow">
+      <p className="text-sm text-[#012920]">{title}</p>
+      <p className="mt-2 text-2xl font-semibold text-[#012920]">{value}</p>
     </div>
   );
 }
 
 function ResultSummaryCard({ totalEnrolled, totalPassed, totalFailed }) {
   return (
-    <div className="rounded-xl bg-white p-5 shadow">
+    <div className="rounded-xl bg-white p-5 border border-[#012920] shadow">
       <p className="text-sm text-gray-500">Result Status</p>
       <div className="mt-3">
         <StatusPills
@@ -537,7 +537,7 @@ function ResultSummaryCard({ totalEnrolled, totalPassed, totalFailed }) {
 
 function StreamSummaryCard({ title, breakdown }) {
   return (
-    <div className="rounded-xl bg-white p-5 shadow">
+    <div className="rounded-xl bg-white p-5 border border-[#012920] shadow">
       <p className="text-sm text-gray-500">{title} Students</p>
       <div className="mt-3">
         <StatusPills
@@ -570,7 +570,7 @@ function StatusPills({ enrolledCount, passedCount, failedCount }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 ">
       {passedCount > 0 && (
         <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
           Passed: {passedCount}

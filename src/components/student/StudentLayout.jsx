@@ -10,7 +10,7 @@ export default function StudentLayout() {
   const hideNavbar = location.pathname === "/student/profile";
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-[#F3F6FA]">
+    <div className="relative flex h-screen overflow-hidden bg-[#F5F4EB]">
       {/* Mobile overlay */}
       <div
         className={`fixed inset-0 z-30 bg-black/40 transition-opacity duration-300 md:hidden ${

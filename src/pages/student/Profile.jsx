@@ -249,9 +249,9 @@ export default function StudentProfile() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 pb-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6 pb-6 ">
       <section className="student-navbar-card rounded-3xl border border-[#D6E1EE] bg-white p-6">
-        <h1 className="text-3xl font-semibold text-[#0B2A4A]">
+        <h1 className="text-3xl font-semibold text-[#012920]">
           Student Profile
         </h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -260,7 +260,7 @@ export default function StudentProfile() {
       </section>
 
       <section className="rounded-2xl border border-[#D6E1EE] bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-[#0B2A4A]">
+        <h2 className="mb-4 text-xl font-semibold text-[#012920]">
           Basic Information
         </h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -320,7 +320,7 @@ export default function StudentProfile() {
           className="grid grid-cols-1 gap-4 md:grid-cols-3"
         >
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-gray-700">
+            <span className="mb-1 block text-sm font-medium text-[#012920]">
               Current Password
             </span>
             <input
@@ -328,7 +328,7 @@ export default function StudentProfile() {
               name="currentPassword"
               value={passwordForm.currentPassword}
               onChange={handlePasswordFieldChange}
-              className="w-full rounded-xl border border-gray-300 bg-[#F8FAFC] px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
               autoComplete="current-password"
             />
           </label>
@@ -342,7 +342,7 @@ export default function StudentProfile() {
               name="newPassword"
               value={passwordForm.newPassword}
               onChange={handlePasswordFieldChange}
-              className="w-full rounded-xl border border-gray-300 bg-[#F8FAFC] px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
               autoComplete="new-password"
             />
           </label>
@@ -356,7 +356,7 @@ export default function StudentProfile() {
               name="confirmPassword"
               value={passwordForm.confirmPassword}
               onChange={handlePasswordFieldChange}
-              className="w-full rounded-xl border border-gray-300 bg-[#F8FAFC] px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
               autoComplete="new-password"
             />
           </label>
@@ -380,7 +380,7 @@ export default function StudentProfile() {
 
 function ProfileItem({ label, value }) {
   return (
-    <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm transition">
+    <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm transition">
       <p className="text-xs uppercase tracking-wide text-[#0B2A4A]/60">
         {label}
       </p>

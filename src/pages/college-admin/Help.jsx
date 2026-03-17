@@ -223,11 +223,11 @@ export default function Help() {
 
       {activeTab === "create" && (
         <section className="overflow-hidden rounded-xl bg-white shadow">
-          <div className="bg-[#f3eafb] px-4 py-3">
-            <h2 className="text-lg font-semibold text-gray-900">
+          <div className="bg-[#012920] px-4 py-3">
+            <h2 className="text-lg font-semibold text-white">
               Create a Support Ticket
             </h2>
-            <p className="mt-0.5 text-xs text-gray-600">
+            <p className="mt-0.5 text-xs text-white">
               Describe your issue in detail. Our support team will respond
               shortly.
             </p>
@@ -327,7 +327,7 @@ export default function Help() {
             <button
               type="submit"
               disabled={creating}
-              className="h-9 w-full rounded-md bg-[#0B2A4A] text-sm font-medium text-white disabled:opacity-60"
+              className="h-9 w-full rounded-md bg-[#012920] text-sm font-medium text-white disabled:opacity-60"
             >
               {creating ? "Creating..." : "Create Support Ticket"}
             </button>
@@ -339,7 +339,7 @@ export default function Help() {
         <section className="overflow-hidden rounded-xl bg-white shadow">
           <div className="overflow-x-auto">
             <div className="min-w-180">
-              <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1.2fr_0.5fr] gap-3 bg-gray-100 px-4 py-2.5 text-xs font-semibold text-gray-600">
+              <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1.2fr_0.5fr] gap-3 bg-[#012920] px-4 py-2.5 text-xs font-semibold text-white">
                 <p>Subject</p>
                 <p>Category</p>
                 <p>Priority</p>

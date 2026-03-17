@@ -218,7 +218,7 @@ export default function StudentNavbar({ onMenuClick }) {
   const collegeInitials = (collegeInfo.code || "CLG").slice(0, 2);
 
   return (
-    <header className="bg-[#F3F6FA] px-4 pt-4 sm:px-6 sm:pt-6">
+    <header className="bg-[#F5F4EB] px-4 pt-4 sm:px-6 sm:pt-6">
       <div className="student-navbar-card rounded-3xl border border-[#D7E2F1] bg-white px-5 py-5 sm:px-6 sm:py-6">
         <div className="flex items-start justify-between gap-3 sm:gap-4">
           <div className="flex min-w-0 flex-1 items-start gap-3">

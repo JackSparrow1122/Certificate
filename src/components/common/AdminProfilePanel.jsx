@@ -108,10 +108,10 @@ export default function AdminProfilePanel({ roleLabel = "Admin" }) {
 
   return (
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <article className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <header className="border-b border-gray-200 p-4">
+      <article className="rounded-2xl border border-[#0B2A4A] bg-white shadow-sm">
+        <header className="border-b border-[#0B2A4A] p-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-[#0B2A4A]/10 p-2 text-[#0B2A4A]">
+            <div className="rounded-full bg-[#F5F4EB] p-2 text-[#0B2A4A]">
               <UserCircle2 size={18} />
             </div>
             <div>
@@ -122,17 +122,17 @@ export default function AdminProfilePanel({ roleLabel = "Admin" }) {
         </header>
 
         <div className="space-y-4 p-4">
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <div className="rounded-xl border border-gray-200 bg-white p-3">
             <p className="text-xs uppercase tracking-wide text-gray-500">Full Name</p>
             <div className="mt-2 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-300 text-lg font-bold text-[#0B2A4A]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F4EB] text-lg font-bold text-[#0B2A4A]">
                 {adminInitial}
               </div>
               <p className="text-lg font-semibold text-gray-900">{adminName}</p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <div className="rounded-xl border border-gray-200 bg-white p-3">
             <p className="text-xs uppercase tracking-wide text-gray-500">Email Address</p>
             <div className="mt-2 flex items-center gap-2 text-base font-semibold text-gray-900">
               <Mail size={16} className="text-gray-500" />
@@ -150,10 +150,10 @@ export default function AdminProfilePanel({ roleLabel = "Admin" }) {
         </div>
       </article>
 
-      <article className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <header className="border-b border-gray-200 p-4">
+      <article className="rounded-2xl border border-[#0B2A4A] bg-white shadow-sm">
+        <header className="border-b border-[#0B2A4A] p-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-[#0B2A4A]/10 p-2 text-[#0B2A4A]">
+            <div className="rounded-full bg-[#F5F4EB] p-2 text-[#0B2A4A]">
               <Lock size={18} />
             </div>
             <div>
@@ -200,7 +200,7 @@ export default function AdminProfilePanel({ roleLabel = "Admin" }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-[#0B2A4A] px-4 py-2.5 text-base font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full rounded-xl bg-[#012920] px-4 py-2.5 text-base font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? "Updating..." : "Update Password"}
           </button>

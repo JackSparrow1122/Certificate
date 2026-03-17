@@ -799,18 +799,18 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-6 bg-gray-50">
+    <div className="space-y-6">
       <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-md">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            <h1 className="text-3xl font-bold tracking-tight text-[#012920]">
               Dashboard{" "}
             
             </h1>
-            <p className="mt-1 text-base font-semibold text-gray-700">
+            <p className="mt-1 text-base font-semibold text-[#012920]">
               Welcome, {adminName}
             </p>
-            <p className="mt-2 text-base text-gray-600">
+            <p className="mt-2 text-base text-[#012920]">
             </p>
             
            
@@ -833,7 +833,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section className="grid w-full grid-cols-1 gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid w-full grid-cols-1 gap-4 rounded-2xl border border-[#012920] bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex w-full items-center gap-3">
           <span className="text-sm font-semibold text-gray-700">Year</span>
           <select
@@ -1109,7 +1109,7 @@ function StatCard({ title, value, icon, color = "blue" }) {
   };
   const iconBg = colorClasses[color] || colorClasses.blue;
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+    <div className="rounded-sm border border-[#012920] bg-white p-6 shadow-sm transition hover:shadow-md">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</p>
         <span className={`rounded-lg ${iconBg} p-2.5`}>{icon}</span>
@@ -1120,7 +1120,7 @@ function StatCard({ title, value, icon, color = "blue" }) {
 }
 function Panel({ title, children }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    <div className="rounded-sm border border-[#012920] bg-white p-6 shadow-sm">
       <h3 className="mb-4 text-lg font-semibold text-gray-900">{title}</h3>
       {children}
     </div>

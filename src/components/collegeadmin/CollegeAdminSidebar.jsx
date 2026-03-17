@@ -3,16 +3,13 @@ import { useState } from "react";
 import { LayoutGrid, Users, Award, CircleHelp, LogOut, X } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
-import logo from "../../assets/logo.png";
-import profileImage from "../../assets/image.jpg";
+import logo from "../../assets/image.png";
+import profileImage from "../../assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
 
 const COLLEGEADMIN_SIDEBAR_STATE_KEY = "collegeadmin_sidebar_expanded";
 
-export default function CollegeAdminSidebar({
-  mobileMenuOpen,
-  setMobileMenuOpen,
-}) {
+export default function CollegeAdminSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(() => {
     try {
@@ -24,38 +21,20 @@ export default function CollegeAdminSidebar({
   const { user, role, profile } = useAuth();
   const isExpanded = mobileMenuOpen || expanded;
 
-  const adminName =
-    profile?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
+  const adminName = profile?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
   const roleLabel =
     role === "collegeAdmin"
       ? "College Admin"
       : role === "superAdmin"
-        ? "Super Admin"
-        : "Admin";
+      ? "Super Admin"
+      : "Admin";
   const adminInitial = adminName.charAt(0).toUpperCase();
 
   const links = [
-    {
-      name: "Dashboard",
-      path: "/college-admin/dashboard",
-      end: true,
-      icon: LayoutGrid,
-    },
-    {
-      name: "Students",
-      path: "/college-admin/students",
-      icon: Users,
-    },
-    {
-      name: "Certificates",
-      path: "/college-admin/certificates",
-      icon: Award,
-    },
-    {
-      name: "Help",
-      path: "/college-admin/help",
-      icon: CircleHelp,
-    },
+    { name: "Dashboard", path: "/college-admin/dashboard", end: true, icon: LayoutGrid },
+    { name: "Students", path: "/college-admin/students", icon: Users },
+    { name: "Certificates", path: "/college-admin/certificates", icon: Award },
+    { name: "Help", path: "/college-admin/help", icon: CircleHelp },
   ];
 
   const handleSignOut = async () => {
@@ -63,11 +42,6 @@ export default function CollegeAdminSidebar({
     localStorage.clear();
     setMobileMenuOpen(false);
     navigate("/login", { replace: true });
-  };
-
-  const handleProfileClick = () => {
-    setMobileMenuOpen(false);
-    navigate("/college-admin/profile");
   };
 
   const handleMouseEnter = () => {
@@ -84,12 +58,13 @@ export default function CollegeAdminSidebar({
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`fixed inset-y-0 left-0 z-40 bg-[#0B2A4A] text-white flex flex-col justify-between transform-gpu transition-transform duration-300 ease-in-out
+      className={`fixed inset-y-0 left-0 z-40 bg-[#B3FFAE] text-[#012920] flex flex-col justify-between transform-gpu transition-transform duration-300 ease-in-out
         w-72 md:sticky md:top-0 md:h-screen md:shrink-0 md:overflow-hidden md:transition-[width,transform] md:translate-x-0
         ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         ${isExpanded ? "md:w-72" : "md:w-20"}`}
     >
       <div>
+        {/* Mobile Close */}
         <div className="flex md:hidden justify-end px-3 pt-3">
           <button
             type="button"
@@ -107,36 +82,42 @@ export default function CollegeAdminSidebar({
             src={isExpanded ? logo : profileImage}
             alt="ERP Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              isExpanded ? "h-20" : "h-12 w-12 bg-white"
+              isExpanded ? "h-30" : "h-16 w-16  p-1"
             }`}
           />
         </div>
 
         {/* Profile */}
-        <button
-          type="button"
-          onClick={handleProfileClick}
-          className={`mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
-            isExpanded
-              ? "rounded-2xl bg-white/12 p-3.5 gap-3 justify-center"
-              : "rounded-xl p-2 justify-center"
-          }`}
-          title="Open Profile"
+        <NavLink
+          to="/college-admin/profile"
+          className={({ isActive }) =>
+            `mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
+              isActive
+                ? "rounded-2xl bg-[#012920] p-1 gap-3 justify-center text-white"
+                : isExpanded
+                ? "rounded-2xl bg-[white/12] gap-3 justify-center text-[#012920]"
+                : "rounded-xl justify-center text-[#012920]"
+            }`
+          }
         >
-          <div className="h-11 w-11 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] text-lg font-semibold leading-none flex items-center justify-center">
+          <div
+            className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl font-semibold text-lg transition-all duration-300 ${
+              isExpanded
+                ? "bg-white text-[#012920] border-none"
+                : window.location.pathname === "/college-admin/profile"
+                ? "bg-[#012920] text-white border-none"
+                : "bg-transparent text-[#012920] border-2 border-[#012920]"
+            }`}
+          >
             {adminInitial}
           </div>
           {isExpanded && (
-            <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-xl font-semibold leading-tight">
-                {adminName}
-              </p>
-              <span className="block truncate text-sm opacity-80">
-                {roleLabel}
-              </span>
+            <div className="min-w-0 flex-1 text-left ml-3">
+              <p className="truncate text-xl font-semibold leading-tight">{adminName}</p>
+              <span className="block truncate text-sm opacity-80">{roleLabel}</span>
             </div>
           )}
-        </button>
+        </NavLink>
 
         {/* Nav Links */}
         <nav className="mt-8 space-y-2 px-3">
@@ -149,8 +130,8 @@ export default function CollegeAdminSidebar({
               className={({ isActive }) =>
                 `flex items-center gap-4 px-4 py-3 rounded-xl transition ${
                   isActive
-                    ? "bg-white text-[#0B2A4A] font-semibold shadow"
-                    : "text-white/90"
+                    ? "bg-[#012920] text-white font-semibold shadow"
+                    : "text-[#012920] font-bold"
                 }`
               }
             >
@@ -165,7 +146,7 @@ export default function CollegeAdminSidebar({
       <div className="px-3 py-6 border-t border-white/10">
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-4 px-4 py-3 rounded-xl text-white/80 transition w-full"
+          className="flex items-center gap-4 px-4 py-3 rounded-xl text-[#012920]/80 transition w-full"
         >
           <LogOut size={22} />
           {isExpanded && <span>Sign Out</span>}

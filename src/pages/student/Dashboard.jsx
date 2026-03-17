@@ -484,7 +484,7 @@ export default function StudentDashboard() {
       <section className="flex flex-wrap items-center justify-between gap-3 px-1">
         <span className="text-lg font-medium text-[#0B2A4A]">Welcome, {fullName}. </span>
         <select
-          className="rounded-lg border border-[#D7E2F1] px-3 py-1.5 text-sm text-[#0B2A4A]"
+          className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-3 py-1.5 text-sm text-white"
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
         >
@@ -519,7 +519,7 @@ export default function StudentDashboard() {
         />
       </section>
 
-      <section className="student-navbar-card rounded-3xl border border-[#D7E2F1] bg-[#EEF3FA] p-5 sm:p-6">
+      <section className="student-navbar-card rounded-3xl border border-[#D7E2F1] bg-white p-5 sm:p-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
           <div className="space-y-3">
             <h3 className="text-2xl font-semibold text-[#0B2A4A]">
@@ -594,29 +594,29 @@ export default function StudentDashboard() {
       <section className="grid grid-cols-1 gap-6">
         <Panel title="Profile Snapshot">
           <div className="space-y-4">
-            <div className="rounded-2xl bg-[#0B2A4A] p-4 text-white shadow-sm">
+            <div className="rounded-2xl bg-[#CFFF92] p-4 text-white shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-lg font-bold text-[#0B2A4A]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-lg font-bold text-[#012920]">
                     {String(fullName || "S")
                       .charAt(0)
                       .toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-lg font-semibold leading-tight">
+                    <p className="text-lg font-semibold leading-tight text-[#012920]">
                       {fullName}
                     </p>
-                    <p className="text-xs text-white/85">Roll No: {rollNo}</p>
+                    <p className="text-xs text-[#012920]">Roll No: {rollNo}</p>
                   </div>
                 </div>
-                <div className="rounded-xl bg-white/15 px-3 py-2 text-right">
-                  <p className="text-xs text-white/80">Current Year</p>
-                  <p className="text-lg font-semibold">{currentYear}</p>
+                <div className="rounded-xl bg-white px-3 py-2 text-right">
+                  <p className="text-xs text-[#012920]">Current Year</p>
+                  <p className="text-lg text-[#012920] font-semibold">{currentYear}</p>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ">
               <SnapshotItem label="Gender" value={gender} />
               <SnapshotItem label="Date of Birth" value={dob} />
               <SnapshotItem label="Passing Year" value={passingYear} />
@@ -625,19 +625,19 @@ export default function StudentDashboard() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[#0B2A4A]/70">
+              <div className="rounded-xl border border-[#D7E2F1] bg-whiite p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-[#012920]">
                   10th Percentage
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-[#0B2A4A]">
+                <p className="mt-1 text-2xl font-semibold text-[#012920]">
                   {tenthPercentage !== "-" ? `${tenthPercentage}%` : "-"}
                 </p>
               </div>
-              <div className="rounded-xl border border-[#D7E2F1] bg-[#EEF3FA] p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[#0B2A4A]/70">
+              <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-[#012920]">
                   12th / Diploma Percentage
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-[#0B2A4A]">
+                <p className="mt-1 text-2xl font-semibold text-[#012920]">
                   {twelfthPercentage !== "-" ? `${twelfthPercentage}%` : "-"}
                 </p>
               </div>
@@ -674,8 +674,8 @@ function Panel({ title, children }) {
 
 function SnapshotItem({ label, value }) {
   return (
-    <div className="rounded-xl border border-[#D7E2F1] bg-[#F7FAFF] p-3 shadow-sm">
-      <p className="text-[11px] uppercase tracking-wide text-[#0B2A4A]/60">
+    <div className="rounded-xl border border-[#D7E2F1] bg-white p-3 shadow-sm">
+      <p className="text-[11px] uppercase tracking-wide text-[#012920]">
         {label}
       </p>
       <p className="mt-1 text-base font-semibold text-[#0B2A4A]">

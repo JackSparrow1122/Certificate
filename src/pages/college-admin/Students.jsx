@@ -534,18 +534,18 @@ export default function Students() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
+        <h1 className="text-3xl font-semibold leading-tight text-[#012920] sm:text-4xl">
           Students
         </h1>
-        <p className="text-sm text-[#415a77]">
+        <p className="text-sm text-[#012920]">
           Select project code and certificate to view mapped students
         </p>
       </div>
 
-      <div className="mb-4 rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+      <div className="mb-4 rounded-2xl border border-[#012920] bg-white p-4 sm:p-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-[#0B2A4A]">
+            <span className="mb-1 block text-sm font-medium text-[#012920]">
               Project Code
             </span>
             <select
@@ -553,7 +553,7 @@ export default function Students() {
               onChange={(event) => setSelectedProjectCode(event.target.value)}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors
               ${loadingProjects ? "border-[#D7E2F1]" : "border-[#D7E2F1]"}
-              ${!selectedProjectCode && !loadingProjects ? "ring-2 ring-yellow-300 border-yellow-500" : ""}`}
+              ${!selectedProjectCode && !loadingProjects ? "ring-2 ring-[#012920] border-[#012920]" : ""}`}
               disabled={loadingProjects}
             >
               <option value="">
@@ -571,14 +571,14 @@ export default function Students() {
               ))}
             </select>
             {!selectedProjectCode && !loadingProjects && (
-              <p className="mt-1 text-xs text-yellow-600">
+              <p className="mt-1 text-xs text-[#012920]">
                 <em>Choose a project code to populate the student list.</em>
               </p>
             )}
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-[#0B2A4A]">
+            <span className="mb-1 block text-sm font-medium text-[#012920]">
               Certificate
             </span>
             <select
@@ -629,7 +629,7 @@ export default function Students() {
       </div>
 
       {selectedProjectCode && !loadingStudents && (
-        <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+        <div className="rounded-2xl border border-[#012920] bg-white p-4 sm:p-5">
           <div className="mb-2 px-3">
             <h2 className="text-lg font-semibold text-[#0B2A4A]">
               Student Master List
@@ -638,9 +638,9 @@ export default function Students() {
 
           <div className="overflow-x-auto rounded-xl border border-[#D7E2F1] bg-white">
             <table className="min-w-full divide-y divide-[#E6EDF6]">
-              <thead className="bg-[#F5F8FD]">
+              <thead className="bg-[#012920]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                  <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-white">
                     <button
                       type="button"
                       onClick={handleIdSortClick}
@@ -667,16 +667,16 @@ export default function Students() {
                       </span>
                     </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">
                     Email Id
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">
                     Current Year
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-[#0B2A4A]">
+                  <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-white">
                     <button
                       type="button"
                       onClick={handleResultSortClick}

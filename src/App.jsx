@@ -80,7 +80,7 @@ function CollegeAdminLayout() {
         setMobileMenuOpen={setMobileMenuOpen}
       />
 
-      <div className="flex h-full min-w-0 w-full flex-1 flex-col overflow-y-auto bg-[#F3F6FA]">
+      <div className="flex h-full min-w-0 w-full flex-1 flex-col overflow-y-auto bg-[#F5F4EB]">
         <CollegeAdminNavbar onMenuClick={() => setMobileMenuOpen(true)} />
         <main className="p-4 sm:p-6 md:p-8 flex-1">
           <Outlet />
