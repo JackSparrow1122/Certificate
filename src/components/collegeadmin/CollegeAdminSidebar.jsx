@@ -58,7 +58,7 @@ export default function CollegeAdminSidebar({ mobileMenuOpen, setMobileMenuOpen 
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`fixed inset-y-0 left-0 z-40 bg-[#B3FFAE] text-[#012920] flex flex-col justify-between transform-gpu transition-transform duration-300 ease-in-out
+      className={`fixed inset-y-0 left-0 z-40 bg-[#acf74d] text-[#012920] flex flex-col justify-between transform-gpu transition-transform duration-300 ease-in-out
         w-72 md:sticky md:top-0 md:h-screen md:shrink-0 md:overflow-hidden md:transition-[width,transform] md:translate-x-0
         ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         ${isExpanded ? "md:w-72" : "md:w-20"}`}

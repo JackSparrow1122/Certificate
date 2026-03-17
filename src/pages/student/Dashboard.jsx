@@ -594,7 +594,7 @@ export default function StudentDashboard() {
       <section className="grid grid-cols-1 gap-6">
         <Panel title="Profile Snapshot">
           <div className="space-y-4">
-            <div className="rounded-2xl bg-[#CFFF92] p-4 text-white shadow-sm">
+            <div className="rounded-2xl bg-[#acf74d] p-4 text-white shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-lg font-bold text-[#012920]">

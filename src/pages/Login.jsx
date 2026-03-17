@@ -93,37 +93,37 @@ export default function Login() {
   return (
     <div className="min-h-screen flex">
       {/* LEFT BLUE PANEL - With Gryphon Branding */}
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-[#0B2A4A] to-[#1a3a5c] flex-col items-center justify-center px-8">
+      <div className="hidden lg:flex w-1/2 bg-[#acf74d] flex-col items-center justify-center px-8">
         <div className="text-center space-y-6 max-w-md">
           {/* Logo/Branding - Gryphon */}
-          <div className="rounded-xl p-6 inline-block shadow-lg">
-            <img src={logo} alt="Gryphon Logo" className="h-16 w-auto mx-auto" />
+          <div className="rounded-xl p-6 inline-block ">
+            <img src={logo} alt="Gryphon Logo" className="h-20 w-auto mx-auto" />
           </div>
 
           
 
           {/* Tagline */}
-          <h2 className="text-2xl font-semibold text-blue-100">
+          <h2 className="text-2xl font-semibold text-[012920]">
            Certificate Management Platform
           </h2>
 
           {/* Description */}
-          <p className="text-blue-100 text-base leading-relaxed">
+          <p className="text-[#012920] text-base leading-relaxed">
             Manage students, faculty, projects, and certifications. Access comprehensive dashboards to monitor academic progress and institutional performance with ease.
           </p>
 
           {/* Features List */}
-          <p className="text-blue-100 text-base leading-relaxed pt-4">
+          <p className="text-[#012920] text-base leading-relaxed pt-4">
             Student & Faculty Management. Project Tracking & Monitoring. Certificate Management.
           </p>
         </div>
       </div>
 
       {/* RIGHT LOGIN PANEL */}
-      <div className="flex flex-1 items-center justify-center bg-gray-50 px-6">
+      <div className="flex flex-1 items-center justify-center bg-[#F5F4EB] px-6">
         <div className="w-full max-w-md">
           {/* Header */}
-          <h2 className="text-3xl font-bold text-center text-gray-900">
+          <h2 className="text-3xl font-bold text-center text-[#012920]">
             Welcome Back
           </h2>
           <p className="text-center text-gray-600 mt-2 mb-8 text-sm">
@@ -194,7 +194,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0B2A4A] hover:bg-[#081f35] disabled:bg-gray-400 text-white py-2.5 rounded-lg font-semibold transition duration-200 mt-6"
+              className="w-full bg-[#012920] hover:bg-[#081f35] disabled:bg-gray-400 text-white py-2.5 rounded-lg font-semibold transition duration-200 mt-6"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
