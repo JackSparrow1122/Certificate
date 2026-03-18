@@ -157,7 +157,7 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
       <div className="px-3 py-6 border-t border-white/10">
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-4 px-4 py-3 rounded-xl text-[#012920] transition w-full"
+    className="flex items-center gap-4 px-4 py-3 rounded-xl text-[#012920] transition w-full hover:bg-red-500 hover:text-white"
         >
           <LogOut size={22} />
           {isExpanded && <span>Sign Out</span>}
