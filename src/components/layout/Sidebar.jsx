@@ -89,12 +89,12 @@ export default function Sidebar() {
       {/* TOP */}
       <div>
         {/* Logo */}
-        <div className="px-4 py-8 flex items-center justify-center">
+        <div className="px-4 py-2 flex items-center justify-center">
           <img
             src={expanded ? logo : profileImage}
             alt="Academy Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              expanded ? "h-30" : "h-16 w-16  p-1"
+              expanded ? "h-25" : "h-16 w-16  p-1"
             }`}
           />
         </div>
@@ -103,7 +103,7 @@ export default function Sidebar() {
         <NavLink
           to="/superadmin/profile"
           className={({ isActive }) =>
-            `mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
+            `mx-3 mt-3 flex w-[calc(100%-1.5rem)] items-center transition-all ${
               isActive
                 ? "rounded-2xl bg-[#012920] p-3 gap-3 justify-center text-white"
                 : expanded

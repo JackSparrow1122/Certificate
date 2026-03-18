@@ -77,12 +77,12 @@ export default function CollegeAdminSidebar({ mobileMenuOpen, setMobileMenuOpen 
         </div>
 
         {/* Logo */}
-        <div className="px-4 py-8 flex items-center justify-center">
+        <div className="px-4 py-4 flex items-center justify-center">
           <img
             src={isExpanded ? logo : profileImage}
             alt="ERP Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              isExpanded ? "h-30" : "h-16 w-16  p-1"
+              isExpanded ? "h-25" : "h-16 w-16  p-1"
             }`}
           />
         </div>
