@@ -213,7 +213,7 @@ export default function CertificateConfig() {
         <div className="w-full space-y-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
+            <h1 className="text-3xl font-semibold leading-tight text-[#012920] sm:text-4xl">
               Certifications Configuration
             </h1>
 
@@ -223,7 +223,7 @@ export default function CertificateConfig() {
                 disabled={
                   loading || refreshingCounts || certifications.length === 0
                 }
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A] disabled:opacity-60"
+                className="whitespace-nowrap rounded-lg bg-[#012920] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {refreshingCounts
                   ? "Refreshing counts..."
@@ -231,19 +231,19 @@ export default function CertificateConfig() {
               </button>
               <button
                 onClick={() => setShowAddOrganizationModal(true)}
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A]"
+                className="whitespace-nowrap rounded-lg bg-[#012920] px-3 py-2 text-sm font-semibold text-white"
               >
                 + Add New Organisation
               </button>
               <button
                 onClick={() => setShowEditOrganizationModal(true)}
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A]"
+                className="whitespace-nowrap rounded-lg bg-[#012920] px-3 py-2 text-sm font-semibold text-white"
               >
                 ✏️ Edit Organisation
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="whitespace-nowrap rounded-lg bg-[#DCE5F1] px-3 py-2 text-xs font-semibold text-[#0B2A4A]"
+                className="whitespace-nowrap rounded-lg bg-[#012920] px-3 py-2 text-sm font-semibold text-white"
               >
                 + Add New Certificate
               </button>
@@ -262,11 +262,11 @@ export default function CertificateConfig() {
           )}
 
           {/* Filters */}
-          <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+          <div className="rounded-2xl border border-[#012920] bg-white p-4 sm:p-5">
             <div className="flex flex-wrap items-end gap-4">
               {/* Organisation */}
               <div className="w-full min-w-45 flex-1">
-                <label className="text-sm font-medium text-[#0B2A4A]">
+                <label className="text-sm font-medium text-[#012920]">
                   Organisation
                 </label>
                 <select
@@ -284,7 +284,7 @@ export default function CertificateConfig() {
 
               {/* Level */}
               <div className="w-full min-w-45 flex-1">
-                <label className="text-sm font-medium text-[#0B2A4A]">
+                <label className="text-sm font-medium text-[#012920]">
                   Level
                 </label>
                 <select
@@ -302,7 +302,7 @@ export default function CertificateConfig() {
 
               {/* Domain */}
               <div className="w-full min-w-45 flex-1">
-                <label className="text-sm font-medium text-[#0B2A4A]">
+                <label className="text-sm font-medium text-[#012920]">
                   Domain
                 </label>
                 <select
@@ -319,7 +319,7 @@ export default function CertificateConfig() {
               </div>
               <button
                 onClick={resetFilters}
-                className="ml-auto inline-flex h-10 items-center rounded-lg bg-[#003B7A] px-4 text-sm font-semibold text-white"
+                className="ml-auto inline-flex h-10 items-center rounded-lg bg-[#012920] px-4 text-sm font-semibold text-white"
               >
                 Reset
               </button>
@@ -327,7 +327,7 @@ export default function CertificateConfig() {
           </div>
 
           {/* Table Header */}
-          <div className="mb-2 grid grid-cols-6 px-3 text-sm font-semibold text-[#0B2A4A]">
+          <div className="mb-2 grid grid-cols-6 px-3 text-sm font-semibold text-[#012920]">
             <span>Organisation</span>
             <span>Certificate Name</span>
             <span>Domain</span>
@@ -337,7 +337,7 @@ export default function CertificateConfig() {
           </div>
 
           {/* Table Body */}
-          <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+          <div className="rounded-2xl border border-[#012920] bg-white p-4 sm:p-5">
             <div className="space-y-2.5">
               {loading && (
                 <p className="text-center text-gray-600">
@@ -398,8 +398,8 @@ export default function CertificateConfig() {
                       }}
                       className={`ml-4 flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                         openMenuId === c.id
-                          ? "bg-[#0B2A4A] text-white"
-                          : "text-[#415a77]"
+                          ? "bg-[#012920] text-white"
+                          : "text-[#012920] hover:bg-[#012920] hover:text-white"
                       }`}
                       title="Manage certificate"
                     >
@@ -434,7 +434,7 @@ export default function CertificateConfig() {
                               setShowDeclareResultModal(true);
                               setOpenMenuId(null);
                             }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[#012920] transition-colors"
                           >
                             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E9EEF5] text-base">
                               📋

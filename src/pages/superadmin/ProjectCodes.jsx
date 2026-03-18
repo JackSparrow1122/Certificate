@@ -257,25 +257,25 @@ export default function ProjectCodes() {
   return (
     <SuperAdminLayout>
       <div className="mx-auto w-full max-w-[1400px] space-y-4 px-4 py-5 sm:px-5 sm:py-6 lg:px-6">
-        <section className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold text-[#0B2A4A]">Project Codes</h1>
+              <h1 className="text-2xl font-semibold text-[#012920]">Project Codes</h1>
               <p className="mt-1 text-sm text-gray-600">Manage, search, and import project codes</p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-xl border border-[#D7E2F1] bg-[#F7FAFF] px-3 py-2">
-              <span className="text-xs font-medium uppercase tracking-wide text-[#0B2A4A]/70">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-[#012920] bg-[#F7FAFF] px-3 py-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#012920]/70">
                 Total
               </span>
-              <span className="text-lg font-semibold text-[#0B2A4A]">{filtered.length}</span>
+              <span className="text-lg font-semibold text-[#012920]">{filtered.length}</span>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm sm:p-5">
+        <section className="rounded-2xl border border-[#012920] bg-white p-4 shadow-sm sm:p-5">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#0B2A4A]/70">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#012920]/70">
                 Search Project Code
               </label>
               <input
@@ -288,7 +288,7 @@ export default function ProjectCodes() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#0B2A4A]/70">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#012920]/70">
                 Manual Add College
               </label>
               <select
@@ -313,7 +313,7 @@ export default function ProjectCodes() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={fetchProjectCodes}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#D7E2F1] bg-white px-3.5 py-2.5 text-sm font-medium text-[#0B2A4A]"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#D7E2F1] bg-white px-3.5 py-2.5 text-sm font-medium text-[#012920]"
               >
                 <RefreshCcw size={15} />
                 Refresh
@@ -327,11 +327,11 @@ export default function ProjectCodes() {
                   }
                   setShowAddModal(true);
                 }}
-                className="rounded-lg border border-[#D7E2F1] bg-white px-3.5 py-2.5 text-sm font-medium text-[#0B2A4A]"
+                className="rounded-lg border border-[#D7E2F1] bg-white px-3.5 py-2.5 text-sm font-medium text-[#012920]"
               >
                 Add Project Code
               </button>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0B2A4A] px-3.5 py-2.5 text-sm font-semibold text-white">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#012920] px-3.5 py-2.5 text-sm font-semibold text-white">
                 <Upload size={15} />
                 {importing ? "Importing..." : "Import JSON"}
                 <input
@@ -353,22 +353,22 @@ export default function ProjectCodes() {
               type="button"
               onClick={handleRerunMatching}
               disabled={rerunningMatch}
-              className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#012920] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {rerunningMatch ? "Matching..." : "Rerun Matching"}
             </button>
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-[#012920] bg-white shadow-sm">
           <div className="border-b border-[#E6EDF6] bg-[#F7FAFF] px-6 py-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0B2A4A]/80">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#012920]">
               Project Code List
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left">
-              <thead className="bg-[#F7FAFF] text-xs uppercase tracking-wide text-[#0B2A4A]/70">
+              <thead className="bg-[#F7FAFF] text-xs uppercase tracking-wide text-[#012920]">
                 <tr>
                   <th className="px-6 py-3">Project Code</th>
                   <th className="px-6 py-3">College</th>

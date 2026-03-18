@@ -496,7 +496,7 @@ export default function StudentDashboard() {
         </select>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 ">
         <StatCard
           label="Enrolled"
           value={statusSummary.enrolled}
@@ -519,7 +519,7 @@ export default function StudentDashboard() {
         />
       </section>
 
-      <section className="student-navbar-card rounded-3xl border border-[#D7E2F1] bg-white p-5 sm:p-6">
+      <section className="student-navbar-card rounded-3xl border border-sm border-[#012920] bg-white p-5 sm:p-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
           <div className="space-y-3">
             <h3 className="text-2xl font-semibold text-[#0B2A4A]">
@@ -591,7 +591,7 @@ export default function StudentDashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6">
+      <section className="grid grid-cols-1 gap-6 border border-[#012920] rounded-2xl ">
         <Panel title="Profile Snapshot">
           <div className="space-y-4">
             <div className="rounded-2xl bg-[#acf74d] p-4 text-white shadow-sm">
@@ -651,10 +651,10 @@ export default function StudentDashboard() {
 
 function StatCard({ label, value, icon }) {
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-xl bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-[#0B2A4A]/70">{label}</p>
-        <span className="rounded-lg bg-[#EEF3FA] p-2 text-[#0B2A4A]">
+        <p className="text-sm font-medium text-[#012920]">{label}</p>
+        <span className="rounded-lg bg-[#F5F4EB] p-2 text-[#0B2A4A]">
           {icon}
         </span>
       </div>

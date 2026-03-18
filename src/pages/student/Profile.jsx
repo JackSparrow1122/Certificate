@@ -250,7 +250,7 @@ export default function StudentProfile() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 pb-6 ">
-      <section className="student-navbar-card rounded-3xl border border-[#D6E1EE] bg-white p-6">
+      <section className="student-navbar-card rounded-3xl border border-[#012920] bg-white p-6">
         <h1 className="text-3xl font-semibold text-[#012920]">
           Student Profile
         </h1>
@@ -259,7 +259,7 @@ export default function StudentProfile() {
         </p>
       </section>
 
-      <section className="rounded-2xl border border-[#D6E1EE] bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-xl font-semibold text-[#012920]">
           Basic Information
         </h2>
@@ -273,8 +273,8 @@ export default function StudentProfile() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#D6E1EE] bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-[#0B2A4A]">
+      <section className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-xl font-semibold text-[#012920]">
           Contact Details
         </h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -299,8 +299,8 @@ export default function StudentProfile() {
         entries={filteredPostGraduationEntries}
       />
 
-      <section className="rounded-2xl border border-[#D6E1EE] bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-[#0B2A4A]">
+      <section className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-xl font-semibold text-[#012920]">
           Change Password
         </h2>
 
@@ -381,10 +381,10 @@ export default function StudentProfile() {
 function ProfileItem({ label, value }) {
   return (
     <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm transition">
-      <p className="text-xs uppercase tracking-wide text-[#0B2A4A]/60">
+      <p className="text-xs uppercase tracking-wide text-[#012920]">
         {label}
       </p>
-      <p className="mt-1 text-base font-semibold text-[#0B2A4A]">
+      <p className="mt-1 text-base font-semibold text-[#012920]">
         {value || "-"}
       </p>
     </div>
@@ -401,8 +401,8 @@ function DetailsSection({ title, entries }) {
   }
 
   return (
-    <section className="rounded-2xl border border-[#D6E1EE] bg-white p-5 shadow-sm">
-      <h2 className="mb-4 text-xl font-semibold text-[#0B2A4A]">{title}</h2>
+    <section className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
+      <h2 className="mb-4 text-xl font-semibold text-[#012920]">{title}</h2>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredEntries.map(([label, value]) => (
           <ProfileItem key={`${title}-${label}`} label={label} value={value} />

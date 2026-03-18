@@ -199,10 +199,10 @@ export default function SuperAdminHelp() {
     <SuperAdminLayout>
       <div className="space-y-5">
         <div>
-          <h1 className="text-4xl font-semibold text-[#1b2a46]">
+          <h1 className="text-4xl font-semibold text-[#012920]">
             Help Tickets Portal
           </h1>
-          <p className="mt-1 text-xl text-[#607089]">
+          <p className="mt-1 text-xl text-[#012920]">
             Manage all support tickets from users, HODs, and admins
           </p>
         </div>
@@ -234,7 +234,7 @@ export default function SuperAdminHelp() {
           />
         </section>
 
-        <section className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-[#012920] bg-white p-4 shadow-sm">
           <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1 md:grid-cols-8">
             {STATUS_TABS.map((status) => (
               <button
@@ -292,14 +292,14 @@ export default function SuperAdminHelp() {
                     <tr key={ticket.id} className="border-b last:border-b-0">
                       <td className="px-3 py-4">
                         <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE_CLASS[ticket.status] || "bg-gray-100 text-gray-700"}`}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE_CLASS[ticket.status] || "bg-gray-100 text-[#012920]"}`}
                         >
                           {ticket.status || "Open"}
                         </span>
                       </td>
                       <td className="px-3 py-4">
                         <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${PRIORITY_BADGE_CLASS[ticket.priority] || "bg-gray-100 text-gray-700"}`}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${PRIORITY_BADGE_CLASS[ticket.priority] || "bg-gray-100 text-[#012920]"}`}
                         >
                           {ticket.priority || "Medium"}
                         </span>
@@ -363,12 +363,12 @@ function MetricCard({ icon, label, value, tone }) {
           : "bg-blue-100 text-blue-600";
 
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
       <div className="flex items-center gap-3">
         <span className={`rounded-xl p-2 ${toneClass}`}>{icon}</span>
         <div>
-          <p className="text-4xl font-semibold text-[#1b2a46]">{value}</p>
-          <p className="text-base text-[#6b7b90]">{label}</p>
+          <p className="text-4xl font-semibold text-[#012920]">{value}</p>
+          <p className="text-base text-[#012920]">{label}</p>
         </div>
       </div>
     </div>

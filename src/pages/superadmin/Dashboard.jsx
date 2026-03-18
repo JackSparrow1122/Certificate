@@ -393,7 +393,7 @@ export default function Dashboard() {
     <SuperAdminLayout>
       <section className="mb-4 flex flex-wrap items-center justify-end gap-2">
         {cacheInfo.cachedAt > 0 && (
-          <span className="mr-auto text-xs text-gray-400">
+          <span className="mr-auto text-lg text-[#012920]">
             {cacheInfo.isStale ? "⚠\uFE0F " : ""}Last updated:{" "}
             {cacheAgeLabel(cacheInfo.cachedAt)}
           </span>
@@ -401,14 +401,14 @@ export default function Dashboard() {
         <button
           type="button"
           onClick={handleResetLocalDb}
-          className="rounded-lg border border-[#D7E2F1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] shadow-sm"
+          className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-4 py-2 text-sm font-semibold text-white shadow-sm"
         >
           Reset Local DB
         </button>
         <button
           type="button"
           onClick={handleToggleDbMode}
-          className="rounded-lg border border-[#D7E2F1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2A4A] shadow-sm"
+          className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-4 py-2 text-sm font-semibold text-white shadow-sm"
         >
           DB Mode: {dbMode === DB_MODES.LOCAL ? "Local" : "Production"}
         </button>
@@ -539,14 +539,14 @@ export default function Dashboard() {
 
 function MetricCard({ icon, label, value, helper }) {
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#012920] bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-[#0B2A4A]/70">{label}</p>
-        <span className="rounded-lg bg-[#0B2A4A]/10 p-2 text-[#0B2A4A]">
+        <p className="text-lg font-medium text-[#012920]">{label}</p>
+        <span className="rounded-lg  bg-[#F5F4EB] p-2 text-[#012920]">
           {icon}
         </span>
       </div>
-      <p className="mt-2 text-3xl font-semibold text-[#0B2A4A]">{value}</p>
+      <p className="mt-2 text-3xl font-semibold text-[#012920]">{value}</p>
       <p className="mt-1 text-xs text-gray-500">{helper}</p>
     </div>
   );
@@ -554,8 +554,8 @@ function MetricCard({ icon, label, value, helper }) {
 
 function ChartCard({ title, children }) {
   return (
-    <div className="rounded-2xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
-      <h2 className="mb-2 text-base font-semibold text-[#0B2A4A]">{title}</h2>
+    <div className="rounded-2xl border border-[#012920] bg-white p-4 shadow-sm">
+      <h2 className="mb-2 text-base font-semibold text-[#012920]">{title}</h2>
       {children}
     </div>
   );

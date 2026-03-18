@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutGrid,
   GraduationCap,
@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase/config";
-import logo from "../../assets/logo.png";
-import profileImage from "../../assets/image.jpg";
+import logo from "../../assets/image.png";
+import profileImage from "../../assets/logo.png";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -25,28 +25,29 @@ export default function Sidebar() {
       return false;
     }
   });
+
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, role, profile } = useAuth();
 
   const adminName =
     profile?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
+
   const effectiveRole = profile?.role || role;
+
   const adminRoleLabel =
     effectiveRole === "collegeAdmin"
       ? "College Admin"
       : effectiveRole === "superAdmin"
-        ? "Super Admin"
-        : "Admin";
+      ? "Super Admin"
+      : "Admin";
+
   const adminInitial = adminName.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     await signOut(auth);
     localStorage.clear();
     navigate("/login", { replace: true });
-  };
-
-  const handleProfileClick = () => {
-    navigate("/superadmin/profile");
   };
 
   const handleMouseEnter = () => {
@@ -82,8 +83,8 @@ export default function Sidebar() {
       onMouseLeave={handleMouseLeave}
       className={`${
         expanded ? "w-72" : "w-20"
-      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#0B2A4A] text-white flex flex-col justify-between
-         transition-[width,transform] duration-300 ease-in-out`}
+      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#CFFF92] text-[#012920] flex flex-col justify-between
+      transition-[width,transform] duration-300 ease-in-out`}
     >
       {/* TOP */}
       <div>
@@ -93,27 +94,38 @@ export default function Sidebar() {
             src={expanded ? logo : profileImage}
             alt="Academy Logo"
             className={`object-contain rounded-xl transition-all duration-300 ${
-              expanded ? "h-20" : "h-12 w-12 bg-white"
+              expanded ? "h-30" : "h-16 w-16  p-1"
             }`}
           />
         </div>
 
-        {/* Profile */}
-        <button
-          type="button"
-          onClick={handleProfileClick}
-          className={`mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
-            expanded
-              ? "rounded-2xl bg-white/12 p-3.5 gap-3 justify-center"
-              : "rounded-xl p-2 justify-center"
-          }`}
-          title="Open Profile"
+        {/* PROFILE */}
+        <NavLink
+          to="/superadmin/profile"
+          className={({ isActive }) =>
+            `mx-3 mt-6 flex w-[calc(100%-1.5rem)] items-center transition-all ${
+              isActive
+                ? "rounded-2xl bg-[#012920] p-3 gap-3 justify-center text-white"
+                : expanded
+                ? "rounded-2xl bg-[white/12] gap-3 justify-center text-[#012920]"
+                : "rounded-xl justify-center text-[#012920]"
+            }`
+          }
         >
-          <div className="h-11 w-11 shrink-0 rounded-xl bg-gray-300 text-[#0B2A4A] text-lg font-semibold leading-none flex items-center justify-center">
+          <div
+            className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl font-semibold text-lg transition-all duration-300 ${
+              expanded
+                ? "bg-white text-[#012920]"
+                : location.pathname === "/superadmin/profile"
+                ? "bg-[#012920] text-white border-none"
+                : "bg-transparent text-[#012920] border-2 border-[#012920]"
+            }`}
+          >
             {adminInitial}
           </div>
+
           {expanded && (
-            <div className="min-w-0 flex-1 text-left">
+            <div className="min-w-0 flex-1 text-left ml-3">
               <p className="truncate text-xl font-semibold leading-tight">
                 {adminName}
               </p>
@@ -122,20 +134,19 @@ export default function Sidebar() {
               </span>
             </div>
           )}
-        </button>
+        </NavLink>
 
-        {/* Menu */}
+        {/* MENU */}
         <nav className="mt-8 space-y-2 px-3">
           {menu.map(({ label, path, icon: Icon }) => (
             <NavLink
               key={label}
               to={path}
               className={({ isActive }) =>
-                `flex items-center gap-4 px-4 py-3 rounded-xl transition
-                ${
+                `flex items-center gap-4 px-4 py-3 rounded-xl transition ${
                   isActive
-                    ? "bg-white text-[#0B2A4A] font-semibold shadow"
-                    : "text-white/90"
+                    ? "bg-[#012920] text-white font-semibold shadow"
+                    : "text-[#012920] font-bold"
                 }`
               }
             >
@@ -150,7 +161,7 @@ export default function Sidebar() {
       <div className="px-3 py-6 border-t border-white/10">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-4 px-4 py-3 rounded-xl text-white/80 transition w-full"
+          className="flex items-center gap-4 px-4 py-3 rounded-xl text-[#012920]/80 transition w-full"
         >
           <LogOut size={22} />
           {expanded && <span>Sign Out</span>}

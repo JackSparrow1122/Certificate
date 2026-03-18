@@ -192,7 +192,7 @@ export default function AddProjectCodeModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+              className="px-4 py-2 bg-[#012920] text-white rounded-md disabled:opacity-50"
             >
               {loading ? "Adding..." : "Add Project Code"}
             </button>

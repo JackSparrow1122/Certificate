@@ -105,7 +105,7 @@ export default function Colleges() {
 
             <button
               onClick={openAdd}
-              className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
+              className="rounded-lg bg-[#012920] px-4 py-2.5 text-sm font-semibold text-white"
             >
               + Add New College
             </button>

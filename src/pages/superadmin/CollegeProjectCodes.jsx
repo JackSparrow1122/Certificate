@@ -175,21 +175,21 @@ export default function CollegeProjectCodes() {
               <button
                 type="button"
                 onClick={() => navigate("/superadmin/colleges")}
-                className="mb-2 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-sm font-medium text-white"
+                className="mb-2 rounded-lg bg-[#012920] px-3 py-1.5 text-sm font-medium text-white"
               >
                 ← Back to Colleges
               </button>
-              <h1 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
+              <h1 className="text-3xl font-semibold leading-tight text-[#012920] sm:text-4xl">
                 {college?.college_name || collegeId}
               </h1>
-              <h2 className="text-3xl font-semibold leading-tight text-[#0B2A4A] sm:text-4xl">
+              <h2 className="text-3xl font-semibold leading-tight text-[#012920] sm:text-4xl">
                 Project Code List
               </h2>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowAddProjectModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
+                className="rounded-lg bg-[#012920] px-4 py-2.5 text-sm font-semibold text-white"
               >
                 + Add New Project Code
               </button>
@@ -197,12 +197,12 @@ export default function CollegeProjectCodes() {
           </div>
 
           <section>
-            <h3 className="mb-3 text-2xl font-semibold tracking-wide text-[#0B2A4A]">
+            <h3 className="mb-3 text-2xl font-semibold tracking-wide text-[#012920]">
               FILTERS
             </h3>
-            <div className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+            <div className="rounded-2xl border border-[#012920] bg-[#E9EEF5] p-4 sm:p-5">
               <div className="flex flex-wrap items-end gap-4">
-                <label className="w-full min-w-[180px] flex-1 text-sm font-medium text-[#0B2A4A]">
+                <label className="w-full min-w-[180px] flex-1 text-sm font-medium text-[#012920]">
                   Project Code
                   <select
                     value={filters.code}
@@ -267,7 +267,7 @@ export default function CollegeProjectCodes() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#003B7A] px-4 text-sm font-semibold text-white"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#012920] px-4 text-sm font-semibold text-white"
                 >
                   <RotateCcw size={15} />
                   Reset
@@ -276,7 +276,7 @@ export default function CollegeProjectCodes() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+          <section className="rounded-2xl border border-[#012920] bg-[#E9EEF5] p-4 sm:p-5">
             <div className="mb-2 grid grid-cols-[2fr_1.2fr_1fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
               <p>Project Code</p>
               <p>Course</p>

@@ -247,7 +247,7 @@ export default function StudentNavbar({ onMenuClick }) {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-start self-start">
+          <div className="flex shrink-0 items-start self-start ">
             <div className="inline-flex items-center">
               {collegeInfo.logo && !logoLoadFailed ? (
                 <img

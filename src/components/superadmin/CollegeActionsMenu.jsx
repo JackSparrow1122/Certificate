@@ -26,14 +26,14 @@ export default function CollegeActionsMenu({ onEdit, onDelete }) {
       <button
         onClick={() => setOpen(!open)}
         className="h-8 w-8 flex items-center justify-center
-                   rounded-full bg-white shadow
-                   text-gray-700"
+                   rounded-full bg-[#012920] shadow
+                   text-white"
       >
         ⋮
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg border z-20">
+        <div className="absolute right-0 mt-2 w-44 bg-[white] rounded-xl shadow-lg border z-20">
           <button
             onClick={onEdit}
             className="flex w-full px-4 py-2 text-sm"
