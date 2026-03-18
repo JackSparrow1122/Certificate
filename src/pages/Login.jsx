@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { auth } from "../firebase/config";
 import { getDashboardByRole } from "../utils/roleRedirect";
 import { getAuthUserProfile } from "../utils/authProfileLookup";
-import logo from "../assets/logo.png";
+import logo from "../assets/image.png";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -97,7 +97,7 @@ export default function Login() {
         <div className="text-center space-y-6 max-w-md">
           {/* Logo/Branding - Gryphon */}
           <div className="rounded-xl p-6 inline-block ">
-            <img src={logo} alt="Gryphon Logo" className="h-20 w-auto mx-auto" />
+            <img src={logo} alt="Gryphon Logo" className="h-40 w-auto mx-auto" />
           </div>
 
           
