@@ -83,7 +83,7 @@ export default function Sidebar() {
       onMouseLeave={handleMouseLeave}
       className={`${
         expanded ? "w-72" : "w-20"
-      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#CFFF92] text-[#012920] flex flex-col justify-between
+      } h-screen sticky top-0 shrink-0 overflow-hidden bg-[#ACF74D] text-[#012920] flex flex-col justify-between
       transition-[width,transform] duration-300 ease-in-out`}
     >
       {/* TOP */}
