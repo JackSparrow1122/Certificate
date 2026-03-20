@@ -39,8 +39,8 @@ export default function Sidebar() {
     effectiveRole === "collegeAdmin"
       ? "College Admin"
       : effectiveRole === "superAdmin"
-      ? "Super Admin"
-      : "Admin";
+        ? "Super Admin"
+        : "Admin";
 
   const adminInitial = adminName.charAt(0).toUpperCase();
 
@@ -107,8 +107,8 @@ export default function Sidebar() {
               isActive
                 ? "rounded-2xl bg-[#012920] p-3 gap-3 justify-center text-white"
                 : expanded
-                ? "rounded-2xl bg-[white/12] gap-3 justify-center text-[#012920]"
-                : "rounded-xl justify-center text-[#012920]"
+                  ? "rounded-2xl bg-[white/12] gap-3 justify-center text-[#012920]"
+                  : "rounded-xl justify-center text-[#012920]"
             }`
           }
         >
@@ -117,8 +117,8 @@ export default function Sidebar() {
               expanded
                 ? "bg-white text-[#012920]"
                 : location.pathname === "/superadmin/profile"
-                ? "bg-[#012920] text-white border-none"
-                : "bg-transparent text-[#012920] border-2 border-[#012920]"
+                  ? "bg-[#012920] text-white border-none"
+                  : "bg-transparent text-[#012920] border-2 border-[#012920]"
             }`}
           >
             {adminInitial}
@@ -159,14 +159,14 @@ export default function Sidebar() {
 
       {/* SIGN OUT */}
       <div className="px-3 py-6 border-t border-white/10">
-  <button
-    onClick={handleLogout}
-    className="flex items-center gap-4 px-4 py-3 rounded-xl text-[#012920] transition w-full hover:bg-red-500 hover:text-white"
-  >
-    <LogOut size={22} />
-    {expanded && <span>Sign Out</span>}
-  </button>
-</div>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-4 px-4 py-3 rounded-xl text-[#012920] transition w-full hover:bg-red-500 hover:text-white"
+        >
+          <LogOut size={22} />
+          {expanded && <span>Sign Out</span>}
+        </button>
+      </div>
     </aside>
   );
 }

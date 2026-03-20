@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { addProjectCode } from "../../../services/projectCodeService";
 
 export default function AddProjectCodeModal({
@@ -18,9 +18,81 @@ export default function AddProjectCodeModal({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const codeInputRef = useRef(null);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  // Generate academic year options
+  const getAcademicYearOptions = () => {
+    const currentYear = new Date().getFullYear();
+    const options = [];
+    
+    // Generate last 2 years, current year, and next 5 years
+    for (let i = -2; i <= 5; i++) {
+      const startYear = currentYear + i;
+      const endYear = startYear + 1;
+      const yearRange = `${startYear}-${endYear}`;
+      options.push(yearRange);
+    }
+    
+    return options;
+  };
+
+  const academicYearOptions = getAcademicYearOptions();
+
+  // Get the college code prefix (e.g., "RCOEM")
+  const collegeCodePrefix = String(collegeCode || collegeId || "")
+    .trim()
+    .toUpperCase();
+
+  // Get first 3 letters of course
+  const getCoursePrefix = (course) => {
+    if (!course || !course.trim()) return "";
+    return course.trim().toUpperCase().substring(0, 3);
+  };
+
+  // Auto-format the project code
+  const formatProjectCode = (course, year, type, academicYear) => {
+    let formatted = collegeCodePrefix;
+    
+    // Add course (first 3 letters)
+    const coursePrefix = getCoursePrefix(course);
+    if (coursePrefix) {
+      formatted += `/${coursePrefix}`;
+    }
+    
+    // Add year
+    if (year && year.trim()) {
+      formatted += `/${year.trim()}`;
+    }
+    
+    // Add type
+    if (type && type.trim()) {
+      formatted += `/${type.trim().toUpperCase()}`;
+    }
+    
+    // Add academic year (optional)
+    if (academicYear && academicYear.trim()) {
+      formatted += `/${academicYear.trim()}`;
+    }
+    
+    return formatted;
+  };
+
+  // When any field changes, update the formatted code
+  const handleFieldChange = (e) => {
+    const { name, value } = e.target;
+    const updatedForm = { ...form, [name]: value };
+    
+    // Auto-update the project code when any field changes
+    const formattedCode = formatProjectCode(
+      name === 'course' ? value : updatedForm.course,
+      name === 'year' ? value : updatedForm.year,
+      name === 'type' ? value : updatedForm.type,
+      name === 'academicYear' ? value : updatedForm.academicYear
+    );
+    updatedForm.code = formattedCode;
+    
+    setForm(updatedForm);
+  };
 
   const validateForm = () => {
     if (!form.code.trim()) {
@@ -39,21 +111,25 @@ export default function AddProjectCodeModal({
       setError("Type is required");
       return false;
     }
-    if (!form.academicYear.trim()) {
-      setError("Academic year is required");
+
+    // Validate the format
+    const parts = form.code.split('/');
+    if (parts.length < 4) {
+      setError(`Project code must follow format: ${collegeCodePrefix}/COURSE/YEAR/TYPE[/ACADEMIC-YEAR] (Academic year is optional)`);
       return false;
     }
 
-    const expectedCodePrefix = String(collegeCode || collegeId || "")
-      .trim()
-      .toUpperCase();
-    const enteredCodePrefix = String(form.code || "")
-      .split("/")[0]
-      ?.trim()
-      .toUpperCase();
+    const enteredCodePrefix = parts[0]?.trim().toUpperCase();
+    if (enteredCodePrefix !== collegeCodePrefix) {
+      setError(`Project code must start with ${collegeCodePrefix}/`);
+      return false;
+    }
 
-    if (!enteredCodePrefix || enteredCodePrefix !== expectedCodePrefix) {
-      setError(`Project code must start with ${expectedCodePrefix}/`);
+    // Validate course is only 3 letters
+    const coursePart = parts[1]?.trim().toUpperCase();
+    const expectedCoursePrefix = getCoursePrefix(form.course);
+    if (coursePart !== expectedCoursePrefix) {
+      setError(`Course should be ${expectedCoursePrefix} (first 3 letters of ${form.course})`);
       return false;
     }
 
@@ -74,7 +150,7 @@ export default function AddProjectCodeModal({
         course: form.course,
         year: form.year,
         type: form.type,
-        academicYear: form.academicYear,
+        academicYear: form.academicYear || "", // Can be empty
         matched: false,
       });
       onProjectCodeAdded();
@@ -115,13 +191,17 @@ export default function AddProjectCodeModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Project Code
             </label>
+            <div className="text-xs text-gray-500 mb-1">
+              Format: {collegeCodePrefix}/COURSE(3 letters)/YEAR/TYPE[/ACADEMIC-YEAR]
+            </div>
             <input
+              ref={codeInputRef}
               type="text"
               name="code"
               value={form.code}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., RCOEM/ENGG/3rd/OT/26-27"
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-sm"
+              placeholder={`e.g., ${collegeCodePrefix}/ENG/3rd/OT`}
             />
           </div>
 
@@ -133,10 +213,15 @@ export default function AddProjectCodeModal({
               type="text"
               name="course"
               value={form.course}
-              onChange={handleChange}
+              onChange={handleFieldChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., Engineering"
+              placeholder="e.g., Engineering, Computer Science"
             />
+            {form.course && (
+              <div className="text-xs text-gray-500 mt-1">
+                Will be shortened to: {getCoursePrefix(form.course)}
+              </div>
+            )}
           </div>
 
           <div>
@@ -147,9 +232,9 @@ export default function AddProjectCodeModal({
               type="text"
               name="year"
               value={form.year}
-              onChange={handleChange}
+              onChange={handleFieldChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., 3rd"
+              placeholder="e.g., 1st, 2nd, 3rd, 4th"
             />
           </div>
 
@@ -161,24 +246,29 @@ export default function AddProjectCodeModal({
               type="text"
               name="type"
               value={form.type}
-              onChange={handleChange}
+              onChange={handleFieldChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., OT"
+              placeholder="e.g., OT, TP"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Academic Year
+              Academic Year <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
-            <input
-              type="text"
+            <select
               name="academicYear"
               value={form.academicYear}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., 2026-2027"
-            />
+              onChange={handleFieldChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Select Academic Year (Optional)</option>
+              {academicYearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
