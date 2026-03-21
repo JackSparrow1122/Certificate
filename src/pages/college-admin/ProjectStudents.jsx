@@ -38,7 +38,7 @@ export default function ProjectStudents() {
               <th className="text-left px-3">Roll No</th>
               <th className="text-left px-3">Name</th>
               <th className="text-left px-3">Email Id</th>
-              <th className="text-left px-3">Current Sem</th>
+              <th className="text-left px-3">Current Year</th>
               <th className="text-left px-3">Admission Year</th>
             
             </tr>
@@ -54,7 +54,7 @@ export default function ProjectStudents() {
                 <td className="px-3 py-3 font-medium">{s.id}</td>
                 <td className="px-3">{s.name}</td>
                 <td className="px-3">{s.email}</td>
-                <td className="px-3">{s.currentSemester}</td>
+                <td className="px-3">{s.currentYear || s.currentSemester || "-"}</td>
                  <td className="px-3">{s.admissionYear}</td>
                
               </tr>

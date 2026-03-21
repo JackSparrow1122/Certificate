@@ -3,6 +3,7 @@ import {
   createCertificateAndEnrollStudents,
   updateCertificate,
 } from "../../../services/certificateService";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function AddCertificateModal({
   onClose,
@@ -67,9 +68,11 @@ export default function AddCertificateModal({
     try {
       if (isEditMode) {
         await updateCertificate(initialCertificate.id, form);
+        notifySuperAdminSuccess("Certificate details updated");
         onCertificateUpdated?.();
       } else {
         await createCertificateAndEnrollStudents(form);
+        notifySuperAdminSuccess("Certificate added");
         onCertificateAdded?.();
       }
       onClose();

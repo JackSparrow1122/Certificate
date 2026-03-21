@@ -114,7 +114,8 @@ export default function StudentProfile() {
   const currentYearFromCode = getCurrentYearFromProjectCode(
     structuredProjectCode,
   );
-  const currentYear = currentYearFromCode || student?.currentSemester || "-";
+  const currentYear =
+    currentYearFromCode || student?.currentYear || student?.currentSemester || "-";
   const seenKeys = new Set(
     [
       "STUDENT NAME",

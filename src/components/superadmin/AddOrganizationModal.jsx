@@ -4,6 +4,7 @@ import {
   updateOrganization,
 } from "../../../services/organizationService";
 import { uploadImageToCloudinary } from "../../../services/cloudinaryService";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function AddOrganizationModal({
   onClose,
@@ -114,12 +115,14 @@ export default function AddOrganizationModal({
           name: form.name,
           logoUrl: finalLogoUrl,
         });
+        notifySuperAdminSuccess("Organisation details updated");
         onOrganizationUpdated?.();
       } else {
         await createOrganization({
           name: form.name,
           logoUrl: finalLogoUrl,
         });
+        notifySuperAdminSuccess("Organisation added");
         onOrganizationAdded?.();
       }
       onClose();

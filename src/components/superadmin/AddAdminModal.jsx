@@ -8,6 +8,7 @@ import { getAllColleges } from "../../../services/collegeService";
 import { app } from "../../firebase/config";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, setPersistence, inMemoryPersistence } from "firebase/auth";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function AddAdminModal({
   admin,
@@ -181,6 +182,7 @@ export default function AddAdminModal({
         college: "",
       });
 
+      notifySuperAdminSuccess(isEdit ? "Admin details updated" : "Admin added");
       onAdminAdded();
       onClose();
     } catch (err) {

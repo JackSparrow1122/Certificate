@@ -126,7 +126,10 @@ export default function StudentDashboard() {
     structuredProjectCode,
   );
   const currentYear =
-    currentYearFromCode || currentStudent?.currentSemester || "-";
+    currentYearFromCode ||
+    currentStudent?.currentYear ||
+    currentStudent?.currentSemester ||
+    "-";
   const tenthPercentage =
     currentStudent?.tenthPercentage ??
     tenthDetails["10th OVERALL MARKS %"] ??

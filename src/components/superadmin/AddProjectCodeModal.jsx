@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { addProjectCode } from "../../../services/projectCodeService";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function AddProjectCodeModal({
   collegeId,
@@ -37,6 +38,8 @@ export default function AddProjectCodeModal({
   };
 
   const academicYearOptions = getAcademicYearOptions();
+  const yearOptions = ["1st", "2nd", "3rd", "4th", "5th"];
+  const typeOptions = ["OT", "TP"];
 
   // Get the college code prefix (e.g., "RCOEM")
   const collegeCodePrefix = String(collegeCode || collegeId || "")
@@ -153,6 +156,7 @@ export default function AddProjectCodeModal({
         academicYear: form.academicYear || "", // Can be empty
         matched: false,
       });
+      notifySuperAdminSuccess("Project code added");
       onProjectCodeAdded();
       onClose();
     } catch (error) {
@@ -228,28 +232,38 @@ export default function AddProjectCodeModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Year
             </label>
-            <input
-              type="text"
+            <select
               name="year"
               value={form.year}
               onChange={handleFieldChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., 1st, 2nd, 3rd, 4th"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Select Year</option>
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Type
             </label>
-            <input
-              type="text"
+            <select
               name="type"
               value={form.type}
               onChange={handleFieldChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., OT, TP"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">Select Type</option>
+              {typeOptions.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

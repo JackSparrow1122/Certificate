@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { addCollege, updateCollege } from "../../../services/collegeService";
 import { createCollegeAdmin } from "../../../services/userService";
 import { uploadImageToCloudinary } from "../../../services/cloudinaryService";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function AddEditCollegeModal({
   college,
@@ -129,8 +130,7 @@ export default function AddEditCollegeModal({
         await updateCollege(college.collegeCode, {
           college_logo: logoUrl,
         });
-
-        alert("College updated successfully!");
+        notifySuperAdminSuccess("College details edited");
       } else {
         // 1. Create college in Firestore
         await addCollege({
@@ -148,8 +148,7 @@ export default function AddEditCollegeModal({
           },
           form.code,
         );
-
-        alert("College and admin created successfully!");
+        notifySuperAdminSuccess("College added");
       }
 
       // Call the callback to refresh the colleges list

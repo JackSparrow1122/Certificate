@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { addStudent } from "../../../services/studentService";
 import { createStudentAuthUser } from "../../../services/userService";
 import { parseProjectCode } from "../../utils/projectCodeParser";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function AddStudentModal({ projectCode, onClose, onStudentAdded }) {
   const parsedProjectCode = useMemo(() => parseProjectCode(projectCode), [projectCode]);
@@ -14,10 +15,10 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
     tenthPercentage: "",
     twelfthPercentage: "",
     courseYear: parsedProjectCode.isStructured
-      ? `${parsedProjectCode.courseLabel}${parsedProjectCode.semesterLabel ? ` / ${parsedProjectCode.semesterLabel}` : ""}`
+      ? parsedProjectCode.courseLabel
       : "",
     admissionYear: parsedProjectCode.sessionStartYear,
-    currentSemester: parsedProjectCode.semesterNumber,
+    currentYear: parsedProjectCode.semesterNumber,
     email: "",
     phone: "",
     collegeCode: parsedProjectCode.collegeCode,
@@ -59,8 +60,8 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
       setError("Admission year is required");
       return false;
     }
-    if (!form.currentSemester) {
-      setError("Current semester is required");
+    if (!form.currentYear) {
+      setError("Current year is required");
       return false;
     }
     setError(null);
@@ -115,10 +116,11 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
         tenthPercentage: parseFloat(form.tenthPercentage),
         twelfthPercentage: parseFloat(form.twelfthPercentage),
         admissionYear: parseInt(form.admissionYear),
-        currentSemester: parseInt(form.currentSemester),
+        currentYear: parseInt(form.currentYear),
         email: form.email,
         phone: form.phone,
       });
+      notifySuperAdminSuccess("Student added");
 
       let authError = null;
       let authResult = null;
@@ -204,7 +206,7 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
                 <p className="text-sm font-medium text-gray-900">{form.course || "-"}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-600">Semester</p>
+                <p className="text-xs uppercase tracking-wide text-gray-600">Year</p>
                 <p className="text-sm font-medium text-gray-900">{form.semesterLabel || "-"}</p>
               </div>
               <div>
@@ -264,22 +266,22 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Course / Year</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Course</label>
               <input
                 type="text"
                 name="courseYear"
                 value={form.courseYear}
-                onChange={handleChange}
+                readOnly
                 className="w-full border-none bg-gray-300 px-3 py-2 text-sm outline-none"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Current Semester</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Current Year</label>
               <input
                 type="number"
-                name="currentSemester"
-                value={form.currentSemester}
-                onChange={handleChange}
+                name="currentYear"
+                value={form.currentYear}
+                readOnly
                 min="1"
                 className="w-full border-none bg-gray-300 px-3 py-2 text-sm outline-none"
               />

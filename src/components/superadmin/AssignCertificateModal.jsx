@@ -4,6 +4,7 @@ import {
   enrollStudentsIntoCertificate,
 } from "../../../services/certificateService";
 import * as XLSX from "xlsx";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 // ---------------------------------------------------------------------------
 // Normalize exam codes: replace Unicode dash variants → ASCII hyphen,
@@ -250,6 +251,7 @@ export default function AssignCertificateModal({
       if (warningMsg) finalMsg = warningMsg + "\n\n" + finalMsg;
 
       setStatus(finalMsg);
+      notifySuperAdminSuccess("Certificate assigned");
 
       if (totalEnrolled > 0) {
         onAssigned?.();

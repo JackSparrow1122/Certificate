@@ -404,7 +404,8 @@ export const localAddStudent = async (studentData) =>
       tenthPercentage: studentData.tenthPercentage,
       twelfthPercentage: studentData.twelfthPercentage,
       admissionYear: studentData.admissionYear,
-      currentSemester: studentData.currentSemester,
+      currentYear:
+        studentData.currentYear ?? studentData.currentSemester ?? "",
       email: studentData.email,
       phone: studentData.phone,
       isActive: true,

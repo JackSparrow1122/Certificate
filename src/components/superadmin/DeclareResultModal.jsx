@@ -4,6 +4,7 @@ import {
   getEnrolledProjectCodesForCertificate,
   declareResultsForCertificate,
 } from "../../../services/certificateService";
+import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
 export default function DeclareResultModal({
   certificate,
@@ -165,6 +166,7 @@ export default function DeclareResultModal({
       });
 
       setStep("complete");
+      notifySuperAdminSuccess("Result declared");
       onResultDeclared?.();
     } catch (err) {
       setError("Failed to declare results");

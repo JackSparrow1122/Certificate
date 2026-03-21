@@ -59,7 +59,7 @@ export default function StudentDetails() {
         <Section title="Academic Information">
           <Detail label="College / Course / Year" value={student.projectId} />
           <Detail label="Admission Year" value={student.admissionYear} />
-          <Detail label="Current Semester" value={student.currentSemester} />
+          <Detail label="Current Year" value={student.currentYear || student.currentSemester || "-"} />
           <Detail label="10th Percentage" value={`${student.tenthPercentage}%`} />
           <Detail
             label="12th / Diploma Percentage"
