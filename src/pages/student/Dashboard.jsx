@@ -67,6 +67,16 @@ const getOptimizedLogoUrl = (logoUrl) => {
   return `${head}${transformation}/${tail}`;
 };
 
+const getLogoFromCertificate = (certificate = {}) => {
+  return String(
+    certificate.organizationLogoUrl ||
+      certificate.logoUrl ||
+      certificate.organizationLogo ||
+      certificate.logo ||
+      "",
+  ).trim();
+};
+
 export default function StudentDashboard() {
   const { user, profile } = useAuth();
   const [currentStudent, setCurrentStudent] = useState(null);
@@ -164,16 +174,88 @@ export default function StudentDashboard() {
 
         const merged = [...byEmail, ...byId];
         if (merged.length > 0) {
-          const mapped = merged.map((entry, idx) => ({
-            id: entry.certificateId || `enroll-${idx}`,
-            name: entry.certificateName || "Certificate",
-            platform: entry.platform || "Certification",
-            organizationName: entry.organizationName || entry.domain || "",
-            organizationLogoUrl: entry.organizationLogoUrl || "",
-            level: entry.level || "",
-            status: normalizeCertificateStatus(entry.status || "enrolled"),
-            yearTag: entry.yearTag || getCurrentYearFromProjectCode(entry.projectCode) || projectYearTag,
-          }));
+          const uniqueCertificateIds = [
+            ...new Set(
+              merged
+                .map((entry) => String(entry.certificateId || "").trim())
+                .filter(Boolean),
+            ),
+          ];
+
+          let linkedCertificates = [];
+          try {
+            linkedCertificates = await getCertificatesByIds(uniqueCertificateIds);
+          } catch (certificateError) {
+            console.warn(
+              "Unable to fetch certificate metadata for email/id enrollments:",
+              certificateError,
+            );
+          }
+
+          let organizations = [];
+          try {
+            organizations = await getAllOrganizations();
+          } catch (organizationError) {
+            console.warn(
+              "Unable to fetch organizations for email/id enrollments:",
+              organizationError,
+            );
+          }
+
+          const certificateById = new Map(
+            (linkedCertificates || [])
+              .filter((certificate) => certificate?.id)
+              .map((certificate) => [certificate.id, certificate]),
+          );
+
+          const organizationByName = new Map(
+            (organizations || [])
+              .filter((organization) => organization?.name)
+              .map((organization) => [
+                String(organization.name || "")
+                  .trim()
+                  .toLowerCase(),
+                organization,
+              ]),
+          );
+
+          const mapped = merged.map((entry, idx) => {
+            const certificateId = String(entry.certificateId || "").trim();
+            const certificateDoc = certificateById.get(certificateId) || {};
+            const organizationName =
+              entry.organizationName ||
+              entry.domain ||
+              certificateDoc.domain ||
+              "";
+            const organizationLogoUrl =
+              getLogoFromCertificate(entry) ||
+              organizationByName.get(
+                String(organizationName || "")
+                  .trim()
+                  .toLowerCase(),
+              )?.logoUrl ||
+              "";
+
+            return {
+              id: certificateId || `enroll-${idx}`,
+              name:
+                entry.certificateName ||
+                certificateDoc.name ||
+                "Certificate",
+              platform:
+                entry.platform ||
+                certificateDoc.platform ||
+                "Certification",
+              organizationName,
+              organizationLogoUrl,
+              level: entry.level || certificateDoc.level || "",
+              status: normalizeCertificateStatus(entry.status || "enrolled"),
+              yearTag:
+                entry.yearTag ||
+                getCurrentYearFromProjectCode(entry.projectCode) ||
+                projectYearTag,
+            };
+          });
           setEnrolledCertificates(mapped);
           return;
         }
@@ -689,7 +771,7 @@ function SnapshotItem({ label, value }) {
 }
 
 function CertificateCard({ certificate }) {
-  const logoUrl = getOptimizedLogoUrl(certificate.organizationLogoUrl);
+  const logoUrl = getOptimizedLogoUrl(getLogoFromCertificate(certificate));
   const statusLabel = normalizeCertificateStatus(
     certificate.status || "enrolled",
   );
