@@ -72,7 +72,7 @@ export default function AddProjectCodeModal({
       formatted += `/${type.trim().toUpperCase()}`;
     }
     
-    // Add academic year (optional)
+    // Add academic year
     if (academicYear && academicYear.trim()) {
       formatted += `/${academicYear.trim()}`;
     }
@@ -114,11 +114,15 @@ export default function AddProjectCodeModal({
       setError("Type is required");
       return false;
     }
+    if (!form.academicYear.trim()) {
+      setError("Academic year is required");
+      return false;
+    }
 
     // Validate the format
     const parts = form.code.split('/');
-    if (parts.length < 4) {
-      setError(`Project code must follow format: ${collegeCodePrefix}/COURSE/YEAR/TYPE[/ACADEMIC-YEAR] (Academic year is optional)`);
+    if (parts.length < 5) {
+      setError(`Project code must follow format: ${collegeCodePrefix}/COURSE/YEAR/TYPE/ACADEMIC-YEAR`);
       return false;
     }
 
@@ -153,7 +157,7 @@ export default function AddProjectCodeModal({
         course: form.course,
         year: form.year,
         type: form.type,
-        academicYear: form.academicYear || "", // Can be empty
+        academicYear: form.academicYear,
         matched: false,
       });
       notifySuperAdminSuccess("Project code added");
@@ -200,7 +204,7 @@ export default function AddProjectCodeModal({
               Project Code
             </label>
             <div className="text-xs text-gray-500 mb-1">
-              Format: {collegeCodePrefix}/COURSE(3 letters)/YEAR/TYPE[/ACADEMIC-YEAR]
+              Format: {collegeCodePrefix}/COURSE(3 letters)/YEAR/TYPE/ACADEMIC-YEAR
             </div>
             <input
               ref={codeInputRef}
@@ -272,7 +276,7 @@ export default function AddProjectCodeModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Academic Year <span className="text-gray-400 text-xs">(Optional)</span>
+              Academic Year
             </label>
             <select
               name="academicYear"
@@ -280,7 +284,7 @@ export default function AddProjectCodeModal({
               onChange={handleFieldChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="">Select Academic Year (Optional)</option>
+              <option value="">Select Academic Year</option>
               {academicYearOptions.map((year) => (
                 <option key={year} value={year}>
                   {year}
