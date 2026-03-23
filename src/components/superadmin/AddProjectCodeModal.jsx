@@ -160,7 +160,11 @@ export default function AddProjectCodeModal({
       onProjectCodeAdded();
       onClose();
     } catch (error) {
-      setError("Failed to add project code");
+      if (error?.code === "project-code/already-exists") {
+        setError("Project code exists");
+      } else {
+        setError("Failed to add project code");
+      }
       console.error(error);
     } finally {
       setLoading(false);

@@ -109,11 +109,71 @@ export const addProjectCode = async (projectData) => {
     return localAddProjectCode(projectData);
   }
   try {
-    const normalizedCode = String(projectData.code || "").trim();
+    const normalizedCode = String(projectData.code || "")
+      .trim()
+      .toUpperCase();
     const normalizedCollegeId = String(projectData.collegeId || "").trim();
 
-    // Always create a fresh document to avoid mutating existing project codes inadvertently.
-    // This prevents the “replace instead of add” behaviour reported in the UI.
+    const existingCodesSnapshot = await getDocs(
+      query(
+        collection(db, PROJECT_CODES_COLLECTION),
+        where("collegeId", "==", normalizedCollegeId),
+      ),
+    );
+
+    const matchingExistingDoc = existingCodesSnapshot.docs.find((projectDoc) => {
+      const projectDocData = projectDoc.data() || {};
+      const existingCode = String(projectDocData.code || "")
+        .trim()
+        .toUpperCase();
+      return existingCode === normalizedCode;
+    });
+
+    if (matchingExistingDoc) {
+      const existingData = matchingExistingDoc.data() || {};
+      const existingIsActive = existingData.isActive !== false;
+
+      if (existingIsActive) {
+        const duplicateError = new Error("Project code already exists");
+        duplicateError.code = "project-code/already-exists";
+        throw duplicateError;
+      }
+
+      await updateDoc(matchingExistingDoc.ref, {
+        code: normalizedCode,
+        collegeId: normalizedCollegeId,
+        college: projectData.college,
+        course: projectData.course,
+        year: projectData.year,
+        type: projectData.type,
+        academicYear: projectData.academicYear,
+        matched: projectData.matched || false,
+        isActive: true,
+        deletedAt: null,
+        updatedAt: new Date(),
+      });
+
+      try {
+        const collegeDocId =
+          projectData.collegeId || projectData.collegeCode || projectData.college;
+        if (collegeDocId) {
+          const collegeRef = doc(db, "college", String(collegeDocId));
+          await updateDoc(collegeRef, {
+            project_codes: arrayUnion(normalizedCode),
+          });
+        }
+      } catch (err) {
+        console.error(
+          "Failed to update college document with restored project code:",
+          err,
+        );
+      }
+
+      await setStudentsProjectActiveStatus(normalizedCode, true);
+      return matchingExistingDoc.id;
+    }
+
+    // Create a fresh document only when this code does not already exist.
     const docRef = await addDoc(collection(db, PROJECT_CODES_COLLECTION), {
       code: normalizedCode,
       collegeId: normalizedCollegeId,
@@ -135,7 +195,7 @@ export const addProjectCode = async (projectData) => {
       if (collegeDocId) {
         const collegeRef = doc(db, "college", String(collegeDocId));
         await updateDoc(collegeRef, {
-          project_codes: arrayUnion(projectData.code),
+          project_codes: arrayUnion(normalizedCode),
         });
       }
     } catch (err) {
