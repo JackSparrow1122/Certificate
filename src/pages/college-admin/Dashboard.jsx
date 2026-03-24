@@ -56,22 +56,41 @@ const extractPassYearFromProjectCode = (code) => {
   return parts[parts.length - 1];
 };
 
+const normalizeCourseLabel = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const upper = raw.toUpperCase();
+  if (upper.includes("ENGG") || upper.includes("ENGINEER") || upper === "ENG") {
+    return "Engineering";
+  }
+  if (upper.includes("MBA")) return "MBA";
+  if (upper.includes("BBA")) return "BBA";
+  if (upper.includes("MCA")) return "MCA";
+  if (upper.includes("BCA")) return "BCA";
+
+  return raw;
+};
+
 const deriveCourseFromProjectCode = (code) => {
   const parts = String(code || "")
     .split("/")
-    .map((p) => p.trim().toUpperCase())
+    .map((p) => p.trim())
     .filter(Boolean);
-  if (parts.some((p) => p.includes("MBA"))) return "MBA";
-  if (parts.some((p) => p.includes("BBA"))) return "BBA";
-  if (parts.some((p) => p.includes("MCA"))) return "MCA";
-  if (parts.some((p) => p.includes("BCA"))) return "BCA";
-  if (parts.some((p) => p.includes("ENGG") || p.includes("ENGINEER"))) return "Engineering";
-  return "Other";
+  const courseToken = parts[1] || "";
+  return normalizeCourseLabel(courseToken);
 };
 
 export default function AdminDashboard() {
   const { profile, user } = useAuth();
-  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
+  const COLORS = [
+    "#3B82F6",
+    "#10B981",
+    "#F59E0B",
+    "#EF4444",
+    "#8B5CF6",
+    "#EC4899",
+  ];
   const collegeCode = String(
     profile?.collegeCode || profile?.college_code || "",
   )
@@ -135,11 +154,15 @@ export default function AdminDashboard() {
           const results =
             student?.certificateResults &&
             typeof student.certificateResults === "object"
-              ? Object.values(student.certificateResults).filter((r) => !r?.isDeleted)
+              ? Object.values(student.certificateResults).filter(
+                  (r) => !r?.isDeleted,
+                )
               : [];
 
           const anyFailed = results.some((r) =>
-            failedStatuses.includes(String(r?.status || r?.result || "").toLowerCase()),
+            failedStatuses.includes(
+              String(r?.status || r?.result || "").toLowerCase(),
+            ),
           );
 
           const legacyStatus = String(
@@ -238,18 +261,18 @@ export default function AdminDashboard() {
           .map((project) => {
             const code = String(project.code || "").trim();
             const derivedCourse = deriveCourseFromProjectCode(code);
-            // Prioritize derived course if it's a known stream (MBA, BBA, Engineering)
-            // This ensures filters match the project code structure rather than potentially incorrect DB fields
             const course =
-              derivedCourse !== "Other"
-                ? derivedCourse
-                : project.course || project.courseCode || "Other";
+              derivedCourse ||
+              normalizeCourseLabel(project.course || project.courseCode) ||
+              "Unknown";
             return {
               ...project,
               course,
             };
           })
-          .sort((a, b) => String(a.code || "").localeCompare(String(b.code || "")));
+          .sort((a, b) =>
+            String(a.code || "").localeCompare(String(b.code || "")),
+          );
 
         // Fetch counts and sampled student docs in parallel
         const sampledProjects = normalizedProjects.slice(
@@ -257,35 +280,36 @@ export default function AdminDashboard() {
           DASHBOARD_SAMPLE_PROJECT_LIMIT,
         );
 
-        const [countEntries, sampledGroups, perProjectStats] = await Promise.all([
-          // Server-side counts for ALL projects — lightweight
-          Promise.all(
-            normalizedProjects.map(async (project) => {
-              const projectCode = String(project.code || "").trim();
-              const count = await getStudentsByProjectCount(projectCode);
-              return [projectCode, Number(count || 0)];
-            }),
-          ),
-          // Sampled student docs only for chart rendering
-          Promise.all(
-            sampledProjects.map((project) =>
-              getStudentsByProject(String(project.code || "").trim(), {
-                maxDocs: DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT,
+        const [countEntries, sampledGroups, perProjectStats] =
+          await Promise.all([
+            // Server-side counts for ALL projects — lightweight
+            Promise.all(
+              normalizedProjects.map(async (project) => {
+                const projectCode = String(project.code || "").trim();
+                const count = await getStudentsByProjectCount(projectCode);
+                return [projectCode, Number(count || 0)];
               }),
             ),
-          ),
-          Promise.all(
-            normalizedProjects.map(async (project) => {
-              const code = String(project.code || "").trim();
-              try {
-                return await getCertificateEnrollmentStatsByProject(code);
-              } catch (err) {
-                console.warn("Cert stats failed for", code, err);
-                return new Map();
-              }
-            }),
-          ),
-        ]);
+            // Sampled student docs only for chart rendering
+            Promise.all(
+              sampledProjects.map((project) =>
+                getStudentsByProject(String(project.code || "").trim(), {
+                  maxDocs: DASHBOARD_SAMPLE_STUDENTS_PER_PROJECT,
+                }),
+              ),
+            ),
+            Promise.all(
+              normalizedProjects.map(async (project) => {
+                const code = String(project.code || "").trim();
+                try {
+                  return await getCertificateEnrollmentStatsByProject(code);
+                } catch (err) {
+                  console.warn("Cert stats failed for", code, err);
+                  return new Map();
+                }
+              }),
+            ),
+          ]);
 
         const countsByProject = Object.fromEntries(countEntries);
         const studentsForCollege = sampledGroups.flatMap(
@@ -357,21 +381,27 @@ export default function AdminDashboard() {
 
   const courseOptions = useMemo(() => {
     const courses = new Set(
-      projects.map((p) => String(p.course || p.courseCode || "").trim()).filter(Boolean),
+      projects
+        .map((p) => String(p.course || p.courseCode || "").trim())
+        .filter(Boolean),
     );
     return ["All", ...Array.from(courses).sort()];
   }, [projects]);
 
   const academicYears = useMemo(() => {
     const years = new Set(
-      projects.map((p) => String(p.year || p.academicYear || "").trim()).filter(Boolean),
+      projects
+        .map((p) => String(p.year || p.academicYear || "").trim())
+        .filter(Boolean),
     );
     return ["All", ...Array.from(years).sort()];
   }, [projects]);
 
   const passYearOptions = useMemo(() => {
     const years = new Set(
-      projects.map((p) => extractPassYearFromProjectCode(p.code)).filter(Boolean),
+      projects
+        .map((p) => extractPassYearFromProjectCode(p.code))
+        .filter(Boolean),
     );
     return ["All", ...Array.from(years).sort()];
   }, [projects]);
@@ -381,7 +411,9 @@ export default function AdminDashboard() {
         String(p.code || "").trim(),
         {
           year: String(p.year || p.academicYear || "").trim(),
-          course: String(p.course || p.courseCode || deriveCourseFromProjectCode(p.code)).trim(),
+          course: String(
+            p.course || p.courseCode || deriveCourseFromProjectCode(p.code),
+          ).trim(),
           passYear: extractPassYearFromProjectCode(p.code),
         },
       ]),
@@ -394,8 +426,10 @@ export default function AdminDashboard() {
         passYear: "",
       };
       const yearOk = selectedYear === "All" || meta.year === selectedYear;
-      const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
-      const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+      const courseOk =
+        selectedCourse === "All" || meta.course === selectedCourse;
+      const passOk =
+        selectedPassYear === "All" || meta.passYear === selectedPassYear;
       return yearOk && courseOk && passOk;
     });
 
@@ -407,30 +441,41 @@ export default function AdminDashboard() {
           passYear: "",
         };
         const yearOk = selectedYear === "All" || meta.year === selectedYear;
-        const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
-        const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+        const courseOk =
+          selectedCourse === "All" || meta.course === selectedCourse;
+        const passOk =
+          selectedPassYear === "All" || meta.passYear === selectedPassYear;
         return yearOk && courseOk && passOk;
       }),
     );
 
     const filteredStudents =
-      selectedYear === "All" && selectedCourse === "All" && selectedPassYear === "All"
+      selectedYear === "All" &&
+      selectedCourse === "All" &&
+      selectedPassYear === "All"
         ? students
         : students.filter((student) => {
-            const projectCode = String(student.projectId || student.projectCode || "").trim();
+            const projectCode = String(
+              student.projectId || student.projectCode || "",
+            ).trim();
             const meta = projectMetaByCode.get(projectCode) || {
               year: "",
               course: "",
               passYear: "",
             };
             const yearOk = selectedYear === "All" || meta.year === selectedYear;
-            const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
-            const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+            const courseOk =
+              selectedCourse === "All" || meta.course === selectedCourse;
+            const passOk =
+              selectedPassYear === "All" || meta.passYear === selectedPassYear;
 
             // If course is missing on student, derive from project code for matching
             if (!courseOk) {
               const derivedCourse = deriveCourseFromProjectCode(projectCode);
-              if (selectedCourse !== "All" && derivedCourse === selectedCourse) {
+              if (
+                selectedCourse !== "All" &&
+                derivedCourse === selectedCourse
+              ) {
                 return yearOk && passOk;
               }
             }
@@ -447,8 +492,10 @@ export default function AdminDashboard() {
           passYear: "",
         };
         const yearOk = selectedYear === "All" || meta.year === selectedYear;
-        const courseOk = selectedCourse === "All" || meta.course === selectedCourse;
-        const passOk = selectedPassYear === "All" || meta.passYear === selectedPassYear;
+        const courseOk =
+          selectedCourse === "All" || meta.course === selectedCourse;
+        const passOk =
+          selectedPassYear === "All" || meta.passYear === selectedPassYear;
         return yearOk && courseOk && passOk;
       })
       .filter(Boolean);
@@ -456,12 +503,19 @@ export default function AdminDashboard() {
     const certIds = new Set();
     filteredStudents.forEach((student) => {
       const results =
-        student?.certificateResults && typeof student.certificateResults === "object"
-          ? Object.values(student.certificateResults).filter((r) => !r?.isDeleted)
+        student?.certificateResults &&
+        typeof student.certificateResults === "object"
+          ? Object.values(student.certificateResults).filter(
+              (r) => !r?.isDeleted,
+            )
           : [];
 
       results.forEach((result, idx) => {
-        const id = String(result.certificateId || result.id || `${student.id || ""}-cert-${idx}`).trim();
+        const id = String(
+          result.certificateId ||
+            result.id ||
+            `${student.id || ""}-cert-${idx}`,
+        ).trim();
         if (id) certIds.add(id);
       });
 
@@ -485,29 +539,36 @@ export default function AdminDashboard() {
       filteredCertStats,
       certCount: certIds.size,
     };
-  }, [projects, projectStudentCounts, students, selectedYear, selectedCourse, selectedPassYear, perProjectCertStats]);
+  }, [
+    projects,
+    projectStudentCounts,
+    students,
+    selectedYear,
+    selectedCourse,
+    selectedPassYear,
+    perProjectCertStats,
+  ]);
 
   const data = useMemo(() => {
-    const { filteredProjects, filteredProjectCounts, filteredStudents, certCount } = filteredData;
+    const {
+      filteredProjects,
+      filteredProjectCounts,
+      filteredStudents,
+      certCount,
+    } = filteredData;
 
     const byCourse = new Map();
-    const normalizeCourse = (courseKey) => {
-      const lower = String(courseKey || "").toLowerCase();
-      if (lower.includes("mba")) return "MBA";
-      if (lower.includes("bba")) return "BBA";
-      if (lower.includes("mca")) return "MCA";
-      if (lower.includes("bca")) return "BCA";
-      if (lower.includes("eng")) return "Engineering";
-      return "Other";
-    };
 
     filteredProjects.forEach((p) => {
-      const courseKey = deriveCourseFromProjectCode(p.code) || p.course || p.courseCode || "Other";
-      const courseLabel = normalizeCourse(courseKey);
+      const courseLabel =
+        normalizeCourseLabel(p.course || p.courseCode) ||
+        deriveCourseFromProjectCode(p.code) ||
+        "Unknown";
       const current = byCourse.get(courseLabel) || 0;
       byCourse.set(
         courseLabel,
-        current + Number(filteredProjectCounts[String(p.code || "").trim()] || 0),
+        current +
+          Number(filteredProjectCounts[String(p.code || "").trim()] || 0),
       );
     });
 
@@ -516,22 +577,14 @@ export default function AdminDashboard() {
         course,
         count,
       }))
-      .sort((a, b) => {
-        if (a.course === "Other") return 1;
-        if (b.course === "Other") return -1;
-        return a.course.localeCompare(b.course);
-      });
+      .sort((a, b) => a.course.localeCompare(b.course));
 
     const pieData = Array.from(byCourse.entries())
       .map(([name, value]) => ({
         name,
         value,
       }))
-      .sort((a, b) => {
-        if (a.name === "Other") return 1;
-        if (b.name === "Other") return -1;
-        return a.name.localeCompare(b.name);
-      });
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     // Compute progress using the richest available source: certificate stats first,
     // then fall back to sampled student docs. This avoids empty graphs when student
@@ -559,7 +612,10 @@ export default function AdminDashboard() {
         const passedCount = Number(stat.passedCount || 0);
         const failedCount = Number(stat.failedCount || 0);
         const enrolledCount = Number(stat.enrolledCount || 0);
-        const ongoingCount = Math.max(0, enrolledCount - passedCount - failedCount);
+        const ongoingCount = Math.max(
+          0,
+          enrolledCount - passedCount - failedCount,
+        );
 
         if (passedCount > 0) {
           addToBands(100);
@@ -583,7 +639,9 @@ export default function AdminDashboard() {
       avgProgress = Math.round(statsWeighted / statsTotal);
     } else {
       // 2) Fall back to sampled students
-      filteredStudents.forEach((student) => addToBands(getStudentProgress(student)));
+      filteredStudents.forEach((student) =>
+        addToBands(getStudentProgress(student)),
+      );
 
       const total = filteredStudents.length;
       if (total > 0) {
@@ -682,7 +740,7 @@ export default function AdminDashboard() {
           }
         });
       }
-      
+
       const legacyCertName = String(student.certificate || "").trim();
       if (legacyCertName && results.length === 0) {
         if (certsWithStats.has(legacyCertName)) return;
@@ -712,7 +770,7 @@ export default function AdminDashboard() {
     });
 
     return Object.values(statsByCertificate)
-      .filter(c => (c.Enrolled + c.Passed + c.Failed) > 0)
+      .filter((c) => c.Enrolled + c.Passed + c.Failed > 0)
       .sort((a, b) => String(a.label).localeCompare(String(b.label)));
   }, [filteredData]);
 
@@ -720,19 +778,19 @@ export default function AdminDashboard() {
   // This ensures bars with the same total number of students have equal heights
   const maxCertTotal = useMemo(() => {
     if (!certificationData || certificationData.length === 0) return 10;
-    
+
     let maxTotal = 0;
     certificationData.forEach((cert) => {
       const enrolled = parseInt(cert.Enrolled) || 0;
       const passed = parseInt(cert.Passed) || 0;
       const failed = parseInt(cert.Failed) || 0;
       const total = enrolled + passed + failed;
-      
+
       if (total > maxTotal) {
         maxTotal = total;
       }
     });
-    
+
     // Ensure we have a reasonable max, with 15% padding for visual space
     return Math.max(Math.ceil(maxTotal * 1.15), 10);
   }, [certificationData]);
@@ -805,15 +863,11 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-[#012920]">
               Dashboard{" "}
-            
             </h1>
             <p className="mt-1 text-base font-semibold text-[#012920]">
               Welcome, {adminName}
             </p>
-            <p className="mt-2 text-base text-[#012920]">
-            </p>
-            
-           
+            <p className="mt-2 text-base text-[#012920]"></p>
           </div>
           <div className="hidden md:flex md:items-center md:justify-center">
             {collegeInfo.logo && !logoLoadFailed ? (
@@ -904,11 +958,10 @@ export default function AdminDashboard() {
           value={data.activeProjectCodes}
           icon={<Layers3 size={20} />}
           color="rose"
-        /> 
+        />
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        
         <Panel title="Certification Results">
           <ResponsiveContainer width="100%" height={340} debounce={75}>
             <BarChart
@@ -980,8 +1033,14 @@ export default function AdminDashboard() {
                 vertical={false}
                 stroke="#E5E7EB"
               />
-              <XAxis dataKey="course" tick={{ fontSize: 13, fill: "#6B7280" }} />
-              <YAxis tick={{ fontSize: 13, fill: "#6B7280" }} allowDecimals={false} />
+              <XAxis
+                dataKey="course"
+                tick={{ fontSize: 13, fill: "#6B7280" }}
+              />
+              <YAxis
+                tick={{ fontSize: 13, fill: "#6B7280" }}
+                allowDecimals={false}
+              />
               <Tooltip
                 cursor={{ fill: "#F3F4F6" }}
                 contentStyle={{
@@ -1005,7 +1064,6 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        
         <Panel title="Course Distribution">
           <ResponsiveContainer width="100%" height={320} debounce={75}>
             <PieChart>
@@ -1065,16 +1123,26 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </Panel>
       </div>
-      <Panel title="Project Codes Overview">
+      <Panel title="Overview">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">Project Code</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">College</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">Course</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">Year</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">Enrollment</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                  College
+                </th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                  Course
+                </th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                  Year
+                </th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                  Passing Year
+                </th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                  Enrollment
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1083,10 +1151,16 @@ export default function AdminDashboard() {
                   key={p.id || p.code}
                   className="border-b border-gray-100 transition hover:bg-gray-50"
                 >
-                  <td className="px-6 py-3 font-medium text-gray-900">{p.code || p.id}</td>
-                  <td className="px-6 py-3 text-gray-600">{p.college || "-"}</td>
-                  <td className="px-6 py-3 text-gray-600">{p.course || p.courseCode || "-"}</td>
+                  <td className="px-6 py-3 text-gray-600">
+                    {p.college || "-"}
+                  </td>
+                  <td className="px-6 py-3 text-gray-600">
+                    {p.course || p.courseCode || "-"}
+                  </td>
                   <td className="px-6 py-3 text-gray-600">{p.year || "-"}</td>
+                  <td className="px-6 py-3 text-gray-600">
+                    {extractPassYearFromProjectCode(p.code) || "-"}
+                  </td>
                   <td className="px-6 py-3 font-semibold text-gray-900">
                     {projectStudentCounts[String(p.code || "").trim()] || 0}
                   </td>
@@ -1111,7 +1185,9 @@ function StatCard({ title, value, icon, color = "blue" }) {
   return (
     <div className="rounded-sm border border-[#012920] bg-white p-6 shadow-sm transition hover:shadow-md">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+          {title}
+        </p>
         <span className={`rounded-lg ${iconBg} p-2.5`}>{icon}</span>
       </div>
       <h2 className="mt-4 text-3xl font-bold text-gray-900">{value}</h2>
