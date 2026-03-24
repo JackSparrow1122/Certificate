@@ -13,7 +13,7 @@ export default function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white w-96 rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-[#0B2A4A] to-[#1a3a5c]">
+        <div className="px-6 py-5 border-b border-gray-200 bg-linear-to-r from-[#0B2A4A] to-[#1a3a5c]">
           <h2 className="text-lg font-semibold text-white">{title}</h2>
         </div>
 

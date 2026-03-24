@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import {
-  getStudentsByProject,
-  getStudentsByProjectPage,
-} from "../../../services/studentService";
+import { getStudentsByProject } from "../../../services/studentService";
 import { getStudentEnrollmentsByProject } from "../../../services/certificateService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
+import { parseProjectCode } from "../../utils/projectCodeParser";
 import StudentModal from "../../components/StudentModal";
 
 const normalizeStatus = (status) => {
@@ -17,12 +15,77 @@ const normalizeStatus = (status) => {
   return "Enrolled";
 };
 
+const normalizeCertificateName = (name) =>
+  String(name || "")
+    .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const getCurrentYearFromProjectCode = (projectCode) => {
   const parts = String(projectCode || "")
     .split("/")
     .map((item) => item.trim())
     .filter(Boolean);
   return parts.length >= 3 ? parts[2] : "";
+};
+
+const normalizeYearToken = (value) => {
+  const token = String(value || "").trim();
+  if (!token) return "";
+  if (/^\d{4}$/.test(token)) return token;
+  if (/^\d{2}$/.test(token)) return `20${token}`;
+  return token;
+};
+
+const getPassingYearFromAcademicYear = (academicYear) => {
+  const text = String(academicYear || "").trim();
+  if (!text) return "";
+
+  const parts = text
+    .split("-")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return normalizeYearToken(parts[1]);
+  }
+
+  return normalizeYearToken(parts[0]);
+};
+
+const getProjectCourse = (projectOption) => {
+  const explicitCourse = String(projectOption?.course || "").trim();
+  if (explicitCourse) return explicitCourse;
+  return parseProjectCode(projectOption?.code || "").courseLabel || "";
+};
+
+const getProjectYear = (projectOption) => {
+  const explicitYear = String(projectOption?.year || "").trim();
+  if (explicitYear) return explicitYear;
+
+  const parsedProject = parseProjectCode(projectOption?.code || "");
+  return parsedProject.semesterLabel || parsedProject.semesterNumber || "";
+};
+
+const getProjectPassingYear = (projectOption) => {
+  const code = String(projectOption?.code || "").trim();
+  if (code) {
+    const parts = code
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts[parts.length - 1];
+    }
+  }
+
+  const parsedProject = parseProjectCode(projectOption?.code || "");
+  if (parsedProject.session) {
+    return String(parsedProject.session).trim();
+  }
+
+  const explicitAcademicYear = String(projectOption?.academicYear || "").trim();
+  return explicitAcademicYear;
 };
 
 const toDisplayStudent = (student) => {
@@ -47,7 +110,7 @@ const toDisplayStudent = (student) => {
     .filter((result) => !result?.isDeleted)
     .map((result) => ({
       id: String(result?.certificateId || "").trim(),
-      name: String(result?.certificateName || "").trim(),
+      name: normalizeCertificateName(result?.certificateName),
       status: normalizeStatus(result?.status || result?.result || "enrolled"),
     }))
     .filter((item) => item.name);
@@ -55,7 +118,7 @@ const toDisplayStudent = (student) => {
   if (normalizedCertificates.length === 0 && student?.certificate) {
     normalizedCertificates.push({
       id: "",
-      name: String(student.certificate).trim(),
+      name: normalizeCertificateName(student.certificate),
       status: normalizeStatus(student?.certificateStatus || "enrolled"),
     });
   }
@@ -103,7 +166,7 @@ const getCertificateOptionsFromStudents = (students) => {
       : [];
 
     certificateItems.forEach((certificateItem) => {
-      const certificateName = String(certificateItem?.name || "").trim();
+      const certificateName = normalizeCertificateName(certificateItem?.name);
       if (!certificateName) return;
 
       const certificateId = String(certificateItem?.id || "").trim();
@@ -128,29 +191,24 @@ const matchesCertificate = (student, certificate) => {
   if (!certificate) return false;
 
   const targetId = String(certificate.id || "").trim();
-  const targetName = String(certificate.name || "")
-    .trim()
-    .toLowerCase();
+  const targetName = normalizeCertificateName(certificate.name).toLowerCase();
 
   if (!targetName) return false;
 
-  // Check new flat enrollments first (_enrollments attached during load)
   const enrollments = Array.isArray(student?._enrollments)
     ? student._enrollments
     : [];
   if (
     enrollments.some(
-      (e) =>
-        e.certificateId === targetId ||
-        String(e.certificateName || "")
-          .trim()
-          .toLowerCase() === targetName,
+      (enrollment) =>
+        enrollment.certificateId === targetId ||
+        normalizeCertificateName(enrollment.certificateName).toLowerCase() ===
+          targetName,
     )
   ) {
     return true;
   }
 
-  // Check certificateItems (computed by toDisplayStudent)
   const certificateItems = Array.isArray(student?.certificateItems)
     ? student.certificateItems
     : [];
@@ -158,18 +216,14 @@ const matchesCertificate = (student, certificate) => {
     certificateItems.some(
       (item) =>
         String(item.id || "").trim() === targetId ||
-        String(item.name || "")
-          .trim()
-          .toLowerCase() === targetName,
+        normalizeCertificateName(item.name).toLowerCase() === targetName,
     )
   ) {
     return true;
   }
 
   return (
-    String(student?.certificate || "")
-      .trim()
-      .toLowerCase() === targetName
+    normalizeCertificateName(student?.certificate).toLowerCase() === targetName
   );
 };
 
@@ -179,55 +233,35 @@ export default function Students() {
   const { profile } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [projectOptions, setProjectOptions] = useState([]);
-  const [certificateOptions, setCertificateOptions] = useState([]);
-  const [selectedProjectCode, setSelectedProjectCode] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedPassingYear, setSelectedPassingYear] = useState("");
   const [selectedCertificateId, setSelectedCertificateId] = useState("");
-  const [projectStudents, setProjectStudents] = useState([]);
+  const [students, setStudents] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [serverPageStudents, setServerPageStudents] = useState([]);
-  const [serverCursor, setServerCursor] = useState(null);
-  const [serverCursorHistory, setServerCursorHistory] = useState([]);
-  const [serverNextCursor, setServerNextCursor] = useState(null);
-  const [loadingServerPage, setLoadingServerPage] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [sortField, setSortField] = useState("id"); // 'id' | 'result'
   const [idSortDir, setIdSortDir] = useState("asc"); // 'asc' | 'desc'
   const [resultSortCycle, setResultSortCycle] = useState(0); // 0=enrolled, 1=passed, 2=failed
 
-  const loadServerPage = async ({
-    projectCode,
-    cursor = null,
-    history = [],
-  }) => {
-    if (!projectCode) {
-      setServerPageStudents([]);
-      setServerCursor(null);
-      setServerCursorHistory([]);
-      setServerNextCursor(null);
-      return;
-    }
+  const getPassingYearOptionsForSelection = (courseValue, yearValue) => {
+    const passingYearSet = new Set();
 
-    setLoadingServerPage(true);
-    try {
-      const response = await getStudentsByProjectPage(projectCode, {
-        pageSize: PAGE_SIZE,
-        cursor,
-      });
-      const mappedStudents = (response?.students || []).map(toDisplayStudent);
-      setServerPageStudents(mappedStudents);
-      setServerCursor(cursor);
-      setServerCursorHistory(history);
-      setServerNextCursor(
-        response?.hasMore ? response?.nextCursor || null : null,
-      );
-    } catch (error) {
-      console.error("Failed to load paged students:", error);
-      setServerPageStudents([]);
-      setServerNextCursor(null);
-    } finally {
-      setLoadingServerPage(false);
-    }
+    (projectOptions || []).forEach((projectOption) => {
+      const optionCourse = getProjectCourse(projectOption);
+      const optionYear = getProjectYear(projectOption);
+
+      if (courseValue && optionCourse !== courseValue) return;
+      if (yearValue && optionYear !== yearValue) return;
+
+      const passingYear = getProjectPassingYear(projectOption);
+      if (passingYear) passingYearSet.add(passingYear);
+    });
+
+    return Array.from(passingYearSet).sort((a, b) =>
+      String(b).localeCompare(String(a), undefined, { numeric: true }),
+    );
   };
 
   useEffect(() => {
@@ -269,65 +303,81 @@ export default function Students() {
     };
   }, [profile]);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadProjectData = async () => {
-      if (!selectedProjectCode) {
-        setCertificateOptions([]);
-        setSelectedCertificateId("");
-        setProjectStudents([]);
-        setServerPageStudents([]);
-        setServerCursor(null);
-        setServerCursorHistory([]);
-        setServerNextCursor(null);
-        return;
+  const courseOptions = useMemo(() => {
+    const courseSet = new Set();
+    (projectOptions || []).forEach((projectOption) => {
+      const course = getProjectCourse(projectOption);
+      if (course) courseSet.add(course);
+    });
+    return Array.from(courseSet).sort((a, b) => a.localeCompare(b));
+  }, [projectOptions]);
+
+  const yearOptions = useMemo(() => {
+    const yearSet = new Set();
+    (projectOptions || []).forEach((projectOption) => {
+      const year = getProjectYear(projectOption);
+      if (year) yearSet.add(year);
+    });
+    return Array.from(yearSet).sort((a, b) => {
+      const aNum = Number.parseInt(String(a).replace(/\D/g, ""), 10);
+      const bNum = Number.parseInt(String(b).replace(/\D/g, ""), 10);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum) && aNum !== bNum) {
+        return aNum - bNum;
       }
+      return String(a).localeCompare(String(b));
+    });
+  }, [projectOptions]);
 
-      try {
-        setLoadingStudents(true);
-        setSelectedCertificateId("");
-        setCurrentPage(1);
-        const [studentsByProject, enrollmentsMap] = await Promise.all([
-          getStudentsByProject(selectedProjectCode, { maxDocs: 5000 }),
-          getStudentEnrollmentsByProject(selectedProjectCode),
-        ]);
-        if (!mounted) return;
+  const passingYearOptions = useMemo(() => {
+    const passingYearSet = new Set();
+    (projectOptions || []).forEach((projectOption) => {
+      const passingYear = getProjectPassingYear(projectOption);
+      if (passingYear) passingYearSet.add(passingYear);
+    });
+    return Array.from(passingYearSet).sort((a, b) =>
+      String(b).localeCompare(String(a), undefined, { numeric: true }),
+    );
+  }, [projectOptions]);
 
-        // Attach enrollment data to each student object
-        const studentsWithEnrollments = (studentsByProject || []).map((s) => {
-          const studentId = s.docId || s.id || "";
-          const enrollments = enrollmentsMap.get(studentId) || [];
-          return { ...s, _enrollments: enrollments };
-        });
+  const filteredPassingYearOptions = useMemo(() => {
+    if (!selectedCourse && !selectedYear) return passingYearOptions;
+    return getPassingYearOptionsForSelection(selectedCourse, selectedYear);
+  }, [projectOptions, selectedCourse, selectedYear, passingYearOptions]);
 
-        const mappedStudents = studentsWithEnrollments.map(toDisplayStudent);
-        setProjectStudents(mappedStudents);
-        setCertificateOptions(
-          getCertificateOptionsFromStudents(mappedStudents),
-        );
-        setServerPageStudents([]);
-        setServerCursor(null);
-        setServerCursorHistory([]);
-        setServerNextCursor(null);
-      } catch (error) {
-        console.error("Failed to load selected project data:", error);
-        if (!mounted) return;
-        setProjectStudents([]);
-        setCertificateOptions([]);
-        setServerPageStudents([]);
-        setServerCursor(null);
-        setServerCursorHistory([]);
-        setServerNextCursor(null);
-      } finally {
-        if (mounted) setLoadingStudents(false);
-      }
-    };
+  const hasActiveFilters =
+    Boolean(selectedCourse) ||
+    Boolean(selectedYear) ||
+    Boolean(selectedPassingYear);
 
-    loadProjectData();
-    return () => {
-      mounted = false;
-    };
-  }, [selectedProjectCode]);
+  const matchingProjectCodes = useMemo(() => {
+    if (!hasActiveFilters) return [];
+
+    return (projectOptions || [])
+      .filter((projectOption) => {
+        const optionCourse = getProjectCourse(projectOption);
+        const optionYear = getProjectYear(projectOption);
+        const optionPassingYear = getProjectPassingYear(projectOption);
+
+        if (selectedCourse && optionCourse !== selectedCourse) return false;
+        if (selectedYear && optionYear !== selectedYear) return false;
+        if (selectedPassingYear && optionPassingYear !== selectedPassingYear)
+          return false;
+        return true;
+      })
+      .map((projectOption) => String(projectOption?.code || "").trim())
+      .filter(Boolean);
+  }, [
+    projectOptions,
+    selectedCourse,
+    selectedYear,
+    selectedPassingYear,
+    hasActiveFilters,
+  ]);
+
+  const certificateOptions = useMemo(
+    () => getCertificateOptionsFromStudents(students),
+    [students],
+  );
 
   const selectedCertificate = useMemo(
     () =>
@@ -337,72 +387,124 @@ export default function Students() {
     [certificateOptions, selectedCertificateId],
   );
 
-  const shouldShowAllStudents =
-    Boolean(selectedProjectCode) &&
-    !loadingStudents &&
-    certificateOptions.length === 0;
+  useEffect(() => {
+    let mounted = true;
+    const loadFilteredStudents = async () => {
+      if (!hasActiveFilters) {
+        setStudents([]);
+        setCurrentPage(1);
+        return;
+      }
 
-  const isServerPaginationMode =
-    Boolean(selectedProjectCode) && shouldShowAllStudents;
+      if (matchingProjectCodes.length === 0) {
+        setStudents([]);
+        setCurrentPage(1);
+        return;
+      }
 
-  const students = useMemo(() => {
-    if (!selectedProjectCode) return [];
-    if (certificateOptions.length === 0) return projectStudents;
-    // If no certificate is selected, show ALL students
-    if (!selectedCertificate) return projectStudents;
-    // If a certificate is selected, filter to only those enrolled in that cert
-    return projectStudents.filter((student) =>
+      try {
+        setLoadingStudents(true);
+        setCurrentPage(1);
+
+        const studentsByProjectCode = await Promise.all(
+          matchingProjectCodes.map(async (projectCode) => {
+            const [studentsForProject, enrollmentsMap] = await Promise.all([
+              getStudentsByProject(projectCode, { maxDocs: 5000 }),
+              getStudentEnrollmentsByProject(projectCode),
+            ]);
+
+            return (studentsForProject || []).map((student) => {
+              const studentId = student.docId || student.id || "";
+              const enrollments = enrollmentsMap.get(studentId) || [];
+              return toDisplayStudent({
+                ...student,
+                projectCode: student?.projectCode || projectCode,
+                _enrollments: enrollments,
+              });
+            });
+          }),
+        );
+
+        if (!mounted) return;
+
+        setStudents(studentsByProjectCode.flat());
+      } catch (error) {
+        console.error("Failed to load filtered students:", error);
+        if (!mounted) return;
+        setStudents([]);
+      } finally {
+        if (mounted) setLoadingStudents(false);
+      }
+    };
+
+    loadFilteredStudents();
+    return () => {
+      mounted = false;
+    };
+  }, [hasActiveFilters, matchingProjectCodes]);
+
+  useEffect(() => {
+    setSelectedCertificateId("");
+  }, [selectedCourse, selectedYear, selectedPassingYear]);
+
+  useEffect(() => {
+    if (!selectedCertificateId) return;
+    const exists = certificateOptions.some(
+      (certificate) => String(certificate.id) === selectedCertificateId,
+    );
+    if (!exists) {
+      setSelectedCertificateId("");
+    }
+  }, [certificateOptions, selectedCertificateId]);
+
+  const filteredStudents = useMemo(() => {
+    if (!selectedCertificate) return students;
+    return students.filter((student) =>
       matchesCertificate(student, selectedCertificate),
     );
-  }, [
-    projectStudents,
-    selectedCertificate,
-    selectedProjectCode,
-    certificateOptions.length,
-  ]);
+  }, [students, selectedCertificate]);
 
   useEffect(() => {
     setCurrentPage(1);
     setSortField("id");
     setIdSortDir("asc");
     setResultSortCycle(0);
-  }, [selectedProjectCode, selectedCertificateId]);
+  }, [
+    selectedCourse,
+    selectedYear,
+    selectedPassingYear,
+    selectedCertificateId,
+  ]);
 
-  useEffect(() => {
-    if (!isServerPaginationMode) return;
-    loadServerPage({
-      projectCode: selectedProjectCode,
-      cursor: null,
-      history: [],
-    });
-  }, [isServerPaginationMode, selectedProjectCode]);
-
-  // Determine if any student in current filtered list has an Enrolled status
   const hasEnrolledStudents = useMemo(() => {
-    return students.some((student) => {
+    return filteredStudents.some((student) => {
       const items = selectedCertificate
         ? (student.certificateItems || []).filter(
             (item) =>
               String(item.name || "")
+                .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
                 .trim()
                 .toLowerCase() ===
               String(selectedCertificate.name || "")
+                .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
                 .trim()
                 .toLowerCase(),
           )
         : student.certificateItems || [];
       return items.some((i) => i.status === "Enrolled");
     });
-  }, [students, selectedCertificate]);
+  }, [filteredStudents, selectedCertificate]);
 
   const getStudentPrimaryStatus = (student, cycle, withEnrolled) => {
     const items = selectedCertificate
       ? (student.certificateItems || []).filter(
           (item) =>
             String(item.name || "")
+              .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
               .trim()
               .toLowerCase() ===
             String(selectedCertificate.name || "")
+              .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
               .trim()
               .toLowerCase(),
         )
@@ -472,8 +574,47 @@ export default function Students() {
     setCurrentPage(1);
   };
 
+  const handleCourseChange = (courseValue) => {
+    setSelectedCourse(courseValue);
+
+    if (!courseValue) {
+      setSelectedYear("");
+      setSelectedPassingYear("");
+      return;
+    }
+
+    if (!selectedYear) return;
+    const nextPassingYearOptions = getPassingYearOptionsForSelection(
+      courseValue,
+      selectedYear,
+    );
+    setSelectedPassingYear(nextPassingYearOptions[0] || "");
+  };
+
+  const handleYearChange = (yearValue) => {
+    setSelectedYear(yearValue);
+
+    if (!yearValue) {
+      setSelectedPassingYear("");
+      return;
+    }
+
+    const nextPassingYearOptions = getPassingYearOptionsForSelection(
+      selectedCourse,
+      yearValue,
+    );
+    setSelectedPassingYear(nextPassingYearOptions[0] || "");
+  };
+
+  const handleResetFilters = () => {
+    setSelectedCourse("");
+    setSelectedYear("");
+    setSelectedPassingYear("");
+    setSelectedCertificateId("");
+  };
+
   const sortedStudents = useMemo(() => {
-    const list = [...students];
+    const list = [...filteredStudents];
     if (sortField === "id") {
       list.sort((a, b) => {
         const cmp = String(a.id || "").localeCompare(
@@ -503,7 +644,7 @@ export default function Students() {
     }
     return list;
   }, [
-    students,
+    filteredStudents,
     sortField,
     idSortDir,
     resultSortCycle,
@@ -516,14 +657,6 @@ export default function Students() {
     const start = (currentPage - 1) * PAGE_SIZE;
     return sortedStudents.slice(start, start + PAGE_SIZE);
   }, [sortedStudents, currentPage, PAGE_SIZE]);
-
-  const displayedStudents = isServerPaginationMode
-    ? serverPageStudents
-    : paginatedStudents;
-
-  const serverCurrentPage = serverCursorHistory.length + 1;
-  const serverHasPrev = serverCursorHistory.length > 0;
-  const serverHasNext = Boolean(serverNextCursor);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -538,43 +671,51 @@ export default function Students() {
           Students
         </h1>
         <p className="text-sm text-[#012920]">
-          Select project code and certificate to view mapped students
+          Filter students by course, year, and passing year from project code
+          data
         </p>
       </div>
 
       <div className="mb-4 rounded-2xl border border-[#012920] bg-white p-4 sm:p-5">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-[#012920]">
-              Project Code
+              Course
             </span>
             <select
-              value={selectedProjectCode}
-              onChange={(event) => setSelectedProjectCode(event.target.value)}
-              className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors
-              ${loadingProjects ? "border-[#D7E2F1]" : "border-[#D7E2F1]"}
-              ${!selectedProjectCode && !loadingProjects ? "ring-2 ring-[#012920] border-[#012920]" : ""}`}
+              value={selectedCourse}
+              onChange={(event) => handleCourseChange(event.target.value)}
+              className="h-10 w-full rounded-lg border border-[#D7E2F1] bg-white px-3 text-sm outline-none transition-colors"
               disabled={loadingProjects}
             >
-              <option value="">
-                {loadingProjects
-                  ? "Loading project codes..."
-                  : "Select project code"}
-              </option>
-              {projectOptions.map((projectOption) => (
-                <option
-                  key={projectOption.id}
-                  value={String(projectOption.code || "")}
-                >
-                  {projectOption.code}
+              <option value="">All Courses</option>
+              {courseOptions.map((course) => (
+                <option key={course} value={course}>
+                  {course}
                 </option>
               ))}
             </select>
-            {!selectedProjectCode && !loadingProjects && (
-              <p className="mt-1 text-xs text-[#012920]">
-                <em>Choose a project code to populate the student list.</em>
-              </p>
-            )}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#012920]">
+              Year
+            </span>
+            <select
+              value={selectedYear}
+              onChange={(event) => handleYearChange(event.target.value)}
+              className="h-10 w-full rounded-lg border border-[#D7E2F1] bg-white px-3 text-sm outline-none transition-colors"
+              disabled={loadingProjects || !selectedCourse}
+            >
+              <option value="">
+                {!selectedCourse ? "Select course first" : "All Years"}
+              </option>
+              {yearOptions.map((yearOption) => (
+                <option key={yearOption} value={yearOption}>
+                  {yearOption}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="block">
@@ -586,15 +727,17 @@ export default function Students() {
               onChange={(event) => setSelectedCertificateId(event.target.value)}
               className="h-10 w-full rounded-lg border border-[#D7E2F1] bg-white px-3 text-sm outline-none transition-colors"
               disabled={
-                !selectedProjectCode || loadingStudents || shouldShowAllStudents
+                !hasActiveFilters ||
+                loadingStudents ||
+                certificateOptions.length === 0
               }
             >
               <option value="">
-                {!selectedProjectCode
-                  ? "Select project code first"
+                {!hasActiveFilters
+                  ? "Select filters first"
                   : loadingStudents
                     ? "Loading certificates..."
-                    : shouldShowAllStudents
+                    : certificateOptions.length === 0
                       ? "No certificates enrolled"
                       : "All Certificates"}
               </option>
@@ -607,28 +750,54 @@ export default function Students() {
                 </option>
               ))}
             </select>
-            {shouldShowAllStudents && (
-              <p className="mt-1 text-xs text-blue-600">
-                <em>
-                  No certificates enrolled for this project. Showing all
-                  students.
-                </em>
-              </p>
-            )}
-            {selectedProjectCode &&
-              !loadingStudents &&
-              !shouldShowAllStudents && (
-                <p className="mt-1 text-xs text-[#415a77]">
-                  <em>
-                    Select a certificate to filter, or leave blank to show all.
-                  </em>
-                </p>
-              )}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-[#012920]">
+              Passing Year
+            </span>
+            <select
+              value={selectedPassingYear}
+              onChange={(event) => setSelectedPassingYear(event.target.value)}
+              className="h-10 w-full rounded-lg border border-[#D7E2F1] bg-white px-3 text-sm outline-none transition-colors"
+              disabled={
+                loadingProjects || filteredPassingYearOptions.length === 0
+              }
+            >
+              <option value="">All Passing Years</option>
+              {filteredPassingYearOptions.map((yearOption) => (
+                <option key={yearOption} value={yearOption}>
+                  {yearOption}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
+
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="rounded-lg border border-[#012920] bg-white px-3 py-1.5 text-sm font-medium text-[#012920] transition-colors hover:bg-[#F0F7F5]"
+            disabled={
+              !selectedCourse &&
+              !selectedYear &&
+              !selectedPassingYear &&
+              !selectedCertificateId
+            }
+          >
+            Reset Filters
+          </button>
+        </div>
+
+        {!hasActiveFilters && !loadingProjects && (
+          <p className="mt-2 text-xs text-[#012920]">
+            <em>Select at least one filter to load students.</em>
+          </p>
+        )}
       </div>
 
-      {selectedProjectCode && !loadingStudents && (
+      {hasActiveFilters && (
         <div className="rounded-2xl border border-[#012920] bg-white p-4 sm:p-5">
           <div className="mb-2 px-3">
             <h2 className="text-lg font-semibold text-[#0B2A4A]">
@@ -726,7 +895,7 @@ export default function Students() {
               </thead>
 
               <tbody className="divide-y divide-[#E6EDF6] bg-white">
-                {(loadingProjects || loadingStudents || loadingServerPage) && (
+                {(loadingProjects || loadingStudents) && (
                   <tr className="bg-gray-50">
                     <td
                       className="px-6 py-6 text-center text-sm text-gray-500"
@@ -738,9 +907,8 @@ export default function Students() {
                 )}
                 {!loadingProjects &&
                   !loadingStudents &&
-                  !loadingServerPage &&
-                  selectedProjectCode &&
-                  displayedStudents.length === 0 && (
+                  hasActiveFilters &&
+                  paginatedStudents.length === 0 && (
                     <tr className="bg-gray-50">
                       <td
                         className="px-6 py-6 text-center text-sm text-gray-500"
@@ -750,15 +918,16 @@ export default function Students() {
                       </td>
                     </tr>
                   )}
-                {displayedStudents.map((student) => {
-                  // Determine which cert items to display based on filter
+                {paginatedStudents.map((student) => {
                   const certItemsToShow = selectedCertificate
                     ? (student.certificateItems || []).filter(
                         (item) =>
                           String(item.name || "")
+                            .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
                             .trim()
                             .toLowerCase() ===
                           String(selectedCertificate.name || "")
+                            .replace(/\s*\(\s*all\s*\)\s*/gi, " ")
                             .trim()
                             .toLowerCase(),
                       )
@@ -818,68 +987,31 @@ export default function Students() {
 
           {!loadingProjects &&
             !loadingStudents &&
-            !loadingServerPage &&
-            ((isServerPaginationMode && (serverHasPrev || serverHasNext)) ||
-              (!isServerPaginationMode &&
-                sortedStudents.length > PAGE_SIZE)) && (
+            sortedStudents.length > PAGE_SIZE && (
               <div className="mt-3 flex items-center justify-between px-1">
                 <p className="text-xs text-[#415a77]">
-                  {isServerPaginationMode
-                    ? `Showing page ${serverCurrentPage}`
-                    : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, sortedStudents.length)} of ${sortedStudents.length}`}
+                  {`Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, sortedStudents.length)} of ${sortedStudents.length}`}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
-                      if (isServerPaginationMode) {
-                        if (!serverHasPrev) return;
-                        const prevCursor =
-                          serverCursorHistory[serverCursorHistory.length - 1] ||
-                          null;
-                        const nextHistory = serverCursorHistory.slice(0, -1);
-                        loadServerPage({
-                          projectCode: selectedProjectCode,
-                          cursor: prevCursor,
-                          history: nextHistory,
-                        });
-                        return;
-                      }
                       setCurrentPage((page) => Math.max(1, page - 1));
                     }}
-                    disabled={
-                      isServerPaginationMode
-                        ? !serverHasPrev
-                        : currentPage === 1
-                    }
+                    disabled={currentPage === 1}
                     className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Previous
                   </button>
                   <span className="text-xs font-medium text-[#0B2A4A]">
-                    {isServerPaginationMode
-                      ? `Page ${serverCurrentPage}`
-                      : `Page ${currentPage} of ${totalPages}`}
+                    {`Page ${currentPage} of ${totalPages}`}
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      if (isServerPaginationMode) {
-                        if (!serverHasNext) return;
-                        loadServerPage({
-                          projectCode: selectedProjectCode,
-                          cursor: serverNextCursor,
-                          history: [...serverCursorHistory, serverCursor],
-                        });
-                        return;
-                      }
                       setCurrentPage((page) => Math.min(totalPages, page + 1));
                     }}
-                    disabled={
-                      isServerPaginationMode
-                        ? !serverHasNext
-                        : currentPage === totalPages
-                    }
+                    disabled={currentPage === totalPages}
                     className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Next
