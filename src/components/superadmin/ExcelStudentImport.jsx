@@ -771,6 +771,22 @@ async function processRows(
             },
             { merge: true },
           );
+
+          availableSemesters.forEach((semester) => {
+            batch.set(
+              doc(db, "students", projectDocId, `sem_${semester}`, "metadata"),
+              {
+                projectCode,
+                semesterDictionary,
+                semesterNumber: semester,
+                semesterType: getSemesterType(semester),
+                availableSemesters: [semester],
+                selectedSemester: semesterNumber === semester ? semester : null,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+          });
         }
 
         for (const row of rowChunk) {

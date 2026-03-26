@@ -2,30 +2,116 @@ import { Award, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useAuth } from "../../context/AuthContext";
-import { getStudentForAuthUser } from "../../../services/studentService";
+import {
+  getStudentForAuthUser,
+  getStudentMatchesByEmail,
+  getStudentByProjectAndId,
+} from "../../../services/studentService";
 import irpTrainingLogo from "../../assets/image.jpg";
 import {
   getCertificatesByIds,
   getStudentEnrollmentsByProject,
   getEnrollmentsByStudentEmail,
   getEnrollmentsByStudentId,
+  getStudentCertificateHistory,
 } from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
-import { deriveCurrentSemesterNumberFromEnrollments } from "../../utils/semesterUtils";
- 
+import {
+  deriveCurrentSemesterNumberFromEnrollments,
+  getYearNumberFromProjectCode,
+} from "../../utils/semesterUtils";
+
 const getCurrentYearFromProjectCode = (projectCodeValue) => {
-  const parts = String(projectCodeValue || "")
-    .split("/")
-    .map((part) => part.trim())
-    .filter(Boolean);
- 
-  if (parts.length >= 3) {
-    return parts[2];
-  }
- 
-  return "";
+  const yearNumber = getYearNumberFromProjectCode(projectCodeValue);
+  return Number.isFinite(yearNumber) ? `${yearNumber}` : "";
 };
- 
+
+const toSemesterNumber = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/\d+/);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const deriveSemesterNumberFromEntry = (entry) => {
+  const direct = toSemesterNumber(entry?.semesterNumber);
+  if (direct) return direct;
+
+  const type = String(entry?.semesterType || "")
+    .trim()
+    .toLowerCase();
+  const yearNumber = getYearNumberFromProjectCode(entry?.projectCode);
+  if (Number.isFinite(yearNumber) && yearNumber > 0) {
+    const odd = (yearNumber - 1) * 2 + 1;
+    if (type === "even") return odd + 1;
+    return odd;
+  }
+
+  return null;
+};
+
+const extractLegacyEnrollmentRowsFromStudent = ({ student, projectCode }) => {
+  if (!student || !projectCode) return [];
+
+  const resultMap =
+    student?.certificateResults &&
+    typeof student.certificateResults === "object"
+      ? student.certificateResults
+      : {};
+
+  const rows = Object.entries(resultMap)
+    .filter(
+      ([, entry]) => entry && typeof entry === "object" && !entry?.isDeleted,
+    )
+    .map(([mapKey, entry]) => ({
+      certificateId: String(entry?.certificateId || mapKey || "").trim(),
+      certificateName: String(entry?.certificateName || "").trim(),
+      status: normalizeCertificateStatus(
+        entry?.status || entry?.result || "enrolled",
+      ),
+      semesterNumber:
+        toSemesterNumber(entry?.semesterNumber) ||
+        toSemesterNumber(student?.currentSemester),
+      semesterType: String(entry?.semesterType || "").trim(),
+      projectCode,
+      studentId: String(student?.id || student?.docId || "").trim(),
+      email: String(student?.email || student?.OFFICIAL_DETAILS?.EMAIL_ID || "")
+        .trim()
+        .toLowerCase(),
+    }));
+
+  if (
+    rows.length === 0 &&
+    student?.certificateResult &&
+    typeof student.certificateResult === "object"
+  ) {
+    const single = student.certificateResult;
+    rows.push({
+      certificateId: String(single?.certificateId || "").trim(),
+      certificateName: String(single?.certificateName || "").trim(),
+      status: normalizeCertificateStatus(
+        single?.status || single?.result || "enrolled",
+      ),
+      semesterNumber:
+        toSemesterNumber(single?.semesterNumber) ||
+        toSemesterNumber(student?.currentSemester),
+      semesterType: String(single?.semesterType || "").trim(),
+      projectCode,
+      studentId: String(student?.id || student?.docId || "").trim(),
+      email: String(student?.email || student?.OFFICIAL_DETAILS?.EMAIL_ID || "")
+        .trim()
+        .toLowerCase(),
+    });
+  }
+
+  return rows.filter(
+    (row) =>
+      String(row.certificateId || row.certificateName || "").trim() !== "",
+  );
+};
+
 const normalizeCertificateStatus = (status) => {
   const normalized = String(status || "")
     .trim()
@@ -35,34 +121,34 @@ const normalizeCertificateStatus = (status) => {
   if (["failed"].includes(normalized)) return "failed";
   return "enrolled";
 };
- 
+
 const getOptimizedLogoUrl = (logoUrl) => {
   const raw = String(logoUrl || "").trim();
   if (!raw) return "";
- 
+
   if (!/res\.cloudinary\.com/i.test(raw)) {
     return raw;
   }
- 
+
   const marker = "/upload/";
   const markerIndex = raw.indexOf(marker);
   if (markerIndex === -1) return raw;
- 
+
   const head = raw.slice(0, markerIndex + marker.length);
   const tail = raw.slice(markerIndex + marker.length);
   const [firstSegment = ""] = tail.split("/");
   const hasTransformation =
     firstSegment.includes(",") ||
     (!/^v\d+$/.test(firstSegment) && firstSegment !== "");
- 
+
   if (hasTransformation) {
     return raw;
   }
- 
+
   const transformation = "e_trim:8,c_fit,w_520,h_220,b_white,q_auto,f_auto";
   return `${head}${transformation}/${tail}`;
 };
- 
+
 const getLogoFromCertificate = (certificate = {}) => {
   return String(
     certificate.organizationLogoUrl ||
@@ -72,21 +158,21 @@ const getLogoFromCertificate = (certificate = {}) => {
       "",
   ).trim();
 };
- 
+
 const STATUS_COLORS = {
   enrolled: "#2563EB",
   passed: "#16A34A",
   failed: "#DC2626",
 };
- 
+
 export default function StudentDashboard() {
   const { user, profile } = useAuth();
   const [currentStudent, setCurrentStudent] = useState(null);
   const [enrolledCertificates, setEnrolledCertificates] = useState([]);
-  const [selectedYear, setSelectedYear] = useState("All Years");
+  const [selectedSemester, setSelectedSemester] = useState("All Semesters");
   const [certLoading, setCertLoading] = useState(false);
   const certScrollRef = useRef(null);
- 
+
   const scrollCerts = (direction) => {
     const container = certScrollRef.current;
     if (!container) return;
@@ -96,7 +182,7 @@ export default function StudentDashboard() {
       behavior: "smooth",
     });
   };
- 
+
   useEffect(() => {
     let mounted = true;
     const loadStudent = async () => {
@@ -108,13 +194,13 @@ export default function StudentDashboard() {
         console.error("Failed to load student record:", error);
       }
     };
- 
+
     loadStudent();
     return () => {
       mounted = false;
     };
   }, [profile, user]);
- 
+
   const officialDetails = currentStudent?.OFFICIAL_DETAILS || {};
   const tenthDetails = currentStudent?.TENTH_DETAILS || {};
   const twelfthDetails = currentStudent?.TWELFTH_DETAILS || {};
@@ -158,20 +244,20 @@ export default function StudentDashboard() {
     twelfthDetails["12th OVERALL MARKS %"] ??
     diplomaDetails["DIPLOMA OVERALL MARKS %"] ??
     "-";
- 
+
   useEffect(() => {
     let mounted = true;
- 
+
     const loadEnrolledCertificates = async () => {
       if (!currentStudent) {
         setEnrolledCertificates([]);
         return;
       }
- 
+
       const projectCode =
         currentStudent.projectCode || currentStudent.projectId || "";
       const projectYearTag = getCurrentYearFromProjectCode(projectCode);
- 
+
       // Try collectionGroup enrollment lookup by student email/id first (captures multiple projects/years)
       try {
         const email = String(
@@ -185,13 +271,120 @@ export default function StudentDashboard() {
             currentStudent.rollNo ||
             "",
         ).trim();
- 
-        const [byEmail, byId] = await Promise.all([
+        const studentUid = String(
+          currentStudent.uid || profile?.uid || user?.uid || "",
+        ).trim();
+
+        const [byEmail, byId, byUid] = await Promise.all([
           email ? getEnrollmentsByStudentEmail(email) : [],
           studentId ? getEnrollmentsByStudentId(studentId) : [],
+          studentUid ? getStudentCertificateHistory(studentUid) : [],
         ]);
- 
-        const merged = [...byEmail, ...byId];
+
+        const matchedStudentsByEmail = email
+          ? await getStudentMatchesByEmail(email)
+          : [];
+
+        const crossProjectStudentEntries = [
+          ...new Map(
+            (matchedStudentsByEmail || [])
+              .map((entry) => {
+                const matchedProjectCode = String(
+                  entry?.projectCode || "",
+                ).trim();
+                const matchedStudentId = String(entry?.studentId || "").trim();
+                if (!matchedProjectCode || !matchedStudentId) return null;
+                return [
+                  `${matchedProjectCode}::${matchedStudentId}`,
+                  {
+                    projectCode: matchedProjectCode,
+                    studentId: matchedStudentId,
+                  },
+                ];
+              })
+              .filter(Boolean),
+          ).values(),
+        ];
+
+        const crossProjectEnrollmentArrays = await Promise.all(
+          crossProjectStudentEntries.map(async ({ projectCode, studentId }) => {
+            const enrollmentsMap =
+              await getStudentEnrollmentsByProject(projectCode);
+            const rows = enrollmentsMap.get(studentId) || [];
+            return rows.map((row) => ({
+              ...row,
+              projectCode,
+              studentId,
+              email: String(
+                row?.email ||
+                  matchedStudentsByEmail.find(
+                    (item) =>
+                      String(item.projectCode || "").trim() === projectCode &&
+                      String(item.studentId || "").trim() === studentId,
+                  )?.email ||
+                  email,
+              )
+                .trim()
+                .toLowerCase(),
+            }));
+          }),
+        );
+
+        const crossProjectStudentDocs = await Promise.all(
+          crossProjectStudentEntries.map(async ({ projectCode, studentId }) => {
+            try {
+              const studentDoc = await getStudentByProjectAndId(
+                projectCode,
+                studentId,
+              );
+              return studentDoc ? { projectCode, student: studentDoc } : null;
+            } catch (error) {
+              console.warn("Unable to load cross-project student doc:", error);
+              return null;
+            }
+          }),
+        );
+
+        const crossProjectLegacyRows = crossProjectStudentDocs
+          .filter(Boolean)
+          .flatMap(({ projectCode, student }) =>
+            extractLegacyEnrollmentRowsFromStudent({
+              student,
+              projectCode,
+            }),
+          );
+
+        const merged = [
+          ...new Map(
+            [
+              ...byEmail,
+              ...byId,
+              ...byUid,
+              ...crossProjectEnrollmentArrays.flat(),
+              ...crossProjectLegacyRows,
+            ]
+              .filter(
+                (entry) =>
+                  String(entry?.certificateId || "").trim() ||
+                  String(entry?.certificateName || "").trim(),
+              )
+              .map((entry) => {
+                const key = [
+                  String(entry?.certificateId || "").trim() ||
+                    String(entry?.certificateName || "")
+                      .trim()
+                      .toLowerCase(),
+                  String(entry?.projectCode || "").trim(),
+                  String(entry?.studentId || "").trim(),
+                  String(deriveSemesterNumberFromEntry(entry) || "").trim(),
+                  String(entry?.status || "")
+                    .trim()
+                    .toLowerCase(),
+                ].join("|");
+                return [key, entry];
+              }),
+          ).values(),
+        ];
         if (merged.length > 0) {
           const uniqueCertificateIds = [
             ...new Set(
@@ -200,7 +393,7 @@ export default function StudentDashboard() {
                 .filter(Boolean),
             ),
           ];
- 
+
           let linkedCertificates = [];
           try {
             linkedCertificates =
@@ -211,7 +404,7 @@ export default function StudentDashboard() {
               certificateError,
             );
           }
- 
+
           let organizations = [];
           try {
             organizations = await getAllOrganizations();
@@ -221,13 +414,13 @@ export default function StudentDashboard() {
               organizationError,
             );
           }
- 
+
           const certificateById = new Map(
             (linkedCertificates || [])
               .filter((certificate) => certificate?.id)
               .map((certificate) => [certificate.id, certificate]),
           );
- 
+
           const organizationByName = new Map(
             (organizations || [])
               .filter((organization) => organization?.name)
@@ -238,7 +431,7 @@ export default function StudentDashboard() {
                 organization,
               ]),
           );
- 
+
           const mapped = merged.map((entry, idx) => {
             const certificateId = String(entry.certificateId || "").trim();
             const certificateDoc = certificateById.get(certificateId) || {};
@@ -255,7 +448,7 @@ export default function StudentDashboard() {
                   .toLowerCase(),
               )?.logoUrl ||
               "";
- 
+
             return {
               id: certificateId || `enroll-${idx}`,
               name:
@@ -266,7 +459,10 @@ export default function StudentDashboard() {
               organizationLogoUrl,
               level: entry.level || certificateDoc.level || "",
               status: normalizeCertificateStatus(entry.status || "enrolled"),
-              semesterNumber: entry.semesterNumber ?? null,
+              semesterNumber:
+                deriveSemesterNumberFromEntry(entry) ??
+                entry.semesterNumber ??
+                null,
               semesterType: entry.semesterType || "",
               yearTag:
                 entry.yearTag ||
@@ -283,7 +479,7 @@ export default function StudentDashboard() {
           err,
         );
       }
- 
+
       // Fallback: per-project enrollments for this student's project
       try {
         const enrollmentsMap =
@@ -291,7 +487,7 @@ export default function StudentDashboard() {
         const enrollmentEntries = enrollmentsMap.get(
           String(currentStudent.id || currentStudent.docId || "").trim(),
         );
- 
+
         if (enrollmentEntries && enrollmentEntries.length > 0) {
           // Fetch all organizations for logos
           let organizations = [];
@@ -313,7 +509,7 @@ export default function StudentDashboard() {
                 organization,
               ]),
           );
- 
+
           // Fetch full certificate details for platform, level, domain
           const certIds = enrollmentEntries.map((e) => e.certificateId);
           let linkedCertificates = [];
@@ -326,11 +522,11 @@ export default function StudentDashboard() {
             );
           }
           const certDataMap = new Map(linkedCertificates.map((c) => [c.id, c]));
- 
+
           const mapped = enrollmentEntries.map((entry, idx) => {
             const certDoc = certDataMap.get(entry.certificateId) || {};
             const orgName = certDoc.domain || entry.organizationName || "";
- 
+
             return {
               id: entry.certificateId || `enroll-${idx}`,
               name: certDoc.name || entry.certificateName || "Certificate",
@@ -355,23 +551,23 @@ export default function StudentDashboard() {
           err,
         );
       }
- 
+
       const resultMap =
         currentStudent.certificateResults &&
         typeof currentStudent.certificateResults === "object"
           ? currentStudent.certificateResults
           : {};
- 
+
       const certificateResultEntries = Object.entries(resultMap).filter(
         ([, entry]) => entry && typeof entry === "object" && !entry?.isDeleted,
       );
- 
+
       const legacyCertificateResult =
         currentStudent.certificateResult &&
         typeof currentStudent.certificateResult === "object"
           ? currentStudent.certificateResult
           : null;
- 
+
       const certificateIdSet = new Set(
         Array.isArray(currentStudent.certificateIds)
           ? currentStudent.certificateIds.filter((id) => {
@@ -381,18 +577,18 @@ export default function StudentDashboard() {
             })
           : [],
       );
- 
+
       certificateResultEntries.forEach(([mapKey, entry]) => {
         const resolvedId = String(entry.certificateId || mapKey || "").trim();
         if (resolvedId) {
           certificateIdSet.add(resolvedId);
         }
       });
- 
+
       if (legacyCertificateResult?.certificateId) {
         certificateIdSet.add(String(legacyCertificateResult.certificateId));
       }
- 
+
       setCertLoading(true);
       try {
         const certificateIds = Array.from(certificateIdSet);
@@ -407,7 +603,7 @@ export default function StudentDashboard() {
             );
           }
         }
- 
+
         let organizations = [];
         try {
           organizations = await getAllOrganizations();
@@ -427,15 +623,15 @@ export default function StudentDashboard() {
               organization,
             ]),
         );
- 
+
         const certificateById = new Map(
           linkedCertificates
             .filter((certificate) => certificate?.id)
             .map((certificate) => [certificate.id, certificate]),
         );
- 
+
         const finalById = new Map();
- 
+
         certificateIds.forEach((certificateId, index) => {
           const certificateDoc = certificateById.get(certificateId);
           finalById.set(certificateId, {
@@ -455,14 +651,14 @@ export default function StudentDashboard() {
             semesterType: "",
           });
         });
- 
+
         certificateResultEntries.forEach(([mapKey, entry], index) => {
           const resolvedId = String(entry.certificateId || mapKey || "").trim();
           const fallbackId = resolvedId || `result-cert-${index}`;
           const certificateDoc = certificateById.get(resolvedId);
           const existing = finalById.get(fallbackId);
           const resolvedStatus = entry.status || entry.result || "enrolled";
- 
+
           finalById.set(fallbackId, {
             id: fallbackId,
             name:
@@ -490,7 +686,7 @@ export default function StudentDashboard() {
             semesterType: existing?.semesterType || "",
           });
         });
- 
+
         if (legacyCertificateResult) {
           const legacyId = String(
             legacyCertificateResult.certificateId || "",
@@ -507,10 +703,10 @@ export default function StudentDashboard() {
                   .toLowerCase(),
             )?.id ||
             "legacy-certificate-result";
- 
+
           const existing = finalById.get(resolvedId);
           const certificateDoc = certificateById.get(legacyId);
- 
+
           finalById.set(resolvedId, {
             id: resolvedId,
             name:
@@ -543,13 +739,13 @@ export default function StudentDashboard() {
             semesterType: existing?.semesterType || "",
           });
         }
- 
+
         const finalList = Array.from(finalById.values()).map((cert, index) => ({
           ...cert,
           yearTag: cert.yearTag || projectYearTag || currentYearFromCode || "",
           id: cert.id || cert.certificateId || `cert-${index}`,
         }));
- 
+
         if (mounted) {
           setEnrolledCertificates(finalList);
         }
@@ -560,29 +756,42 @@ export default function StudentDashboard() {
         if (mounted) setCertLoading(false);
       }
     };
- 
+
     loadEnrolledCertificates();
     return () => {
       mounted = false;
     };
   }, [currentStudent]);
- 
+
   const certYearOptions = useMemo(() => {
-    const years = new Set(
+    const semesters = new Set(
       enrolledCertificates
-        .map((cert) => String(cert.yearTag || "").trim())
-        .filter(Boolean),
+        .map((cert) => deriveSemesterNumberFromEntry(cert))
+        .filter((value) => Number.isFinite(value)),
     );
-    return ["All Years", ...Array.from(years).sort()];
+    const sortedSemesters = Array.from(semesters).sort((a, b) => a - b);
+    return [
+      "All Semesters",
+      ...sortedSemesters.map((sem) => `Semester ${sem}`),
+    ];
   }, [enrolledCertificates]);
- 
+
+  useEffect(() => {
+    if (selectedSemester === "All Semesters") return;
+    if (!certYearOptions.includes(selectedSemester)) {
+      setSelectedSemester("All Semesters");
+    }
+  }, [certYearOptions, selectedSemester]);
+
   const filteredCertificates = useMemo(() => {
-    if (selectedYear === "All Years") return enrolledCertificates;
+    if (selectedSemester === "All Semesters") return enrolledCertificates;
+    const selectedSemesterNumber = toSemesterNumber(selectedSemester);
+    if (!selectedSemesterNumber) return enrolledCertificates;
     return enrolledCertificates.filter(
-      (cert) => String(cert.yearTag || "").trim() === selectedYear,
+      (cert) => deriveSemesterNumberFromEntry(cert) === selectedSemesterNumber,
     );
-  }, [enrolledCertificates, selectedYear]);
- 
+  }, [enrolledCertificates, selectedSemester]);
+
   const statusSummary = filteredCertificates.reduce(
     (acc, certificate) => {
       const normalizedStatus = normalizeCertificateStatus(certificate.status);
@@ -593,7 +802,7 @@ export default function StudentDashboard() {
     },
     { enrolled: 0, passed: 0, failed: 0 },
   );
- 
+
   return (
     <div className="space-y-8">
       <section className="flex flex-wrap items-center justify-between gap-3 px-1">
@@ -602,17 +811,17 @@ export default function StudentDashboard() {
         </span>
         <select
           className="rounded-xl border border-[#C8D8EE] bg-gradient-to-r from-[#0E3C67] to-[#14558E] px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:shadow"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
+          value={selectedSemester}
+          onChange={(e) => setSelectedSemester(e.target.value)}
         >
-          {certYearOptions.map((year) => (
-            <option key={year} value={year}>
-              {year}
+          {certYearOptions.map((semesterLabel) => (
+            <option key={semesterLabel} value={semesterLabel}>
+              {semesterLabel}
             </option>
           ))}
         </select>
       </section>
- 
+
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
         <SummaryCard
           enrolled={statusSummary.enrolled}
@@ -636,10 +845,14 @@ export default function StudentDashboard() {
               className="h-full"
             />
           </div>
-          <TrainingProgressCard title="IRP Training" progress={0} className="h-full" />
+          <TrainingProgressCard
+            title="IRP Training"
+            progress={0}
+            className="h-full"
+          />
         </div>
       </section>
- 
+
       <section className="student-navbar-card rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF5FF] p-5 shadow-[0_12px_40px_-28px_rgba(11,42,74,0.55)] sm:p-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
           <div className="space-y-3">
@@ -657,7 +870,7 @@ export default function StudentDashboard() {
               {filteredCertificates.length} shown
             </button>
           </div>
- 
+
           <div className="relative flex items-center gap-2 min-w-0">
             {/* Left arrow */}
             <button
@@ -669,7 +882,7 @@ export default function StudentDashboard() {
             >
               <ChevronLeft size={20} />
             </button>
- 
+
             {/* Card strip */}
             <div
               ref={certScrollRef}
@@ -697,7 +910,7 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
- 
+
             {/* Right arrow */}
             <button
               type="button"
@@ -711,7 +924,7 @@ export default function StudentDashboard() {
           </div>
         </div>
       </section>
- 
+
       <section className="grid grid-cols-1 gap-6 rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white to-[#F2F8FF] p-1">
         <Panel title="Profile Snapshot">
           <div className="space-y-4">
@@ -732,7 +945,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
             </div>
- 
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ">
               <SnapshotItem label="Gender" value={gender} />
               <SnapshotItem label="Date of Birth" value={dob} />
@@ -740,7 +953,7 @@ export default function StudentDashboard() {
               <SnapshotItem label="Email" value={email} />
               <SnapshotItem label="Phone" value={phone} />
             </div>
- 
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-[#012920]">
@@ -765,7 +978,7 @@ export default function StudentDashboard() {
     </div>
   );
 }
- 
+
 function StatCard({ label, value, icon, compact = false, className = "" }) {
   return (
     <div
@@ -792,7 +1005,7 @@ function StatCard({ label, value, icon, compact = false, className = "" }) {
     </div>
   );
 }
- 
+
 function SummaryCard({ enrolled, passed, failed }) {
   const chartData = [
     {
@@ -804,8 +1017,11 @@ function SummaryCard({ enrolled, passed, failed }) {
     { name: "Failed", value: Number(failed || 0), color: STATUS_COLORS.failed },
   ];
   const hasData = chartData.some((item) => item.value > 0);
-  const totalCertificates = chartData.reduce((sum, item) => sum + item.value, 0);
- 
+  const totalCertificates = chartData.reduce(
+    (sum, item) => sum + item.value,
+    0,
+  );
+
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white via-[#F8FBFF] to-[#ECF4FF] p-4 shadow-[0_16px_40px_-28px_rgba(11,42,74,0.65)] sm:p-5">
       <div className="pointer-events-none absolute -left-16 -top-20 h-52 w-52 rounded-full bg-[#D4E6FF]/50" />
@@ -863,7 +1079,9 @@ function SummaryCard({ enrolled, passed, failed }) {
                   className="h-3 w-3 rounded-full"
                   style={{ backgroundColor: item.color }}
                 />
-                <span className="font-medium text-[#0B2A4A]/90">{item.name}</span>
+                <span className="font-medium text-[#0B2A4A]/90">
+                  {item.name}
+                </span>
               </div>
               <span className="rounded-lg bg-[#EEF4FF] px-2.5 py-1 font-semibold text-[#0B2A4A]">
                 {item.value}
@@ -875,7 +1093,7 @@ function SummaryCard({ enrolled, passed, failed }) {
     </div>
   );
 }
- 
+
 function TrainingProgressCard({ title, progress = 0, className = "" }) {
   const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
   return (
@@ -892,7 +1110,7 @@ function TrainingProgressCard({ title, progress = 0, className = "" }) {
             {safeProgress}%
           </span>
         </div>
- 
+
         <div className="overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white/95">
           <div className="flex h-20 items-center justify-center bg-gradient-to-b from-[#F8FBFF] to-white px-3 py-2">
             <div className="flex h-14 w-full items-center justify-center rounded-lg bg-white px-2">
@@ -904,18 +1122,19 @@ function TrainingProgressCard({ title, progress = 0, className = "" }) {
             </div>
           </div>
           <div className="space-y-1.5 px-3 pb-3 pt-1">
-           
             <p className="text-sm font-semibold leading-tight text-[#0B2A4A]">
               IRP Training
             </p>
             <p className="text-xs text-[#0B2A4A]/70">Not Enrolled</p>
           </div>
         </div>
- 
+
         <div>
           <div className="mb-2 flex items-center justify-between text-xs text-[#0B2A4A]/75">
             <span>Progress</span>
-            <span className="font-semibold text-[#0B2A4A]">{safeProgress}%</span>
+            <span className="font-semibold text-[#0B2A4A]">
+              {safeProgress}%
+            </span>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-[#E3ECF9]">
             <div
@@ -928,7 +1147,7 @@ function TrainingProgressCard({ title, progress = 0, className = "" }) {
     </div>
   );
 }
- 
+
 function Panel({ title, children }) {
   return (
     <div className="rounded-3xl border border-[#D7E2F1] bg-white p-5 shadow-[0_10px_35px_-28px_rgba(11,42,74,0.7)]">
@@ -939,7 +1158,7 @@ function Panel({ title, children }) {
     </div>
   );
 }
- 
+
 function SnapshotItem({ label, value }) {
   return (
     <div className="rounded-xl border border-[#D7E2F1] bg-[#FBFDFF] p-3 shadow-sm">
@@ -952,7 +1171,7 @@ function SnapshotItem({ label, value }) {
     </div>
   );
 }
- 
+
 function CertificateCard({ certificate }) {
   const logoUrl = getOptimizedLogoUrl(getLogoFromCertificate(certificate));
   const statusLabel = normalizeCertificateStatus(
@@ -964,7 +1183,7 @@ function CertificateCard({ certificate }) {
       : statusLabel === "failed"
         ? "bg-[#FEECEC] text-[#C03535]"
         : "bg-[#E9F1FF] text-[#0B4F9B]";
- 
+
   return (
     <article
       style={{ scrollSnapAlign: "start", scrollSnapStop: "always" }}
@@ -997,7 +1216,7 @@ function CertificateCard({ certificate }) {
           </h4>
           <p className="mt-1 text-xs text-gray-600">{certificate.level}</p>
         </div>
- 
+
         <div className="flex items-center justify-between text-xs">
           <span
             className={`rounded-full px-2 py-1 font-medium capitalize ${statusBadgeClass}`}
@@ -1009,5 +1228,3 @@ function CertificateCard({ certificate }) {
     </article>
   );
 }
- 
- 

@@ -75,6 +75,27 @@ export const addStudent = async (studentData) => {
       ? selectedSemester
       : semesterOptions[0] || null;
     const semesterDictionary = buildSemesterDictionary(studentData.projectId);
+    const numericSemesterMetadataWrites = semesterOptions.map((semester) =>
+      setDoc(
+        doc(
+          db,
+          STUDENTS_COLLECTION,
+          projectDocId,
+          `sem_${semester}`,
+          "metadata",
+        ),
+        {
+          projectCode: studentData.projectId,
+          semesterDictionary,
+          semesterNumber: semester,
+          semesterType: getSemesterType(semester),
+          availableSemesters: [semester],
+          selectedSemester: validSelectedSemester === semester ? semester : null,
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      ),
+    );
 
     await Promise.all([
       setDoc(
@@ -105,6 +126,7 @@ export const addStudent = async (studentData) => {
         },
         { merge: true },
       ),
+      ...numericSemesterMetadataWrites,
     ]);
 
     const studentRef = doc(
@@ -584,6 +606,115 @@ export const getStudentByEmail = async (email) => {
   } catch (error) {
     console.error("Error getting student by email:", error);
     throw error;
+  }
+};
+
+// Get all student matches by email across all project-year students_list docs.
+export const getStudentMatchesByEmail = async (email) => {
+  if (isLocalDbMode()) {
+    const normalized = String(email || "")
+      .trim()
+      .toLowerCase();
+    if (!normalized) return [];
+
+    const rows = await localGetAllStudents();
+    return (rows || [])
+      .filter((student) => {
+        const studentEmail = String(
+          student?.email || student?.OFFICIAL_DETAILS?.EMAIL_ID || "",
+        )
+          .trim()
+          .toLowerCase();
+        return studentEmail === normalized;
+      })
+      .map((student) => ({
+        studentId: String(student?.id || student?.docId || "").trim(),
+        projectCode: String(student?.projectCode || student?.projectId || ""),
+        email: String(
+          student?.email || student?.OFFICIAL_DETAILS?.EMAIL_ID || normalized,
+        )
+          .trim()
+          .toLowerCase(),
+        uid: String(student?.uid || "").trim(),
+      }))
+      .filter((item) => item.studentId && item.projectCode);
+  }
+
+  try {
+    const rawEmail = String(email || "").trim();
+    if (!rawEmail) return [];
+    const normalized = rawEmail.toLowerCase();
+
+    const lookupQueries = [
+      query(
+        collectionGroup(db, "students_list"),
+        where("email", "==", rawEmail),
+      ),
+      query(
+        collectionGroup(db, "students_list"),
+        where(new FieldPath("OFFICIAL_DETAILS", "EMAIL_ID"), "==", rawEmail),
+      ),
+      query(
+        collectionGroup(db, "students_list"),
+        where(new FieldPath("OFFICIAL_DETAILS", "EMAIL_ID."), "==", rawEmail),
+      ),
+    ];
+
+    if (normalized !== rawEmail) {
+      lookupQueries.push(
+        query(
+          collectionGroup(db, "students_list"),
+          where("email", "==", normalized),
+        ),
+        query(
+          collectionGroup(db, "students_list"),
+          where(
+            new FieldPath("OFFICIAL_DETAILS", "EMAIL_ID"),
+            "==",
+            normalized,
+          ),
+        ),
+      );
+    }
+
+    const snapshots = await Promise.all(lookupQueries.map((q) => getDocs(q)));
+    const byKey = new Map();
+
+    snapshots.forEach((snapshot) => {
+      snapshot.forEach((studentDoc) => {
+        const data = studentDoc.data() || {};
+        if ((data?.isActive ?? true) === false) return;
+
+        const projectCode = String(
+          data.projectCode || data.projectId || "",
+        ).trim();
+        const studentId = String(
+          data.id || data.OFFICIAL_DETAILS?.SN || studentDoc.id || "",
+        ).trim();
+        if (!projectCode || !studentId) return;
+
+        const key = `${projectCode}::${studentId}`;
+        if (byKey.has(key)) return;
+
+        const resolvedEmail = String(
+          data.email || data.OFFICIAL_DETAILS?.EMAIL_ID || normalized,
+        )
+          .trim()
+          .toLowerCase();
+
+        byKey.set(key, {
+          studentId,
+          projectCode,
+          email: resolvedEmail,
+          uid: String(data.uid || "").trim(),
+        });
+      });
+    });
+
+    return Array.from(byKey.values());
+  } catch (error) {
+    console.error("Error getting student matches by email:", error);
+    return [];
   }
 };
 

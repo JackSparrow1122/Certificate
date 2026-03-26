@@ -1,14 +1,24 @@
 const YEAR_ORDINAL_REGEX = /(\d+)/;
 
 export const getYearNumberFromProjectCode = (projectCode) => {
-  const parts = String(projectCode || "")
-    .split("/")
+  const raw = String(projectCode || "").trim();
+  if (!raw) return null;
+
+  const tokenRegex = /(?:^|[\/-])(\d+)(?:st|nd|rd|th)(?:$|[\/-])/i;
+  const tokenMatch = raw.match(tokenRegex);
+  if (tokenMatch) {
+    const yearNumber = Number.parseInt(tokenMatch[1], 10);
+    return Number.isFinite(yearNumber) && yearNumber > 0 ? yearNumber : null;
+  }
+
+  const parts = raw
+    .split(/[\/-]/)
     .map((part) => part.trim())
     .filter(Boolean);
+  if (parts.length === 0) return null;
 
-  if (parts.length < 3) return null;
-  const yearToken = parts[2];
-  const match = String(yearToken).match(YEAR_ORDINAL_REGEX);
+  const candidate = parts.find((part) => /\d/.test(part)) || "";
+  const match = String(candidate).match(YEAR_ORDINAL_REGEX);
   if (!match) return null;
 
   const yearNumber = Number.parseInt(match[1], 10);

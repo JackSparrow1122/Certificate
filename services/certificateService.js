@@ -4,7 +4,6 @@ import {
   collection,
   collectionGroup,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   query,
@@ -13,7 +12,7 @@ import {
   writeBatch,
   increment,
 } from "firebase/firestore";
-import { codeToDocId } from "../src/utils/projectCodeUtils";
+import { codeToDocId, docIdToCode } from "../src/utils/projectCodeUtils";
 import { isLocalDbMode } from "./dbModeService";
 import {
   localCreateCertificateAndEnrollStudents,
@@ -28,6 +27,11 @@ const CERTIFICATES_COLLECTION = "certificates";
 const STUDENTS_COLLECTION = "students";
 const SEMESTER_ODD_COLLECTION = "sem_odd";
 const SEMESTER_EVEN_COLLECTION = "sem_even";
+const MAX_NUMERIC_SEMESTER_COLLECTION = 12;
+const NUMERIC_SEMESTER_COLLECTIONS = Array.from(
+  { length: MAX_NUMERIC_SEMESTER_COLLECTION },
+  (_, index) => `sem_${index + 1}`,
+);
 const SEMESTER_METADATA_DOC_ID = "metadata";
 const BATCH_CHUNK_SIZE = 400;
 
@@ -50,8 +54,29 @@ const semesterTypeFromNumber = (semesterNumber) => {
 };
 
 const getEnrollmentCollectionName = (semesterNumber) => {
+  const parsed = toSemesterNumber(semesterNumber);
+  if (parsed) return `sem_${parsed}`;
   const type = semesterTypeFromNumber(semesterNumber);
   return type === "even" ? SEMESTER_EVEN_COLLECTION : SEMESTER_ODD_COLLECTION;
+};
+
+const getAllEnrollmentCollectionNames = () =>
+  Array.from(
+    new Set([
+      SEMESTER_ODD_COLLECTION,
+      SEMESTER_EVEN_COLLECTION,
+      ...NUMERIC_SEMESTER_COLLECTIONS,
+    ]),
+  );
+
+const dedupeEnrollmentDocsByPath = (docs) => {
+  const byPath = new Map();
+  (Array.isArray(docs) ? docs : []).forEach((snapshotDoc) => {
+    const path = String(snapshotDoc?.ref?.path || "").trim();
+    if (!path || byPath.has(path)) return;
+    byPath.set(path, snapshotDoc);
+  });
+  return Array.from(byPath.values());
 };
 
 const resolveStudentSemesterNumber = ({ studentData, fallbackSemester }) => {
@@ -82,7 +107,7 @@ const isValidEnrollmentDoc = (snapshotDoc) => {
 };
 
 const loadProjectEnrollmentDocs = async ({ projectDocId, certificateId }) => {
-  const targetCollections = [SEMESTER_ODD_COLLECTION, SEMESTER_EVEN_COLLECTION];
+  const targetCollections = getAllEnrollmentCollectionNames();
   const snapshots = await Promise.all(
     targetCollections.map((collectionName) => {
       const baseRef = collection(
@@ -100,13 +125,15 @@ const loadProjectEnrollmentDocs = async ({ projectDocId, certificateId }) => {
     }),
   );
 
-  return snapshots.flatMap((snapshot) =>
-    snapshot.docs.filter((snapshotDoc) => isValidEnrollmentDoc(snapshotDoc)),
+  return dedupeEnrollmentDocsByPath(
+    snapshots.flatMap((snapshot) =>
+      snapshot.docs.filter((snapshotDoc) => isValidEnrollmentDoc(snapshotDoc)),
+    ),
   );
 };
 
 const loadEnrollmentDocsByFieldAcrossProjects = async ({ field, value }) => {
-  const targetCollections = [SEMESTER_ODD_COLLECTION, SEMESTER_EVEN_COLLECTION];
+  const targetCollections = getAllEnrollmentCollectionNames();
   const snapshots = await Promise.all(
     targetCollections.map((collectionName) =>
       getDocs(
@@ -115,8 +142,10 @@ const loadEnrollmentDocsByFieldAcrossProjects = async ({ field, value }) => {
     ),
   );
 
-  return snapshots.flatMap((snapshot) =>
-    snapshot.docs.filter((snapshotDoc) => isValidEnrollmentDoc(snapshotDoc)),
+  return dedupeEnrollmentDocsByPath(
+    snapshots.flatMap((snapshot) =>
+      snapshot.docs.filter((snapshotDoc) => isValidEnrollmentDoc(snapshotDoc)),
+    ),
   );
 };
 
@@ -267,7 +296,7 @@ export const updateCertificate = async (certificateId, updateData) => {
 };
 
 // ---------------------------------------------------------------------------
-// Enrollment counts — from sem_odd / sem_even collectionGroups
+// Enrollment counts — from all supported semester collectionGroups
 // ---------------------------------------------------------------------------
 
 export const getCertificateEnrollmentCounts = async (certificateIds) => {
@@ -286,26 +315,26 @@ export const getCertificateEnrollmentCounts = async (certificateIds) => {
   if (ids.length === 0) return {};
 
   try {
-    const countEntries = await Promise.all(
-      ids.map(async (certificateId) => {
-        const countQuery = query(
-          collectionGroup(db, SEMESTER_ODD_COLLECTION),
-          where("certificateId", "==", certificateId),
+    const countEntries = await Promise.all(ids.map(async (certificateId) => {
+      const docs = await loadEnrollmentDocsByFieldAcrossProjects({
+        field: "certificateId",
+        value: certificateId,
+      });
+      const uniqueEnrollmentKeys = new Set();
+      docs.forEach((snapshotDoc) => {
+        const d = snapshotDoc.data() || {};
+        if (d.isDeleted === true) return;
+        const certId = String(d.certificateId || "").trim();
+        const studentId = String(d.studentId || "").trim();
+        const projectCode = String(d.projectCode || "").trim();
+        const semesterNumber = String(toSemesterNumber(d.semesterNumber) || "");
+        if (!certId || !studentId) return;
+        uniqueEnrollmentKeys.add(
+          [certId, projectCode, studentId, semesterNumber].join("|"),
         );
-        const evenQuery = query(
-          collectionGroup(db, SEMESTER_EVEN_COLLECTION),
-          where("certificateId", "==", certificateId),
-        );
-        const [oddSnapshot, evenSnapshot] = await Promise.all([
-          getCountFromServer(countQuery),
-          getCountFromServer(evenQuery),
-        ]);
-        const total =
-          Number(oddSnapshot?.data?.()?.count || 0) +
-          Number(evenSnapshot?.data?.()?.count || 0);
-        return [certificateId, total];
-      }),
-    );
+      });
+      return [certificateId, uniqueEnrollmentKeys.size];
+    }));
 
     return Object.fromEntries(countEntries);
   } catch (error) {
@@ -675,29 +704,27 @@ export const getStudentCertificateHistory = async (uid) => {
   try {
     if (!uid) return [];
 
-    const enrollmentsQuery = query(
-      collectionGroup(db, SEMESTER_ODD_COLLECTION),
-      where("uid", "==", uid),
-    );
-    const evenQuery = query(
-      collectionGroup(db, SEMESTER_EVEN_COLLECTION),
-      where("uid", "==", uid),
-    );
-    const [oddSnapshot, evenSnapshot] = await Promise.all([
-      getDocs(enrollmentsQuery),
-      getDocs(evenQuery),
-    ]);
-    const docs = [...oddSnapshot.docs, ...evenSnapshot.docs].filter(
-      (snapshotDoc) => isValidEnrollmentDoc(snapshotDoc),
-    );
+    const docs = await loadEnrollmentDocsByFieldAcrossProjects({
+      field: "uid",
+      value: uid,
+    });
 
     if (docs.length === 0) return [];
 
     const enrollments = [];
     docs.forEach((enrollmentDoc) => {
+      const data = enrollmentDoc.data() || {};
+      const pathParts = String(enrollmentDoc.ref?.path || "")
+        .split("/")
+        .filter(Boolean);
+      const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
+
       enrollments.push({
         id: enrollmentDoc.id,
-        ...enrollmentDoc.data(),
+        ...data,
+        projectCode:
+          String(data.projectCode || "").trim() ||
+          (projectDocId ? docIdToCode(projectDocId) : ""),
       });
     });
 
@@ -775,7 +802,6 @@ export const unenrollStudentsFromCertificate = async ({
 
 export const declareResultsForCertificate = async ({
   certificateId,
-  certificateName,
   projectCodes,
   emailStatusMap, // Map<email, "passed"|"failed">
   defaultStatus = "failed",
@@ -882,53 +908,43 @@ export const getEnrollmentsByStudentEmail = async (email) => {
     .toLowerCase();
   if (!normalized) return [];
   try {
-    const queries = [
-      query(
-        collectionGroup(db, SEMESTER_ODD_COLLECTION),
-        where("email", "==", normalized),
-      ),
-      query(
-        collectionGroup(db, SEMESTER_EVEN_COLLECTION),
-        where("email", "==", normalized),
-      ),
-    ];
-
     const rawEmail = String(email || "").trim();
-    if (rawEmail && rawEmail !== normalized) {
-      queries.push(
-        query(
-          collectionGroup(db, SEMESTER_ODD_COLLECTION),
-          where("email", "==", rawEmail),
-        ),
-        query(
-          collectionGroup(db, SEMESTER_EVEN_COLLECTION),
-          where("email", "==", rawEmail),
-        ),
-      );
-    }
-
-    const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
+    const candidateEmails = Array.from(
+      new Set([normalized, rawEmail].filter(Boolean)),
+    );
+    const snapshots = await Promise.all(
+      candidateEmails.map((candidateEmail) =>
+        loadEnrollmentDocsByFieldAcrossProjects({
+          field: "email",
+          value: candidateEmail,
+        }),
+      ),
+    );
+    const docs = dedupeEnrollmentDocsByPath(snapshots.flat());
     const rows = [];
-    snapshots.forEach((snapshot) => {
-      snapshot.forEach((docSnap) => {
-        if (!isValidEnrollmentDoc(docSnap)) return;
-        const d = docSnap.data() || {};
-        if (d.isDeleted === true) return;
-        rows.push({
-          certificateId: d.certificateId || "",
-          certificateName: d.certificateName || "",
-          examCode: d.examCode || "",
-          semesterNumber: d.semesterNumber ?? null,
-          semesterType: d.semesterType || "",
-          status: d.status || "enrolled",
-          projectCode: d.projectCode || "",
-          platform: d.platform || d.domain || "",
-          organizationName: d.organizationName || d.domain || "",
-          organizationLogoUrl: d.organizationLogoUrl || "",
-          level: d.level || "",
-          email: d.email || normalized,
-          studentId: d.studentId || "",
-        });
+    docs.forEach((docSnap) => {
+      const d = docSnap.data() || {};
+      if (d.isDeleted === true) return;
+      const pathParts = String(docSnap.ref?.path || "")
+        .split("/")
+        .filter(Boolean);
+      const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
+      rows.push({
+        certificateId: d.certificateId || "",
+        certificateName: d.certificateName || "",
+        examCode: d.examCode || "",
+        semesterNumber: d.semesterNumber ?? null,
+        semesterType: d.semesterType || "",
+        status: d.status || "enrolled",
+        projectCode:
+          String(d.projectCode || "").trim() ||
+          (projectDocId ? docIdToCode(projectDocId) : ""),
+        platform: d.platform || d.domain || "",
+        organizationName: d.organizationName || d.domain || "",
+        organizationLogoUrl: d.organizationLogoUrl || "",
+        level: d.level || "",
+        email: d.email || normalized,
+        studentId: d.studentId || "",
       });
     });
     return rows;
@@ -944,41 +960,34 @@ export const getEnrollmentsByStudentId = async (studentId) => {
   const normalized = String(studentId || "").trim();
   if (!normalized) return [];
   try {
-    const snapshots = await Promise.all([
-      getDocs(
-        query(
-          collectionGroup(db, SEMESTER_ODD_COLLECTION),
-          where("studentId", "==", normalized),
-        ),
-      ),
-      getDocs(
-        query(
-          collectionGroup(db, SEMESTER_EVEN_COLLECTION),
-          where("studentId", "==", normalized),
-        ),
-      ),
-    ]);
+    const docs = await loadEnrollmentDocsByFieldAcrossProjects({
+      field: "studentId",
+      value: normalized,
+    });
     const rows = [];
-    snapshots.forEach((snapshot) => {
-      snapshot.forEach((docSnap) => {
-        if (!isValidEnrollmentDoc(docSnap)) return;
-        const d = docSnap.data() || {};
-        if (d.isDeleted === true) return;
-        rows.push({
-          certificateId: d.certificateId || "",
-          certificateName: d.certificateName || "",
-          examCode: d.examCode || "",
-          semesterNumber: d.semesterNumber ?? null,
-          semesterType: d.semesterType || "",
-          status: d.status || "enrolled",
-          projectCode: d.projectCode || "",
-          platform: d.platform || d.domain || "",
-          organizationName: d.organizationName || d.domain || "",
-          organizationLogoUrl: d.organizationLogoUrl || "",
-          level: d.level || "",
-          email: d.email || "",
-          studentId: d.studentId || normalized,
-        });
+    docs.forEach((docSnap) => {
+      const d = docSnap.data() || {};
+      if (d.isDeleted === true) return;
+      const pathParts = String(docSnap.ref?.path || "")
+        .split("/")
+        .filter(Boolean);
+      const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
+      rows.push({
+        certificateId: d.certificateId || "",
+        certificateName: d.certificateName || "",
+        examCode: d.examCode || "",
+        semesterNumber: d.semesterNumber ?? null,
+        semesterType: d.semesterType || "",
+        status: d.status || "enrolled",
+        projectCode:
+          String(d.projectCode || "").trim() ||
+          (projectDocId ? docIdToCode(projectDocId) : ""),
+        platform: d.platform || d.domain || "",
+        organizationName: d.organizationName || d.domain || "",
+        organizationLogoUrl: d.organizationLogoUrl || "",
+        level: d.level || "",
+        email: d.email || "",
+        studentId: d.studentId || normalized,
       });
     });
     return rows;
