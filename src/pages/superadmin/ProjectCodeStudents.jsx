@@ -32,7 +32,10 @@ function extractStudentDisplayData(student, projectCodeStr) {
     ? student._enrollments
     : [];
   const official = student.OFFICIAL_DETAILS || {};
-  const derivedSemester = deriveCurrentSemesterFromEnrollments(allEnrollments, "");
+  const derivedSemester = deriveCurrentSemesterFromEnrollments(
+    allEnrollments,
+    "",
+  );
   return {
     id: student.id,
     docId: student.docId || student.id,

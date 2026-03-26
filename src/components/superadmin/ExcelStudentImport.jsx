@@ -93,18 +93,37 @@ function applyHeaderAliases(headerMap) {
   if (headerMap["EMAIL ID."] && !headerMap["EMAIL_ID."]) {
     headerMap["EMAIL_ID."] = headerMap["EMAIL ID."];
   }
+  if (headerMap["EXAM CODE"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAM CODE"];
+  }
+  if (headerMap["EXAM-CODE"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAM-CODE"];
+  }
+  if (headerMap["EXAMCODE"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAMCODE"];
+  }
+  if (headerMap["EXAM CODES"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAM CODES"];
+  }
   return headerMap;
 }
 
 // Allow "EMAIL ID" (legacy) to count as satisfying the "EMAIL_ID" requirement.
 function resolveHeadersForValidation(normalizedHeaders) {
-  if (
-    normalizedHeaders.includes("EMAIL ID") &&
-    !normalizedHeaders.includes("EMAIL_ID")
-  ) {
-    return [...normalizedHeaders, "EMAIL_ID"];
+  const resolved = [...normalizedHeaders];
+  if (resolved.includes("EMAIL ID") && !resolved.includes("EMAIL_ID")) {
+    resolved.push("EMAIL_ID");
   }
-  return normalizedHeaders;
+
+  const examAliases = ["EXAM CODE", "EXAM-CODE", "EXAMCODE", "EXAM CODES"];
+  if (
+    examAliases.some((header) => resolved.includes(header)) &&
+    !resolved.includes("EXAM_CODE")
+  ) {
+    resolved.push("EXAM_CODE");
+  }
+
+  return resolved;
 }
 
 function buildNested(obj, keyMap) {
@@ -552,7 +571,9 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
             disabled={loading || allowedSemesters.length === 0}
           >
             {allowedSemesters.length === 0 ? (
-              <option value="">No semester options for this project code</option>
+              <option value="">
+                No semester options for this project code
+              </option>
             ) : (
               allowedSemesters.map((semester) => (
                 <option key={semester} value={String(semester)}>

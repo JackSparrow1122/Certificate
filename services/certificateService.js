@@ -427,16 +427,15 @@ export const enrollStudentsIntoCertificate = async ({
         type: "update",
         ref: studentRef,
         data: {
-          [`certificateEnrollments.${certificateId}`]: buildStudentEnrollmentMirror(
-            {
+          [`certificateEnrollments.${certificateId}`]:
+            buildStudentEnrollmentMirror({
               certificateId,
               certificateName,
               examCode,
               status: "enrolled",
               projectCode: normalizedProjectCode,
               email: studentEmail,
-            },
-          ),
+            }),
         },
       });
       enrolledCount += 1;
@@ -885,7 +884,9 @@ export const getStudentEnrollmentsByProject = async (projectCode) => {
           status: d.status || "enrolled",
           assignedSemesterNumber: parseSemesterNumber(d.assignedSemesterNumber),
           assignedSemesterParity:
-            String(d.assignedSemesterParity || "").trim().toLowerCase() ||
+            String(d.assignedSemesterParity || "")
+              .trim()
+              .toLowerCase() ||
             getSemesterParity(parseSemesterNumber(d.assignedSemesterNumber)),
           isDeleted: false,
         });
@@ -908,7 +909,9 @@ export const getStudentEnrollmentsByProject = async (projectCode) => {
 
 export const getEnrollmentsByStudentEmail = async (email) => {
   if (isLocalDbMode()) return [];
-  const normalized = String(email || "").trim().toLowerCase();
+  const normalized = String(email || "")
+    .trim()
+    .toLowerCase();
   if (!normalized) return [];
   try {
     const queries = [
@@ -1033,7 +1036,9 @@ export const getCertificateEnrollmentStatsByProject = async (projectCode) => {
 
       current.enrolledCount += 1;
       const status = String(d.status || "").toLowerCase();
-      const isPass = ["passed", "completed", "certified", "pass"].includes(status);
+      const isPass = ["passed", "completed", "certified", "pass"].includes(
+        status,
+      );
       const isFail = ["failed", "fail"].includes(status);
       if (isPass) current.passedCount += 1;
       if (isFail) current.failedCount += 1;

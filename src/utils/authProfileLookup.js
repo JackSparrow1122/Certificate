@@ -1,4 +1,12 @@
-import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../firebase/config";
 
 const isActiveProfile = (data) => (data?.isActive ?? true) !== false;
@@ -53,11 +61,18 @@ export const getAuthUserProfile = async ({ uid, email }) => {
   const rawEmail = String(email || "").trim();
   if (rawEmail) {
     const studentByRawEmailSnap = await getDocs(
-      query(collection(db, "student_users"), where("email", "==", rawEmail), limit(1)),
+      query(
+        collection(db, "student_users"),
+        where("email", "==", rawEmail),
+        limit(1),
+      ),
     );
     const studentByRawEmail = getFirstDocData(studentByRawEmailSnap);
     if (studentByRawEmail) {
-      return { role: studentByRawEmail.role || "student", ...studentByRawEmail };
+      return {
+        role: studentByRawEmail.role || "student",
+        ...studentByRawEmail,
+      };
     }
 
     const normalizedEmail = rawEmail.toLowerCase();
@@ -69,7 +84,9 @@ export const getAuthUserProfile = async ({ uid, email }) => {
           limit(1),
         ),
       );
-      const studentByNormalizedEmail = getFirstDocData(studentByNormalizedEmailSnap);
+      const studentByNormalizedEmail = getFirstDocData(
+        studentByNormalizedEmailSnap,
+      );
       if (studentByNormalizedEmail) {
         return {
           role: studentByNormalizedEmail.role || "student",

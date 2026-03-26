@@ -160,7 +160,8 @@ export default function StudentDashboard() {
         return;
       }
 
-      const projectCode = currentStudent.projectCode || currentStudent.projectId || "";
+      const projectCode =
+        currentStudent.projectCode || currentStudent.projectId || "";
       const projectYearTag = getCurrentYearFromProjectCode(projectCode);
 
       // Primary source: enrollment mirror saved directly on student doc.
@@ -198,7 +199,8 @@ export default function StudentDashboard() {
 
           let linkedCertificates = [];
           try {
-            linkedCertificates = await getCertificatesByIds(uniqueCertificateIds);
+            linkedCertificates =
+              await getCertificatesByIds(uniqueCertificateIds);
           } catch (certificateError) {
             console.warn(
               "Unable to fetch certificate metadata for mirrored enrollments:",
@@ -253,13 +255,9 @@ export default function StudentDashboard() {
             return {
               id: `${certificateId || `enroll-${idx}`}_${entry.projectCode || projectCode || ""}`,
               name:
-                entry.certificateName ||
-                certificateDoc.name ||
-                "Certificate",
+                entry.certificateName || certificateDoc.name || "Certificate",
               platform:
-                entry.platform ||
-                certificateDoc.platform ||
-                "Certification",
+                entry.platform || certificateDoc.platform || "Certification",
               organizationName,
               organizationLogoUrl,
               level: entry.level || certificateDoc.level || "",
@@ -274,13 +272,25 @@ export default function StudentDashboard() {
           return;
         }
       } catch (mirrorError) {
-        console.warn("Mirror enrollment lookup failed, trying fallbacks", mirrorError);
+        console.warn(
+          "Mirror enrollment lookup failed, trying fallbacks",
+          mirrorError,
+        );
       }
 
       // Try collectionGroup enrollment lookup by student email/id first (captures multiple projects/years)
       try {
-        const email = String(currentStudent.email || currentStudent.OFFICIAL_DETAILS?.EMAIL_ID || "").trim();
-        const studentId = String(currentStudent.id || currentStudent.docId || currentStudent.rollNo || "").trim();
+        const email = String(
+          currentStudent.email ||
+            currentStudent.OFFICIAL_DETAILS?.EMAIL_ID ||
+            "",
+        ).trim();
+        const studentId = String(
+          currentStudent.id ||
+            currentStudent.docId ||
+            currentStudent.rollNo ||
+            "",
+        ).trim();
 
         const [byEmail, byId] = await Promise.all([
           email ? getEnrollmentsByStudentEmail(email) : [],
@@ -299,7 +309,8 @@ export default function StudentDashboard() {
 
           let linkedCertificates = [];
           try {
-            linkedCertificates = await getCertificatesByIds(uniqueCertificateIds);
+            linkedCertificates =
+              await getCertificatesByIds(uniqueCertificateIds);
           } catch (certificateError) {
             console.warn(
               "Unable to fetch certificate metadata for email/id enrollments:",
@@ -354,13 +365,9 @@ export default function StudentDashboard() {
             return {
               id: certificateId || `enroll-${idx}`,
               name:
-                entry.certificateName ||
-                certificateDoc.name ||
-                "Certificate",
+                entry.certificateName || certificateDoc.name || "Certificate",
               platform:
-                entry.platform ||
-                certificateDoc.platform ||
-                "Certification",
+                entry.platform || certificateDoc.platform || "Certification",
               organizationName,
               organizationLogoUrl,
               level: entry.level || certificateDoc.level || "",
@@ -375,12 +382,16 @@ export default function StudentDashboard() {
           return;
         }
       } catch (err) {
-        console.warn("Email/id enrollment lookup failed, fallback to project lookup", err);
+        console.warn(
+          "Email/id enrollment lookup failed, fallback to project lookup",
+          err,
+        );
       }
 
       // Fallback: per-project enrollments for this student's project
       try {
-        const enrollmentsMap = await getStudentEnrollmentsByProject(projectCode);
+        const enrollmentsMap =
+          await getStudentEnrollmentsByProject(projectCode);
         const enrollmentEntries = enrollmentsMap.get(
           String(currentStudent.id || currentStudent.docId || "").trim(),
         );
@@ -682,7 +693,9 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-7">
       <section className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="text-lg font-medium text-[#0B2A4A]">Welcome, {fullName}. </span>
+        <span className="text-lg font-medium text-[#0B2A4A]">
+          Welcome, {fullName}.{" "}
+        </span>
         <select
           className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-3 py-1.5 text-sm text-white"
           value={selectedYear}
@@ -811,7 +824,9 @@ export default function StudentDashboard() {
                 </div>
                 <div className="rounded-xl bg-white px-3 py-2 text-right">
                   <p className="text-xs text-[#012920]">Current Year</p>
-                  <p className="text-lg text-[#012920] font-semibold">{currentYear}</p>
+                  <p className="text-lg text-[#012920] font-semibold">
+                    {currentYear}
+                  </p>
                 </div>
               </div>
             </div>
