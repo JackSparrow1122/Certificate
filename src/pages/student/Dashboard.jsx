@@ -14,6 +14,7 @@ import {
   getStudentEnrollmentsByProject,
   getEnrollmentsByStudentEmail,
   getEnrollmentsByStudentId,
+  getStudentCertificateHistory,
 } from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
 
@@ -161,6 +162,120 @@ export default function StudentDashboard() {
 
       const projectCode = currentStudent.projectCode || currentStudent.projectId || "";
       const projectYearTag = getCurrentYearFromProjectCode(projectCode);
+
+      // Primary source: enrollment mirror saved directly on student doc.
+      try {
+        const mirroredEntries = Object.values(
+          currentStudent?.certificateEnrollments || {},
+        ).filter((entry) => entry && entry.isDeleted !== true);
+
+        let mergedEntries = [...mirroredEntries];
+        const uid = String(currentStudent?.uid || "").trim();
+        if (uid) {
+          const uidHistory = await getStudentCertificateHistory(uid);
+          mergedEntries = [...mergedEntries, ...(uidHistory || [])];
+        }
+
+        const seen = new Set();
+        const dedupedEntries = mergedEntries.filter((entry) => {
+          const certId = String(entry?.certificateId || "").trim();
+          const pCode = String(entry?.projectCode || projectCode || "").trim();
+          if (!certId) return false;
+          const key = `${pCode}__${certId}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        if (dedupedEntries.length > 0) {
+          const uniqueCertificateIds = [
+            ...new Set(
+              dedupedEntries
+                .map((entry) => String(entry.certificateId || "").trim())
+                .filter(Boolean),
+            ),
+          ];
+
+          let linkedCertificates = [];
+          try {
+            linkedCertificates = await getCertificatesByIds(uniqueCertificateIds);
+          } catch (certificateError) {
+            console.warn(
+              "Unable to fetch certificate metadata for mirrored enrollments:",
+              certificateError,
+            );
+          }
+
+          let organizations = [];
+          try {
+            organizations = await getAllOrganizations();
+          } catch (organizationError) {
+            console.warn(
+              "Unable to fetch organizations for mirrored enrollments:",
+              organizationError,
+            );
+          }
+
+          const certificateById = new Map(
+            (linkedCertificates || [])
+              .filter((certificate) => certificate?.id)
+              .map((certificate) => [certificate.id, certificate]),
+          );
+
+          const organizationByName = new Map(
+            (organizations || [])
+              .filter((organization) => organization?.name)
+              .map((organization) => [
+                String(organization.name || "")
+                  .trim()
+                  .toLowerCase(),
+                organization,
+              ]),
+          );
+
+          const mapped = dedupedEntries.map((entry, idx) => {
+            const certificateId = String(entry.certificateId || "").trim();
+            const certificateDoc = certificateById.get(certificateId) || {};
+            const organizationName =
+              entry.organizationName ||
+              entry.domain ||
+              certificateDoc.domain ||
+              "";
+            const organizationLogoUrl =
+              getLogoFromCertificate(entry) ||
+              organizationByName.get(
+                String(organizationName || "")
+                  .trim()
+                  .toLowerCase(),
+              )?.logoUrl ||
+              "";
+
+            return {
+              id: `${certificateId || `enroll-${idx}`}_${entry.projectCode || projectCode || ""}`,
+              name:
+                entry.certificateName ||
+                certificateDoc.name ||
+                "Certificate",
+              platform:
+                entry.platform ||
+                certificateDoc.platform ||
+                "Certification",
+              organizationName,
+              organizationLogoUrl,
+              level: entry.level || certificateDoc.level || "",
+              status: normalizeCertificateStatus(entry.status || "enrolled"),
+              yearTag:
+                entry.yearTag ||
+                getCurrentYearFromProjectCode(entry.projectCode) ||
+                projectYearTag,
+            };
+          });
+          setEnrolledCertificates(mapped);
+          return;
+        }
+      } catch (mirrorError) {
+        console.warn("Mirror enrollment lookup failed, trying fallbacks", mirrorError);
+      }
 
       // Try collectionGroup enrollment lookup by student email/id first (captures multiple projects/years)
       try {

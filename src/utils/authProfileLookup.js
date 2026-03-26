@@ -34,7 +34,11 @@ export const getAuthUserProfile = async ({ uid, email }) => {
   if (studentByIdSnap.exists()) {
     const studentByIdData = studentByIdSnap.data() || {};
     if (isActiveProfile(studentByIdData)) {
-      return { id: studentByIdSnap.id, ...studentByIdData };
+      return {
+        id: studentByIdSnap.id,
+        role: studentByIdData.role || "student",
+        ...studentByIdData,
+      };
     }
   }
 
@@ -43,7 +47,7 @@ export const getAuthUserProfile = async ({ uid, email }) => {
   );
   const studentByUid = getFirstDocData(studentByUidSnap);
   if (studentByUid) {
-    return studentByUid;
+    return { role: studentByUid.role || "student", ...studentByUid };
   }
 
   const rawEmail = String(email || "").trim();
@@ -53,7 +57,7 @@ export const getAuthUserProfile = async ({ uid, email }) => {
     );
     const studentByRawEmail = getFirstDocData(studentByRawEmailSnap);
     if (studentByRawEmail) {
-      return studentByRawEmail;
+      return { role: studentByRawEmail.role || "student", ...studentByRawEmail };
     }
 
     const normalizedEmail = rawEmail.toLowerCase();
@@ -67,7 +71,10 @@ export const getAuthUserProfile = async ({ uid, email }) => {
       );
       const studentByNormalizedEmail = getFirstDocData(studentByNormalizedEmailSnap);
       if (studentByNormalizedEmail) {
-        return studentByNormalizedEmail;
+        return {
+          role: studentByNormalizedEmail.role || "student",
+          ...studentByNormalizedEmail,
+        };
       }
     }
   }

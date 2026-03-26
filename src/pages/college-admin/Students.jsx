@@ -5,6 +5,7 @@ import { getStudentEnrollmentsByProject } from "../../../services/certificateSer
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import { parseProjectCode } from "../../utils/projectCodeParser";
 import StudentModal from "../../components/StudentModal";
+import { deriveCurrentSemesterFromEnrollments } from "../../utils/semesterUtils";
 
 const normalizeStatus = (status) => {
   const value = String(status || "")
@@ -125,6 +126,10 @@ const toDisplayStudent = (student) => {
 
   const projectCode = student?.projectCode || student?.projectId || "-";
   const currentYearFromCode = getCurrentYearFromProjectCode(projectCode);
+  const currentSemesterFromEnrollments = deriveCurrentSemesterFromEnrollments(
+    enrollments,
+    "",
+  );
 
   return {
     ...student,
@@ -137,6 +142,7 @@ const toDisplayStudent = (student) => {
     email:
       student?.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
     currentYear:
+      currentSemesterFromEnrollments ||
       currentYearFromCode ||
       student?.currentYear ||
       student?.currentSemester ||
