@@ -622,6 +622,20 @@ export const getStudentsByCertificateInProject = async (
           ...studentSnap.data(),
           enrollmentStatus: enrollmentData.status || "enrolled",
           enrolledAt: enrollmentData.enrolledAt,
+          assignedSemesterNumber:
+            parseSemesterNumber(enrollmentData.assignedSemesterNumber) || null,
+          assignedSemesterParity: enrollmentData.assignedSemesterParity || "",
+          _enrollments: [
+            {
+              certificateId: String(certificateId || "").trim(),
+              status: enrollmentData.status || "enrolled",
+              assignedSemesterNumber:
+                parseSemesterNumber(enrollmentData.assignedSemesterNumber) ||
+                null,
+              assignedSemesterParity:
+                enrollmentData.assignedSemesterParity || "",
+            },
+          ],
         };
       }),
     );
