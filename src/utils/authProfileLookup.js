@@ -1,4 +1,12 @@
-import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../firebase/config";
 
 const isActiveProfile = (data) => (data?.isActive ?? true) !== false;
@@ -34,7 +42,11 @@ export const getAuthUserProfile = async ({ uid, email }) => {
   if (studentByIdSnap.exists()) {
     const studentByIdData = studentByIdSnap.data() || {};
     if (isActiveProfile(studentByIdData)) {
-      return { id: studentByIdSnap.id, ...studentByIdData };
+      return {
+        id: studentByIdSnap.id,
+        role: studentByIdData.role || "student",
+        ...studentByIdData,
+      };
     }
   }
 
@@ -43,17 +55,24 @@ export const getAuthUserProfile = async ({ uid, email }) => {
   );
   const studentByUid = getFirstDocData(studentByUidSnap);
   if (studentByUid) {
-    return studentByUid;
+    return { role: studentByUid.role || "student", ...studentByUid };
   }
 
   const rawEmail = String(email || "").trim();
   if (rawEmail) {
     const studentByRawEmailSnap = await getDocs(
-      query(collection(db, "student_users"), where("email", "==", rawEmail), limit(1)),
+      query(
+        collection(db, "student_users"),
+        where("email", "==", rawEmail),
+        limit(1),
+      ),
     );
     const studentByRawEmail = getFirstDocData(studentByRawEmailSnap);
     if (studentByRawEmail) {
-      return studentByRawEmail;
+      return {
+        role: studentByRawEmail.role || "student",
+        ...studentByRawEmail,
+      };
     }
 
     const normalizedEmail = rawEmail.toLowerCase();
@@ -65,9 +84,14 @@ export const getAuthUserProfile = async ({ uid, email }) => {
           limit(1),
         ),
       );
-      const studentByNormalizedEmail = getFirstDocData(studentByNormalizedEmailSnap);
+      const studentByNormalizedEmail = getFirstDocData(
+        studentByNormalizedEmailSnap,
+      );
       if (studentByNormalizedEmail) {
-        return studentByNormalizedEmail;
+        return {
+          role: studentByNormalizedEmail.role || "student",
+          ...studentByNormalizedEmail,
+        };
       }
     }
   }

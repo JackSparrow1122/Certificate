@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "../../firebase/config";
 import {
   writeBatch,
@@ -9,11 +9,16 @@ import {
 import { codeToDocId } from "../../utils/projectCodeUtils";
 import { getStudentsByProject } from "../../../services/studentService";
 import { createStudentAuthUser } from "../../../services/userService";
+import {
+  enrollStudentsIntoCertificate,
+  getAllCertificates,
+} from "../../../services/certificateService";
 
 const REQUIRED_HEADERS = [
   "SN",
   "FULL NAME OF STUDENT",
   "EMAIL_ID",
+  "EXAM_CODE",
   "MOBILE NO.",
   "BIRTH DATE",
   "GENDER",
@@ -43,6 +48,42 @@ function normalizeHeader(h) {
     .toUpperCase();
 }
 
+function normalizeExamCode(value) {
+  return String(value || "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function parseExamCodes(value) {
+  return String(value || "")
+    .split(",")
+    .map((code) => normalizeExamCode(code))
+    .filter(Boolean);
+}
+
+function getYearNumberFromProjectCode(projectCodeValue) {
+  const parts = String(projectCodeValue || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 3) return null;
+  const match = parts[2].match(/\d+/);
+  if (!match) return null;
+  const yearNumber = Number(match[0]);
+  return Number.isFinite(yearNumber) && yearNumber > 0 ? yearNumber : null;
+}
+
+function getAllowedSemestersForYear(projectCodeValue) {
+  const yearNumber = getYearNumberFromProjectCode(projectCodeValue);
+  if (!yearNumber) return [];
+  const first = yearNumber * 2 - 1;
+  const second = yearNumber * 2;
+  return [first, second];
+}
+
 // After building a headerMap, alias legacy column names to their current equivalents.
 // Handles Excel/CSV files still exported with "EMAIL ID" (space) as the column header.
 function applyHeaderAliases(headerMap) {
@@ -52,18 +93,37 @@ function applyHeaderAliases(headerMap) {
   if (headerMap["EMAIL ID."] && !headerMap["EMAIL_ID."]) {
     headerMap["EMAIL_ID."] = headerMap["EMAIL ID."];
   }
+  if (headerMap["EXAM CODE"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAM CODE"];
+  }
+  if (headerMap["EXAM-CODE"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAM-CODE"];
+  }
+  if (headerMap["EXAMCODE"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAMCODE"];
+  }
+  if (headerMap["EXAM CODES"] && !headerMap["EXAM_CODE"]) {
+    headerMap["EXAM_CODE"] = headerMap["EXAM CODES"];
+  }
   return headerMap;
 }
 
 // Allow "EMAIL ID" (legacy) to count as satisfying the "EMAIL_ID" requirement.
 function resolveHeadersForValidation(normalizedHeaders) {
-  if (
-    normalizedHeaders.includes("EMAIL ID") &&
-    !normalizedHeaders.includes("EMAIL_ID")
-  ) {
-    return [...normalizedHeaders, "EMAIL_ID"];
+  const resolved = [...normalizedHeaders];
+  if (resolved.includes("EMAIL ID") && !resolved.includes("EMAIL_ID")) {
+    resolved.push("EMAIL_ID");
   }
-  return normalizedHeaders;
+
+  const examAliases = ["EXAM CODE", "EXAM-CODE", "EXAMCODE", "EXAM CODES"];
+  if (
+    examAliases.some((header) => resolved.includes(header)) &&
+    !resolved.includes("EXAM_CODE")
+  ) {
+    resolved.push("EXAM_CODE");
+  }
+
+  return resolved;
 }
 
 function buildNested(obj, keyMap) {
@@ -84,13 +144,43 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
   const [duplicateSummary, setDuplicateSummary] = useState(null);
   const [skippedEntries, setSkippedEntries] = useState([]);
   const [success, setSuccess] = useState(null);
+  const [selectedSemester, setSelectedSemester] = useState("");
+  const [skippedExamCodeRows, setSkippedExamCodeRows] = useState([]);
+
+  const allowedSemesters = useMemo(
+    () => getAllowedSemestersForYear(projectCode),
+    [projectCode],
+  );
+
+  useEffect(() => {
+    if (!allowedSemesters.length) {
+      setSelectedSemester("");
+      return;
+    }
+    if (!allowedSemesters.includes(Number(selectedSemester || 0))) {
+      setSelectedSemester(String(allowedSemesters[0]));
+    }
+  }, [allowedSemesters, selectedSemester]);
 
   const handleFile = async (file) => {
     setLoading(true);
     setError(null);
     setMissingColumns([]);
+    setDuplicateSummary(null);
     setSkippedEntries([]);
+    setSkippedExamCodeRows([]);
     setSuccess(null);
+
+    const semesterNumber = Number(selectedSemester || 0);
+    if (
+      !Number.isFinite(semesterNumber) ||
+      semesterNumber <= 0 ||
+      !allowedSemesters.includes(semesterNumber)
+    ) {
+      setError("Select semester before bulk upload.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const fileName = String(file.name || "").toLowerCase();
@@ -123,15 +213,16 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         });
         applyHeaderAliases(headerMap);
 
-        await processRows(
+        await detectAndImport({
           rows,
           headerMap,
           projectCode,
+          semesterNumber,
           onStudentAdded,
           setLoading,
           setError,
           setSuccess,
-        );
+        });
         return;
       }
 
@@ -202,6 +293,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
           rows,
           headerMap,
           projectCode,
+          semesterNumber,
           onStudentAdded,
           setLoading,
           setError,
@@ -251,6 +343,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         rows: dataRows,
         headerMap,
         projectCode,
+        semesterNumber,
         onStudentAdded,
         setLoading,
         setError,
@@ -268,6 +361,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
     rows,
     headerMap,
     projectCode,
+    semesterNumber,
     onStudentAdded,
     setLoading,
     setError,
@@ -277,6 +371,8 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       // Primary keys
       const emailKey = headerMap[normalizeHeader("EMAIL_ID")] || "EMAIL_ID";
       const phoneKey = headerMap[normalizeHeader("MOBILE NO.")] || "MOBILE NO.";
+      const examCodeKey =
+        headerMap[normalizeHeader("EXAM_CODE")] || "EXAM_CODE";
       const nameKey =
         headerMap[normalizeHeader("FULL NAME OF STUDENT")] ||
         "FULL NAME OF STUDENT";
@@ -309,7 +405,9 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       const duplicatesExcel = [];
       const duplicatesDB = [];
       const missingMobileOrEmail = [];
+      const missingExamCodeRows = [];
       const toImportRows = [];
+      const rowsForAssignment = [];
 
       rows.forEach((row, idx) => {
         const rawEmail = row[emailKey];
@@ -322,13 +420,35 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         const phoneVal = rawPhone ? String(rawPhone).trim() : null;
         const nameVal = rawName ? String(rawName).trim() : "-";
         const snVal = rawSn ? String(rawSn).trim() : "-";
+        const examCodes = parseExamCodes(row[examCodeKey]);
 
-        if (!emailVal || !phoneVal) {
+        if (!emailVal) {
           missingMobileOrEmail.push({
             row: idx + 1,
             sn: snVal,
             name: nameVal,
-            missing: `${!emailVal ? "Email" : ""}${!emailVal && !phoneVal ? ", " : ""}${!phoneVal ? "Mobile" : ""}`,
+            missing: "Email",
+          });
+          return;
+        }
+
+        if (examCodes.length === 0) {
+          missingExamCodeRows.push({
+            row: idx + 1,
+            sn: snVal,
+            name: nameVal,
+          });
+          return;
+        }
+
+        rowsForAssignment.push(row);
+
+        if (!phoneVal) {
+          missingMobileOrEmail.push({
+            row: idx + 1,
+            sn: snVal,
+            name: nameVal,
+            missing: "Mobile",
           });
           return;
         }
@@ -369,6 +489,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
       });
 
       setSkippedEntries(missingMobileOrEmail);
+      setSkippedExamCodeRows(missingExamCodeRows);
       if (missingMobileOrEmail.length > 0) {
         const shouldProceed = window.confirm(
           `${missingMobileOrEmail.length} student entr${missingMobileOrEmail.length > 1 ? "ies are" : "y is"} missing Mobile/Email and will be skipped.\nContinue with remaining entries?`,
@@ -400,6 +521,28 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         setError,
         setSuccess,
       );
+
+      const assignmentSummary = await assignCertificatesFromRows({
+        rows: rowsForAssignment,
+        headerMap,
+        projectCode,
+        semesterNumber,
+      });
+
+      if (assignmentSummary.unmatchedExamCodes.length > 0) {
+        setError(
+          `Unmatched EXAM_CODE values: ${assignmentSummary.unmatchedExamCodes.join(", ")}`,
+        );
+      }
+
+      setSuccess((prev) => {
+        const base = String(prev || "✅ Import complete").trim();
+        return `${base}. Certificates assigned: ${assignmentSummary.assignedCount}${
+          assignmentSummary.alreadyEnrolledCount
+            ? `, already enrolled: ${assignmentSummary.alreadyEnrolledCount}`
+            : ""
+        }`;
+      });
     } catch (e) {
       console.error(e);
       const isXlsxImportError = String(e?.message || "").includes(
@@ -416,6 +559,32 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
 
   return (
     <div className="w-full space-y-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#0B2A4A]">
+            Semester (required)
+          </label>
+          <select
+            value={selectedSemester}
+            onChange={(event) => setSelectedSemester(event.target.value)}
+            className="h-10 w-full rounded-lg border border-[#CBD8EA] bg-white px-3 text-sm text-[#0B2A4A] outline-none focus:border-[#0B2A4A]"
+            disabled={loading || allowedSemesters.length === 0}
+          >
+            {allowedSemesters.length === 0 ? (
+              <option value="">
+                No semester options for this project code
+              </option>
+            ) : (
+              allowedSemesters.map((semester) => (
+                <option key={semester} value={String(semester)}>
+                  Semester {semester}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <label className="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-medium text-white transition">
           <span>{loading ? "⏳ Processing..." : "📁 Select Excel File"}</span>
@@ -511,6 +680,21 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
               Showing first 25 skipped entries.
             </p>
           )}
+        </div>
+      )}
+
+      {skippedExamCodeRows.length > 0 && (
+        <div className="rounded-lg bg-amber-50 border border-amber-300 p-4">
+          <p className="font-semibold text-amber-900 mb-2">
+            Skipped Entries (Missing EXAM_CODE): {skippedExamCodeRows.length}
+          </p>
+          <ul className="text-xs font-mono text-amber-800 max-h-36 overflow-auto space-y-1">
+            {skippedExamCodeRows.slice(0, 25).map((entry, idx) => (
+              <li key={`${entry.row}-${idx}`}>
+                row {entry.row} | SN: {entry.sn} | Name: {entry.name}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -847,4 +1031,70 @@ async function processRows(
   } finally {
     setLoading(false);
   }
+}
+
+async function assignCertificatesFromRows({
+  rows,
+  headerMap,
+  projectCode,
+  semesterNumber,
+}) {
+  const emailKey = headerMap[normalizeHeader("EMAIL_ID")] || "EMAIL_ID";
+  const examCodeKey = headerMap[normalizeHeader("EXAM_CODE")] || "EXAM_CODE";
+
+  const certificates = await getAllCertificates({ includeInactive: true });
+  const certificateByExamCode = new Map();
+  (certificates || []).forEach((certificate) => {
+    const normalizedCode = normalizeExamCode(certificate?.examCode || "");
+    if (!normalizedCode) return;
+    certificateByExamCode.set(normalizedCode, certificate);
+  });
+
+  const emailsByCertificate = new Map();
+  const unmatchedExamCodes = new Set();
+
+  (rows || []).forEach((row) => {
+    const email = String(row?.[emailKey] || "")
+      .trim()
+      .toLowerCase();
+    if (!email) return;
+
+    const parsedCodes = parseExamCodes(row?.[examCodeKey]);
+    parsedCodes.forEach((examCode) => {
+      const certificate = certificateByExamCode.get(examCode);
+      if (!certificate?.id) {
+        unmatchedExamCodes.add(examCode);
+        return;
+      }
+      if (!emailsByCertificate.has(certificate.id)) {
+        emailsByCertificate.set(certificate.id, {
+          certificate,
+          emails: new Set(),
+        });
+      }
+      emailsByCertificate.get(certificate.id).emails.add(email);
+    });
+  });
+
+  let assignedCount = 0;
+  let alreadyEnrolledCount = 0;
+
+  for (const entry of emailsByCertificate.values()) {
+    const result = await enrollStudentsIntoCertificate({
+      certificateId: entry.certificate.id,
+      certificateName: entry.certificate.name || "",
+      examCode: entry.certificate.examCode || "",
+      projectCode,
+      studentEmails: Array.from(entry.emails),
+      assignedSemesterNumber: semesterNumber,
+    });
+    assignedCount += Number(result?.enrolledCount || 0);
+    alreadyEnrolledCount += Number(result?.alreadyEnrolledCount || 0);
+  }
+
+  return {
+    assignedCount,
+    alreadyEnrolledCount,
+    unmatchedExamCodes: Array.from(unmatchedExamCodes),
+  };
 }
