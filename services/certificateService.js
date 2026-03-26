@@ -942,6 +942,12 @@ export const getEnrollmentsByStudentEmail = async (email) => {
           certificateName: d.certificateName || "",
           examCode: d.examCode || "",
           status: d.status || "enrolled",
+          assignedSemesterNumber: parseSemesterNumber(d.assignedSemesterNumber),
+          assignedSemesterParity:
+            String(d.assignedSemesterParity || "")
+              .trim()
+              .toLowerCase() ||
+            getSemesterParity(parseSemesterNumber(d.assignedSemesterNumber)),
           projectCode: d.projectCode || "",
           platform: d.platform || d.domain || "",
           organizationName: d.organizationName || d.domain || "",
@@ -979,6 +985,12 @@ export const getEnrollmentsByStudentId = async (studentId) => {
         certificateName: d.certificateName || "",
         examCode: d.examCode || "",
         status: d.status || "enrolled",
+        assignedSemesterNumber: parseSemesterNumber(d.assignedSemesterNumber),
+        assignedSemesterParity:
+          String(d.assignedSemesterParity || "")
+            .trim()
+            .toLowerCase() ||
+          getSemesterParity(parseSemesterNumber(d.assignedSemesterNumber)),
         projectCode: d.projectCode || "",
         platform: d.platform || d.domain || "",
         organizationName: d.organizationName || d.domain || "",

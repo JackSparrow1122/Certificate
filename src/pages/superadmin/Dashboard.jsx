@@ -13,14 +13,17 @@ import {
 } from "recharts";
 import { BookOpenCheck, Building2, GraduationCap, Users } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getAllStudents,
   getAllStudentsCount,
   getStudentsByProject,
 } from "../../../services/studentService";
 import { getAllAdmins } from "../../../services/userService";
-import { getAllCertificates } from "../../../services/certificateService";
+import {
+  getAllCertificates,
+  getCertificateEnrollmentStatsByProject,
+} from "../../../services/certificateService";
 import { getAllColleges } from "../../../services/collegeService";
 import { getAllProjectCodes } from "../../../services/projectCodeService";
 import { resetLocalDb } from "../../../services/localDbService";
@@ -52,33 +55,57 @@ const parseProgress = (progressValue) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const resolveStudentGender = (student) => {
-  const officialDetails = student?.OFFICIAL_DETAILS || {};
-  const raw = String(
-    student?.gender ||
-      officialDetails?.GENDER ||
-      officialDetails?.Gender ||
-      officialDetails?.gender ||
-      "",
-  )
-    .trim()
-    .toLowerCase();
-
-  if (!raw) return "Unknown";
-  if (["male", "m", "boy"].includes(raw)) return "Male";
-  if (["female", "f", "girl"].includes(raw)) return "Female";
-  if (["other", "others", "non-binary", "non binary"].includes(raw)) {
-    return "Other";
-  }
-
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-};
-
 const isCollegeAdminRole = (roleValue) => {
   const normalized = String(roleValue || "")
     .trim()
     .toLowerCase();
   return normalized === "collegeadmin" || normalized === "college admin";
+};
+
+const normalizeCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const getProjectCodeValue = (projectCodeRow) =>
+  String(projectCodeRow?.code || projectCodeRow?.projectCode || "").trim();
+
+const deriveCollegeCodeFromProject = (projectCode) =>
+  normalizeCode(String(projectCode || "").split("/")[0]);
+
+const resolveCollegeCodeForProjectRow = (projectCodeRow) => {
+  const explicitCode = normalizeCode(
+    projectCodeRow?.collegeCode ||
+      projectCodeRow?.college_code ||
+      projectCodeRow?.collegeId ||
+      "",
+  );
+  if (explicitCode) return explicitCode;
+
+  const code = getProjectCodeValue(projectCodeRow);
+  if (!code) return "";
+  return deriveCollegeCodeFromProject(code);
+};
+
+const resolveCollegeCodeForStudent = (student) => {
+  const explicitCode = normalizeCode(
+    student?.collegeCode || student?.college_code || "",
+  );
+  if (explicitCode) return explicitCode;
+  return deriveCollegeCodeFromProject(student?.projectId || student?.projectCode);
+};
+
+const getStudentResultStatus = (statusValue) => {
+  const normalized = String(statusValue || "")
+    .trim()
+    .toLowerCase();
+  if (["passed", "completed", "certified", "pass"].includes(normalized)) {
+    return "passed";
+  }
+  if (["failed", "fail"].includes(normalized)) {
+    return "failed";
+  }
+  return "ongoing";
 };
 
 export default function Dashboard() {
@@ -89,7 +116,9 @@ export default function Dashboard() {
   const [certifications, setCertifications] = useState([]);
   const [colleges, setColleges] = useState([]);
   const [projectCodes, setProjectCodes] = useState([]);
+  const [certStatsByProject, setCertStatsByProject] = useState({});
   const [totalStudentsCount, setTotalStudentsCount] = useState(0);
+  const [selectedCollegeCode, setSelectedCollegeCode] = useState("ALL");
   const [dbMode, setDbModeState] = useState(getDbMode());
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
   const [cacheInfo, setCacheInfo] = useState({ cachedAt: 0, isStale: false });
@@ -177,26 +206,47 @@ export default function Dashboard() {
     if ("colleges" in freshData) setColleges(freshData.colleges);
     if ("projectCodes" in freshData) setProjectCodes(freshData.projectCodes);
 
-    // Write to cache when we got all core keys (not partial/degraded)
-    const allCoreFetched =
-      "students" in freshData &&
-      "totalStudentsCount" in freshData &&
-      "colleges" in freshData &&
-      "projectCodes" in freshData;
-    if (allCoreFetched) {
-      setCached(SA_CACHE_KEY, {
-        students: freshData.students,
-        totalStudentsCount: freshData.totalStudentsCount,
-        admins: freshData.admins ?? [],
-        certifications: freshData.certifications ?? [],
-        colleges: freshData.colleges,
-        projectCodes: freshData.projectCodes,
-      });
-      setCacheInfo({ cachedAt: Date.now(), isStale: false });
-    }
-
     const nextProjectCodes = freshData.projectCodes ?? [];
     const nextStudents = freshData.students ?? [];
+    let nextCertStatsByProject = certStatsByProject;
+
+    const projectRowsForStats = (nextProjectCodes.length > 0
+      ? nextProjectCodes
+      : projectCodes
+    ).filter((projectCodeRow) => getProjectCodeValue(projectCodeRow));
+
+    if (projectRowsForStats.length > 0) {
+      const statsSettled = await Promise.allSettled(
+        projectRowsForStats.map(async (projectCodeRow) => {
+          const projectCode = getProjectCodeValue(projectCodeRow);
+          const statsMap = await getCertificateEnrollmentStatsByProject(
+            projectCode,
+          );
+          return [projectCode, Array.from(statsMap.values())];
+        }),
+      );
+
+      const builtStats = {};
+      statsSettled.forEach((result, index) => {
+        const projectCode = getProjectCodeValue(projectRowsForStats[index]);
+        if (!projectCode) return;
+
+        if (result.status === "fulfilled") {
+          builtStats[projectCode] = result.value?.[1] || [];
+          return;
+        }
+
+        console.warn(
+          `Certificate stats fetch failed for ${projectCode}:`,
+          result.reason,
+        );
+      });
+
+      if (Object.keys(builtStats).length > 0) {
+        nextCertStatsByProject = builtStats;
+        setCertStatsByProject(builtStats);
+      }
+    }
 
     if (nextStudents.length === 0 && nextProjectCodes.length > 0) {
       try {
@@ -226,6 +276,25 @@ export default function Dashboard() {
         );
       }
     }
+
+    // Write to cache when we got all core keys (not partial/degraded)
+    const allCoreFetched =
+      "students" in freshData &&
+      "totalStudentsCount" in freshData &&
+      "colleges" in freshData &&
+      "projectCodes" in freshData;
+    if (allCoreFetched) {
+      setCached(SA_CACHE_KEY, {
+        students: freshData.students,
+        totalStudentsCount: freshData.totalStudentsCount,
+        admins: freshData.admins ?? [],
+        certifications: freshData.certifications ?? [],
+        colleges: freshData.colleges,
+        projectCodes: freshData.projectCodes,
+        certStatsByProject: nextCertStatsByProject,
+      });
+      setCacheInfo({ cachedAt: Date.now(), isStale: false });
+    }
   };
 
   useEffect(() => {
@@ -241,6 +310,7 @@ export default function Dashboard() {
       setCertifications(d.certifications || []);
       setColleges(d.colleges || []);
       setProjectCodes(d.projectCodes || []);
+      setCertStatsByProject(d.certStatsByProject || {});
       setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
     }
 
@@ -298,8 +368,68 @@ export default function Dashboard() {
     isCollegeAdminRole(admin?.role),
   ).length;
 
+  const collegeOptions = useMemo(() => {
+    const optionsByCode = new Map();
+
+    colleges.forEach((college) => {
+      const code = normalizeCode(college?.college_code || college?.collegeCode);
+      if (!code) return;
+      const name = String(college?.college_name || code).trim();
+      optionsByCode.set(code, { code, label: `${code} - ${name}` });
+    });
+
+    projectCodes.forEach((projectCodeRow) => {
+      const code = resolveCollegeCodeForProjectRow(projectCodeRow);
+      if (!code || optionsByCode.has(code)) return;
+      optionsByCode.set(code, { code, label: code });
+    });
+
+    students.forEach((student) => {
+      const code = resolveCollegeCodeForStudent(student);
+      if (!code || optionsByCode.has(code)) return;
+      optionsByCode.set(code, { code, label: code });
+    });
+
+    return Array.from(optionsByCode.values()).sort((a, b) =>
+      String(a.code || "").localeCompare(String(b.code || "")),
+    );
+  }, [colleges, projectCodes, students]);
+
+  const selectedProjects = useMemo(() => {
+    if (selectedCollegeCode === "ALL") return projectCodes;
+    return projectCodes.filter(
+      (projectCodeRow) =>
+        resolveCollegeCodeForProjectRow(projectCodeRow) === selectedCollegeCode,
+    );
+  }, [projectCodes, selectedCollegeCode]);
+
+  const selectedProjectCodeSet = useMemo(
+    () =>
+      new Set(
+        selectedProjects
+          .map((projectCodeRow) => getProjectCodeValue(projectCodeRow))
+          .filter(Boolean),
+      ),
+    [selectedProjects],
+  );
+
+  const chartStudents = useMemo(() => {
+    if (selectedCollegeCode === "ALL") return students;
+    if (selectedProjectCodeSet.size > 0) {
+      return students.filter((student) => {
+        const projectCode = String(
+          student.projectId || student.projectCode || "",
+        ).trim();
+        return selectedProjectCodeSet.has(projectCode);
+      });
+    }
+    return students.filter(
+      (student) => resolveCollegeCodeForStudent(student) === selectedCollegeCode,
+    );
+  }, [students, selectedCollegeCode, selectedProjectCodeSet]);
+
   const studentsByProject = Object.entries(
-    students.reduce((accumulator, student) => {
+    chartStudents.reduce((accumulator, student) => {
       const key = student.projectId || student.projectCode || "Unknown";
       accumulator[key] = (accumulator[key] || 0) + 1;
       return accumulator;
@@ -309,26 +439,31 @@ export default function Dashboard() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
-  const studentsByGender = Object.entries(
-    students.reduce((accumulator, student) => {
-      const key = resolveStudentGender(student);
-      accumulator[key] = (accumulator[key] || 0) + 1;
-      return accumulator;
-    }, {}),
-  ).map(([name, value]) => ({ name, value }));
+  const progressBuckets = useMemo(() => {
+    const buckets = [
+      { bucket: "0-40%", count: 0 },
+      { bucket: "41-70%", count: 0 },
+      { bucket: "71-100%", count: 0 },
+    ];
 
-  const progressBuckets = [
-    { bucket: "0-40%", count: 0 },
-    { bucket: "41-70%", count: 0 },
-    { bucket: "71-100%", count: 0 },
-  ];
+    chartStudents.forEach((student) => {
+      const progress = parseProgress(student.progress);
+      if (progress <= 40) buckets[0].count += 1;
+      else if (progress <= 70) buckets[1].count += 1;
+      else buckets[2].count += 1;
+    });
 
-  students.forEach((student) => {
-    const progress = parseProgress(student.progress);
-    if (progress <= 40) progressBuckets[0].count += 1;
-    else if (progress <= 70) progressBuckets[1].count += 1;
-    else progressBuckets[2].count += 1;
-  });
+    return buckets;
+  }, [chartStudents]);
+
+  const progressDistributionData = useMemo(
+    () =>
+      progressBuckets.map((entry) => ({
+        name: entry.bucket,
+        value: entry.count,
+      })),
+    [progressBuckets],
+  );
 
   const certificateToOrganization = new Map(
     certifications.map((certificate) => [
@@ -338,7 +473,7 @@ export default function Dashboard() {
   );
 
   const organizationEnrollmentMap = new Map();
-  students.forEach((student) => {
+  chartStudents.forEach((student) => {
     const studentKey = String(student?.docId || student?.id || "").trim();
     if (!studentKey) return;
 
@@ -389,6 +524,81 @@ export default function Dashboard() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
+  const certificationResultsData = useMemo(() => {
+    const statsByCertificate = new Map();
+
+    selectedProjects.forEach((projectCodeRow) => {
+      const projectCode = getProjectCodeValue(projectCodeRow);
+      if (!projectCode) return;
+
+      const statsRows = certStatsByProject[projectCode] || [];
+      statsRows.forEach((stat) => {
+        const certificateId = String(stat?.id || "").trim();
+        const label = String(stat?.name || stat?.examCode || certificateId).trim();
+        if (!label) return;
+
+        const current = statsByCertificate.get(label) || {
+          label,
+          Passed: 0,
+          Failed: 0,
+          Ongoing: 0,
+          total: 0,
+        };
+
+        const passed = Number(stat?.passedCount || 0);
+        const failed = Number(stat?.failedCount || 0);
+        const enrolled = Number(stat?.enrolledCount || 0);
+        const ongoing = Math.max(enrolled - passed - failed, 0);
+
+        current.Passed += passed;
+        current.Failed += failed;
+        current.Ongoing += ongoing;
+        current.total += passed + failed + ongoing;
+
+        statsByCertificate.set(label, current);
+      });
+    });
+
+    if (statsByCertificate.size === 0) {
+      chartStudents.forEach((student) => {
+        const certificateResults =
+          student?.certificateResults &&
+          typeof student.certificateResults === "object"
+            ? Object.values(student.certificateResults).filter(
+                (entry) => !entry?.isDeleted,
+              )
+            : [];
+
+        if (certificateResults.length > 0) {
+          certificateResults.forEach((result) => {
+            const label = String(
+              result?.certificateName || result?.name || result?.certificateId,
+            ).trim();
+            if (!label) return;
+
+            const status = getStudentResultStatus(result?.status || result?.result);
+            const current = statsByCertificate.get(label) || {
+              label,
+              Passed: 0,
+              Failed: 0,
+              Ongoing: 0,
+              total: 0,
+            };
+            if (status === "passed") current.Passed += 1;
+            else if (status === "failed") current.Failed += 1;
+            else current.Ongoing += 1;
+            current.total += 1;
+            statsByCertificate.set(label, current);
+          });
+        }
+      });
+    }
+
+    return Array.from(statsByCertificate.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+  }, [selectedProjects, certStatsByProject, chartStudents]);
+
   return (
     <SuperAdminLayout>
       <section className="mb-4 flex flex-wrap items-center justify-end gap-2">
@@ -398,6 +608,19 @@ export default function Dashboard() {
             {cacheAgeLabel(cacheInfo.cachedAt)}
           </span>
         )}
+        <label className="text-sm font-semibold text-[#012920]">College</label>
+        <select
+          value={selectedCollegeCode}
+          onChange={(event) => setSelectedCollegeCode(event.target.value)}
+          className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-2 text-sm font-semibold text-[#012920]"
+        >
+          <option value="ALL">All Colleges</option>
+          {collegeOptions.map((option) => (
+            <option key={option.code} value={option.code}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={handleResetLocalDb}
@@ -507,23 +730,70 @@ export default function Dashboard() {
         </ChartCard>
       </section>
 
-      <section className="mt-5 grid grid-cols-1 gap-5">
-        <ChartCard title="Gender Mix">
+      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <ChartCard title="Certification Results">
+          <ResponsiveContainer width="100%" height={280} debounce={75}>
+            <BarChart
+              data={certificationResultsData}
+              margin={{ top: 16, right: 12, left: 0, bottom: 52 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                height={54}
+                angle={-24}
+                textAnchor="end"
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis allowDecimals={false} />
+              <Tooltip cursor={false} />
+              <Legend />
+              <Bar
+                dataKey="Failed"
+                stackId="certResult"
+                fill="#E15B64"
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
+              />
+              <Bar
+                dataKey="Ongoing"
+                stackId="certResult"
+                fill={ACCENT_BLUE}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
+              />
+              <Bar
+                dataKey="Passed"
+                stackId="certResult"
+                fill={MINT}
+                radius={[6, 6, 0, 0]}
+                isAnimationActive={!isLayoutResizing}
+                animationDuration={220}
+                animationEasing="ease-out"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Student Progress Distribution">
           <ResponsiveContainer width="100%" height={240} debounce={75}>
             <PieChart>
               <Pie
-                data={studentsByGender}
+                data={progressDistributionData}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
                 cy="50%"
+                innerRadius={52}
                 outerRadius={82}
-                label={!isLayoutResizing}
                 isAnimationActive={!isLayoutResizing}
                 animationDuration={220}
                 animationEasing="ease-out"
               >
-                {studentsByGender.map((entry, index) => (
+                {progressDistributionData.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
