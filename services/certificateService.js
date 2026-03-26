@@ -197,7 +197,8 @@ const extractEnrollmentEntriesFromDoc = (snapshotDoc) => {
         certificateId,
         certificateName: row?.certificateName || "",
         examCode: row?.examCode || "",
-        platform: row?.platform || row?.domain || data.platform || data.domain || "",
+        platform:
+          row?.platform || row?.domain || data.platform || data.domain || "",
         domain: row?.domain || data.domain || "",
         organizationName:
           row?.organizationName ||
@@ -215,9 +216,7 @@ const extractEnrollmentEntriesFromDoc = (snapshotDoc) => {
         email: row?.email || data.email || "",
         studentId: String(row?.studentId || data.studentId || "").trim(),
         uid: String(row?.uid || data.uid || snapshotDoc.id || "").trim(),
-        projectCode:
-          String(row?.projectCode || "").trim() ||
-          projectCode,
+        projectCode: String(row?.projectCode || "").trim() || projectCode,
         collegeCode: row?.collegeCode || data.collegeCode || "",
         _sourceMode: "uid",
         _sourceDocRef: snapshotDoc.ref,
@@ -438,7 +437,9 @@ export const getCertificateEnrollmentCounts = async (certificateIds) => {
         const studentId = String(entry.studentId || entry.uid || "").trim();
         if (!studentId) return;
         const projectCode = String(entry.projectCode || "").trim();
-        const semesterNumber = String(toSemesterNumber(entry.semesterNumber) || "");
+        const semesterNumber = String(
+          toSemesterNumber(entry.semesterNumber) || "",
+        );
         countsByCert
           .get(certId)
           .add([certId, projectCode, studentId, semesterNumber].join("|"));
@@ -650,8 +651,7 @@ export const enrollStudentsIntoCertificate = async ({
             collegeCode,
             status: "enrolled",
             isDeleted: false,
-            enrolledAt:
-              existingUidCertificate?.enrolledAt || new Date(),
+            enrolledAt: existingUidCertificate?.enrolledAt || new Date(),
             updatedAt: new Date(),
           },
         },
@@ -867,7 +867,9 @@ export const getStudentCertificateHistory = async (uid) => {
     if (docs.length === 0) return [];
 
     return docs
-      .flatMap((enrollmentDoc) => extractEnrollmentEntriesFromDoc(enrollmentDoc))
+      .flatMap((enrollmentDoc) =>
+        extractEnrollmentEntriesFromDoc(enrollmentDoc),
+      )
       .map((entry) => {
         const cleaned = { ...entry };
         delete cleaned._sourceDocRef;
@@ -1086,7 +1088,9 @@ export const getStudentEnrollmentsByProject = async (projectCode) => {
         const key = [
           String(row.certificateId || "").trim(),
           String(toSemesterNumber(row.semesterNumber) || ""),
-          String(row.status || "").trim().toLowerCase(),
+          String(row.status || "")
+            .trim()
+            .toLowerCase(),
         ].join("|");
         if (
           rows.some(
@@ -1094,7 +1098,9 @@ export const getStudentEnrollmentsByProject = async (projectCode) => {
               [
                 String(existing.certificateId || "").trim(),
                 String(toSemesterNumber(existing.semesterNumber) || ""),
-                String(existing.status || "").trim().toLowerCase(),
+                String(existing.status || "")
+                  .trim()
+                  .toLowerCase(),
               ].join("|") === key,
           )
         ) {
@@ -1166,7 +1172,9 @@ export const getEnrollmentsByStudentEmail = async (email) => {
             String(row.projectCode || "").trim(),
             String(row.studentId || "").trim(),
             String(toSemesterNumber(row.semesterNumber) || ""),
-            String(row.status || "").trim().toLowerCase(),
+            String(row.status || "")
+              .trim()
+              .toLowerCase(),
           ].join("|"),
           row,
         ]),
@@ -1218,7 +1226,9 @@ export const getEnrollmentsByStudentId = async (studentId) => {
             String(row.projectCode || "").trim(),
             String(row.studentId || "").trim(),
             String(toSemesterNumber(row.semesterNumber) || ""),
-            String(row.status || "").trim().toLowerCase(),
+            String(row.status || "")
+              .trim()
+              .toLowerCase(),
           ].join("|"),
           row,
         ]),
