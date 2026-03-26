@@ -1,11 +1,29 @@
 import { useMemo, useState } from "react";
 import { addStudent } from "../../../services/studentService";
 import { createStudentAuthUser } from "../../../services/userService";
+import {
+  enrollStudentsIntoCertificate,
+  getAllCertificates,
+} from "../../../services/certificateService";
 import { parseProjectCode } from "../../utils/projectCodeParser";
 import { notifySuperAdminSuccess } from "../../utils/superAdminNotifier";
 
-export default function AddStudentModal({ projectCode, onClose, onStudentAdded }) {
-  const parsedProjectCode = useMemo(() => parseProjectCode(projectCode), [projectCode]);
+const normalizeExamCode = (value) =>
+  String(value || "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+
+export default function AddStudentModal({
+  projectCode,
+  onClose,
+  onStudentAdded,
+}) {
+  const parsedProjectCode = useMemo(
+    () => parseProjectCode(projectCode),
+    [projectCode],
+  );
 
   const [form, setForm] = useState({
     id: "",
@@ -21,6 +39,7 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
     currentYear: parsedProjectCode.semesterNumber,
     email: "",
     phone: "",
+    examCode: "",
     collegeCode: parsedProjectCode.collegeCode,
     course: parsedProjectCode.courseLabel,
     semesterLabel: parsedProjectCode.semesterLabel,
@@ -62,6 +81,10 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
     }
     if (!form.currentYear) {
       setError("Current year is required");
+      return false;
+    }
+    if (!normalizeExamCode(form.examCode)) {
+      setError("Exam code is required");
       return false;
     }
     setError(null);
@@ -120,6 +143,35 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
         email: form.email,
         phone: form.phone,
       });
+
+      const normalizedExamCode = normalizeExamCode(form.examCode);
+      const allCertificates = await getAllCertificates({
+        includeInactive: true,
+      });
+      const matchedCertificate = (allCertificates || []).find(
+        (certificate) =>
+          normalizeExamCode(certificate?.examCode || "") === normalizedExamCode,
+      );
+
+      if (!matchedCertificate?.id) {
+        setError(
+          `Student added, but EXAM_CODE ${normalizedExamCode} was not found in certificates.`,
+        );
+        onStudentAdded();
+        return;
+      }
+
+      await enrollStudentsIntoCertificate({
+        certificateId: matchedCertificate.id,
+        certificateName: matchedCertificate.name || "",
+        examCode: matchedCertificate.examCode || normalizedExamCode,
+        projectCode,
+        studentEmails: [
+          String(form.email || "")
+            .trim()
+            .toLowerCase(),
+        ],
+      });
       notifySuperAdminSuccess("Student added");
 
       let authError = null;
@@ -164,10 +216,7 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/20"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
 
       <div className="relative z-10 mx-4 w-full max-w-5xl rounded-[2rem] border border-black/20 bg-gray-100 p-6 shadow-xl max-h-[92vh] overflow-y-auto">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -198,31 +247,53 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
           {parsedProjectCode.isStructured && (
             <div className="grid gap-3 rounded-2xl bg-gray-200 p-3 sm:grid-cols-2 lg:grid-cols-5">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-600">College</p>
-                <p className="text-sm font-medium text-gray-900">{form.collegeCode || "-"}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-600">
+                  College
+                </p>
+                <p className="text-sm font-medium text-gray-900">
+                  {form.collegeCode || "-"}
+                </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-600">Course</p>
-                <p className="text-sm font-medium text-gray-900">{form.course || "-"}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-600">
+                  Course
+                </p>
+                <p className="text-sm font-medium text-gray-900">
+                  {form.course || "-"}
+                </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-600">Year</p>
-                <p className="text-sm font-medium text-gray-900">{form.semesterLabel || "-"}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-600">
+                  Year
+                </p>
+                <p className="text-sm font-medium text-gray-900">
+                  {form.semesterLabel || "-"}
+                </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-600">Training Type</p>
-                <p className="text-sm font-medium text-gray-900">{form.trainingType || "-"}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-600">
+                  Training Type
+                </p>
+                <p className="text-sm font-medium text-gray-900">
+                  {form.trainingType || "-"}
+                </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-600">Session</p>
-                <p className="text-sm font-medium text-gray-900">{form.currentSession || "-"}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-600">
+                  Session
+                </p>
+                <p className="text-sm font-medium text-gray-900">
+                  {form.currentSession || "-"}
+                </p>
               </div>
             </div>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Roll No</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Roll No
+              </label>
               <input
                 type="text"
                 name="id"
@@ -232,7 +303,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Student Name</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Student Name
+              </label>
               <input
                 type="text"
                 name="name"
@@ -242,7 +315,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Gender</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Gender
+              </label>
               <select
                 name="gender"
                 value={form.gender}
@@ -256,7 +331,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Date of Birth</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Date of Birth
+              </label>
               <input
                 type="date"
                 name="dob"
@@ -266,7 +343,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Course</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Course
+              </label>
               <input
                 type="text"
                 name="courseYear"
@@ -276,7 +355,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Current Year</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Current Year
+              </label>
               <input
                 type="number"
                 name="currentYear"
@@ -287,7 +368,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Email
+              </label>
               <input
                 type="email"
                 name="email"
@@ -297,7 +380,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Phone
+              </label>
               <input
                 type="tel"
                 name="phone"
@@ -307,7 +392,23 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">10th Percentage</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Exam Code <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                name="examCode"
+                value={form.examCode}
+                onChange={handleChange}
+                placeholder="e.g. HR001"
+                className="w-full border-none bg-gray-300 px-3 py-2 text-sm outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                10th Percentage
+              </label>
               <input
                 type="number"
                 name="tenthPercentage"
@@ -320,7 +421,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">12th Percentage</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                12th Percentage
+              </label>
               <input
                 type="number"
                 name="twelfthPercentage"
@@ -333,7 +436,9 @@ export default function AddStudentModal({ projectCode, onClose, onStudentAdded }
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Admission Year</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Admission Year
+              </label>
               <input
                 type="number"
                 name="admissionYear"
