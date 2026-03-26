@@ -56,8 +56,7 @@ const semesterTypeFromNumber = (semesterNumber) => {
 const getEnrollmentCollectionName = (semesterNumber) => {
   const parsed = toSemesterNumber(semesterNumber);
   if (parsed) return `sem_${parsed}`;
-  const type = semesterTypeFromNumber(semesterNumber);
-  return type === "even" ? SEMESTER_EVEN_COLLECTION : SEMESTER_ODD_COLLECTION;
+  return "sem_1";
 };
 
 const getAllEnrollmentCollectionNames = () =>
@@ -103,10 +102,21 @@ const isValidEnrollmentDoc = (snapshotDoc) => {
   if (!snapshotDoc) return false;
   if (String(snapshotDoc.id || "") === SEMESTER_METADATA_DOC_ID) return false;
   const data = snapshotDoc.data() || {};
-  return Boolean(String(data.certificateId || "").trim());
+  if (String(data.certificateId || "").trim()) return true;
+  if (Array.isArray(data.certificates) && data.certificates.length > 0) {
+    return true;
+  }
+  if (
+    data.certificates &&
+    typeof data.certificates === "object" &&
+    Object.keys(data.certificates).length > 0
+  ) {
+    return true;
+  }
+  return false;
 };
 
-const loadProjectEnrollmentDocs = async ({ projectDocId, certificateId }) => {
+const loadProjectEnrollmentDocs = async ({ projectDocId }) => {
   const targetCollections = getAllEnrollmentCollectionNames();
   const snapshots = await Promise.all(
     targetCollections.map((collectionName) => {
@@ -116,11 +126,6 @@ const loadProjectEnrollmentDocs = async ({ projectDocId, certificateId }) => {
         projectDocId,
         collectionName,
       );
-      if (certificateId) {
-        return getDocs(
-          query(baseRef, where("certificateId", "==", certificateId)),
-        );
-      }
       return getDocs(baseRef);
     }),
   );
@@ -132,6 +137,96 @@ const loadProjectEnrollmentDocs = async ({ projectDocId, certificateId }) => {
   );
 };
 
+const extractEnrollmentEntriesFromDoc = (snapshotDoc) => {
+  if (!isValidEnrollmentDoc(snapshotDoc)) return [];
+
+  const data = snapshotDoc.data() || {};
+  const pathParts = String(snapshotDoc.ref?.path || "")
+    .split("/")
+    .filter(Boolean);
+  const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
+  const collectionName = pathParts.length >= 3 ? pathParts[2] : "";
+  const projectCode =
+    String(data.projectCode || "").trim() ||
+    (projectDocId ? docIdToCode(projectDocId) : "");
+
+  if (String(data.certificateId || "").trim()) {
+    return [
+      {
+        certificateId: String(data.certificateId || "").trim(),
+        certificateName: data.certificateName || "",
+        examCode: data.examCode || "",
+        platform: data.platform || data.domain || "",
+        domain: data.domain || "",
+        organizationName: data.organizationName || data.domain || "",
+        organizationLogoUrl: data.organizationLogoUrl || "",
+        level: data.level || "",
+        semesterNumber: data.semesterNumber ?? null,
+        semesterType: data.semesterType || "",
+        status: data.status || "enrolled",
+        isDeleted: data.isDeleted === true,
+        email: data.email || "",
+        studentId: String(data.studentId || "").trim(),
+        uid: String(data.uid || "").trim(),
+        projectCode,
+        collegeCode: data.collegeCode || "",
+        _sourceMode: "legacy",
+        _sourceDocRef: snapshotDoc.ref,
+        _sourceCollectionName: collectionName,
+      },
+    ];
+  }
+
+  const certificateContainer = data.certificates;
+  const certificateEntries = Array.isArray(certificateContainer)
+    ? certificateContainer
+    : certificateContainer && typeof certificateContainer === "object"
+      ? Object.entries(certificateContainer).map(([certificateIdKey, row]) => ({
+          certificateId: certificateIdKey,
+          ...(row || {}),
+        }))
+      : [];
+
+  return certificateEntries
+    .map((row) => {
+      const certificateId = String(
+        row?.certificateId || row?.id || row?.certId || "",
+      ).trim();
+      if (!certificateId) return null;
+      return {
+        certificateId,
+        certificateName: row?.certificateName || "",
+        examCode: row?.examCode || "",
+        platform: row?.platform || row?.domain || data.platform || data.domain || "",
+        domain: row?.domain || data.domain || "",
+        organizationName:
+          row?.organizationName ||
+          row?.domain ||
+          data.organizationName ||
+          data.domain ||
+          "",
+        organizationLogoUrl:
+          row?.organizationLogoUrl || data.organizationLogoUrl || "",
+        level: row?.level || data.level || "",
+        semesterNumber: row?.semesterNumber ?? data.semesterNumber ?? null,
+        semesterType: row?.semesterType || data.semesterType || "",
+        status: row?.status || row?.resultStatus || "enrolled",
+        isDeleted: row?.isDeleted === true || data.isDeleted === true,
+        email: row?.email || data.email || "",
+        studentId: String(row?.studentId || data.studentId || "").trim(),
+        uid: String(row?.uid || data.uid || snapshotDoc.id || "").trim(),
+        projectCode:
+          String(row?.projectCode || "").trim() ||
+          projectCode,
+        collegeCode: row?.collegeCode || data.collegeCode || "",
+        _sourceMode: "uid",
+        _sourceDocRef: snapshotDoc.ref,
+        _sourceCollectionName: collectionName,
+      };
+    })
+    .filter(Boolean);
+};
+
 const loadEnrollmentDocsByFieldAcrossProjects = async ({ field, value }) => {
   const targetCollections = getAllEnrollmentCollectionNames();
   const snapshots = await Promise.all(
@@ -139,6 +234,21 @@ const loadEnrollmentDocsByFieldAcrossProjects = async ({ field, value }) => {
       getDocs(
         query(collectionGroup(db, collectionName), where(field, "==", value)),
       ),
+    ),
+  );
+
+  return dedupeEnrollmentDocsByPath(
+    snapshots.flatMap((snapshot) =>
+      snapshot.docs.filter((snapshotDoc) => isValidEnrollmentDoc(snapshotDoc)),
+    ),
+  );
+};
+
+const loadAllEnrollmentDocsAcrossProjects = async () => {
+  const targetCollections = getAllEnrollmentCollectionNames();
+  const snapshots = await Promise.all(
+    targetCollections.map((collectionName) =>
+      getDocs(collectionGroup(db, collectionName)),
     ),
   );
 
@@ -315,28 +425,32 @@ export const getCertificateEnrollmentCounts = async (certificateIds) => {
   if (ids.length === 0) return {};
 
   try {
-    const countEntries = await Promise.all(ids.map(async (certificateId) => {
-      const docs = await loadEnrollmentDocsByFieldAcrossProjects({
-        field: "certificateId",
-        value: certificateId,
-      });
-      const uniqueEnrollmentKeys = new Set();
-      docs.forEach((snapshotDoc) => {
-        const d = snapshotDoc.data() || {};
-        if (d.isDeleted === true) return;
-        const certId = String(d.certificateId || "").trim();
-        const studentId = String(d.studentId || "").trim();
-        const projectCode = String(d.projectCode || "").trim();
-        const semesterNumber = String(toSemesterNumber(d.semesterNumber) || "");
-        if (!certId || !studentId) return;
-        uniqueEnrollmentKeys.add(
-          [certId, projectCode, studentId, semesterNumber].join("|"),
-        );
-      });
-      return [certificateId, uniqueEnrollmentKeys.size];
-    }));
+    const docs = await loadAllEnrollmentDocsAcrossProjects();
+    const targetSet = new Set(ids);
+    const countsByCert = new Map(ids.map((id) => [id, new Set()]));
 
-    return Object.fromEntries(countEntries);
+    docs.forEach((snapshotDoc) => {
+      const entries = extractEnrollmentEntriesFromDoc(snapshotDoc);
+      entries.forEach((entry) => {
+        if (entry.isDeleted) return;
+        const certId = String(entry.certificateId || "").trim();
+        if (!targetSet.has(certId)) return;
+        const studentId = String(entry.studentId || entry.uid || "").trim();
+        if (!studentId) return;
+        const projectCode = String(entry.projectCode || "").trim();
+        const semesterNumber = String(toSemesterNumber(entry.semesterNumber) || "");
+        countsByCert
+          .get(certId)
+          .add([certId, projectCode, studentId, semesterNumber].join("|"));
+      });
+    });
+
+    return Object.fromEntries(
+      ids.map((certificateId) => [
+        certificateId,
+        countsByCert.get(certificateId)?.size || 0,
+      ]),
+    );
   } catch (error) {
     console.error("Error getting enrollment counts:", error);
     return Object.fromEntries(ids.map((id) => [id, 0]));
@@ -362,22 +476,41 @@ export const softDeleteCertificate = async ({ certificateId }) => {
     const ops = [];
     let affectedStudents = 0;
 
-    // Find all sem_odd/sem_even enrollment docs for this certificate
-    const enrollmentsSnapshotDocs =
-      await loadEnrollmentDocsByFieldAcrossProjects({
-        field: "certificateId",
-        value: certificateId,
-      });
+    const allEnrollmentDocs = await loadAllEnrollmentDocsAcrossProjects();
+    const touched = new Set();
+    allEnrollmentDocs.forEach((enrollmentDoc) => {
+      const entries = extractEnrollmentEntriesFromDoc(enrollmentDoc).filter(
+        (entry) =>
+          String(entry.certificateId || "").trim() ===
+            String(certificateId || "").trim() && !entry.isDeleted,
+      );
+      entries.forEach((entry) => {
+        const uniq = `${entry._sourceDocRef.path}|${entry.certificateId}`;
+        if (touched.has(uniq)) return;
+        touched.add(uniq);
+        affectedStudents += 1;
+        if (entry._sourceMode === "legacy") {
+          ops.push({
+            type: "update",
+            ref: entry._sourceDocRef,
+            data: {
+              isDeleted: true,
+              updatedAt: new Date(),
+            },
+          });
+          return;
+        }
 
-    enrollmentsSnapshotDocs.forEach((enrollmentDoc) => {
-      affectedStudents += 1;
-      ops.push({
-        type: "update",
-        ref: enrollmentDoc.ref,
-        data: {
-          isDeleted: true,
-          updatedAt: new Date(),
-        },
+        ops.push({
+          type: "set",
+          ref: entry._sourceDocRef,
+          data: {
+            updatedAt: new Date(),
+            [`certificates.${entry.certificateId}.isDeleted`]: true,
+            [`certificates.${entry.certificateId}.updatedAt`]: new Date(),
+          },
+          options: { merge: true },
+        });
       });
     });
 
@@ -468,18 +601,25 @@ export const enrollStudentsIntoCertificate = async ({
       const targetCollection = getEnrollmentCollectionName(
         studentSemesterNumber,
       );
+      const uidValue = String(studentData.uid || "").trim();
 
-      const enrollmentRef = doc(
+      if (!uidValue) continue;
+
+      const uidEnrollmentRef = doc(
         db,
         STUDENTS_COLLECTION,
         projectDocId,
         targetCollection,
-        `${studentDoc.id}_${certificateId}`,
+        uidValue,
       );
-      const existingEnrollment = await getDoc(enrollmentRef);
+      const existingUidEnrollment = await getDoc(uidEnrollmentRef);
+      const existingUidCertificate =
+        existingUidEnrollment.data()?.certificates?.[certificateId];
       if (
-        existingEnrollment.exists() &&
-        existingEnrollment.data()?.status !== "unenrolled"
+        existingUidCertificate &&
+        existingUidCertificate.isDeleted !== true &&
+        String(existingUidCertificate.status || "").toLowerCase() !==
+          "unenrolled"
       ) {
         alreadyEnrolledCount += 1;
         continue;
@@ -487,22 +627,33 @@ export const enrollStudentsIntoCertificate = async ({
 
       ops.push({
         type: "set",
-        ref: enrollmentRef,
+        ref: uidEnrollmentRef,
         data: {
-          certificateId,
-          certificateName: certificateName || "",
-          examCode: examCode || "",
-          semesterNumber: studentSemesterNumber,
-          semesterType: studentSemesterType,
-          email: studentEmail,
+          uid: uidValue,
           studentId: studentDoc.id,
+          email: studentEmail,
           projectCode: normalizedProjectCode,
           collegeCode,
-          uid: studentData.uid || "",
-          status: "enrolled",
-          isDeleted: false,
-          enrolledAt: new Date(),
+          semesterNumber: studentSemesterNumber,
+          semesterType: studentSemesterType,
           updatedAt: new Date(),
+          [`certificates.${certificateId}`]: {
+            certificateId,
+            certificateName: certificateName || "",
+            examCode: examCode || "",
+            semesterNumber: studentSemesterNumber,
+            semesterType: studentSemesterType,
+            email: studentEmail,
+            studentId: studentDoc.id,
+            uid: uidValue,
+            projectCode: normalizedProjectCode,
+            collegeCode,
+            status: "enrolled",
+            isDeleted: false,
+            enrolledAt:
+              existingUidCertificate?.enrolledAt || new Date(),
+            updatedAt: new Date(),
+          },
         },
         options: { merge: true },
       });
@@ -539,26 +690,16 @@ export const getEnrolledProjectCodesForCertificate = async (certificateId) => {
   if (isLocalDbMode()) return [];
   try {
     const certificateIdFilter = String(certificateId || "").trim();
-    const snapshots = await Promise.all([
-      getDocs(
-        query(
-          collectionGroup(db, SEMESTER_ODD_COLLECTION),
-          where("certificateId", "==", certificateIdFilter),
-        ),
-      ),
-      getDocs(
-        query(
-          collectionGroup(db, SEMESTER_EVEN_COLLECTION),
-          where("certificateId", "==", certificateIdFilter),
-        ),
-      ),
-    ]);
+    const allDocs = await loadAllEnrollmentDocsAcrossProjects();
     const codes = new Set();
-    snapshots.forEach((snapshot) => {
-      snapshot.forEach((d) => {
-        if (!isValidEnrollmentDoc(d)) return;
-        if (d.data().isDeleted === true) return;
-        const pc = String(d.data().projectCode || "").trim();
+    allDocs.forEach((snapshotDoc) => {
+      const entries = extractEnrollmentEntriesFromDoc(snapshotDoc);
+      entries.forEach((entry) => {
+        if (entry.isDeleted) return;
+        if (String(entry.certificateId || "").trim() !== certificateIdFilter) {
+          return;
+        }
+        const pc = String(entry.projectCode || "").trim();
         if (pc) codes.add(pc);
       });
     });
@@ -585,32 +726,34 @@ export const getCertificatesForProjectCode = async (projectCode) => {
     // Aggregate by certificateId
     const certMap = new Map();
     enrollmentDocs.forEach((enrollmentDoc) => {
-      const data = enrollmentDoc.data();
-      if (data.isDeleted) return;
-      const certId = data.certificateId;
-      if (!certId) return;
+      const entries = extractEnrollmentEntriesFromDoc(enrollmentDoc);
+      entries.forEach((entry) => {
+        if (entry.isDeleted) return;
+        const certId = String(entry.certificateId || "").trim();
+        if (!certId) return;
 
-      const semesterType = String(
-        data.semesterType || semesterTypeFromNumber(data.semesterNumber),
-      )
-        .trim()
-        .toLowerCase();
+        const semesterType = String(
+          entry.semesterType || semesterTypeFromNumber(entry.semesterNumber),
+        )
+          .trim()
+          .toLowerCase();
 
-      if (!certMap.has(certId)) {
-        certMap.set(certId, {
-          certificateId: certId,
-          certificateName: data.certificateName || "",
-          examCode: data.examCode || "",
-          enrolledCount: 0,
-          oddEnrolledCount: 0,
-          evenEnrolledCount: 0,
-        });
-      }
+        if (!certMap.has(certId)) {
+          certMap.set(certId, {
+            certificateId: certId,
+            certificateName: entry.certificateName || "",
+            examCode: entry.examCode || "",
+            enrolledCount: 0,
+            oddEnrolledCount: 0,
+            evenEnrolledCount: 0,
+          });
+        }
 
-      const aggregate = certMap.get(certId);
-      aggregate.enrolledCount += 1;
-      if (semesterType === "odd") aggregate.oddEnrolledCount += 1;
-      if (semesterType === "even") aggregate.evenEnrolledCount += 1;
+        const aggregate = certMap.get(certId);
+        aggregate.enrolledCount += 1;
+        if (semesterType === "odd") aggregate.oddEnrolledCount += 1;
+        if (semesterType === "even") aggregate.evenEnrolledCount += 1;
+      });
     });
 
     if (certMap.size === 0) return [];
@@ -654,39 +797,51 @@ export const getStudentsByCertificateInProject = async (
     // Direct collection query — no collectionGroup needed
     const enrollmentsSnapshotDocs = await loadProjectEnrollmentDocs({
       projectDocId,
-      certificateId,
     });
 
     if (enrollmentsSnapshotDocs.length === 0) return [];
 
     // Fetch each student doc by studentId stored in the enrollment
-    const studentFetches = enrollmentsSnapshotDocs
-      .filter((d) => !d.data()?.isDeleted)
-      .map(async (enrollmentDoc) => {
-        const enrollmentData = enrollmentDoc.data();
-        const studentId = enrollmentData.studentId;
-        if (!studentId) return null;
+    const flattenedEntries = enrollmentsSnapshotDocs.flatMap((enrollmentDoc) =>
+      extractEnrollmentEntriesFromDoc(enrollmentDoc),
+    );
+    const matchingEntries = flattenedEntries.filter(
+      (entry) =>
+        !entry.isDeleted &&
+        String(entry.certificateId || "").trim() ===
+          String(certificateId || "").trim(),
+    );
+    const dedupedEntries = Array.from(
+      new Map(
+        matchingEntries
+          .filter((entry) => String(entry.studentId || "").trim())
+          .map((entry) => [String(entry.studentId || "").trim(), entry]),
+      ).values(),
+    );
 
-        const studentRef = doc(
-          db,
-          STUDENTS_COLLECTION,
-          projectDocId,
-          "students_list",
-          studentId,
-        );
-        const studentSnap = await getDoc(studentRef);
-        if (!studentSnap.exists()) return null;
-        return {
-          id: studentSnap.id,
-          docId: studentSnap.id,
-          projectCode: normalizedProjectCode,
-          ...studentSnap.data(),
-          enrollmentStatus: enrollmentData.status || "enrolled",
-          enrollmentSemesterNumber: enrollmentData.semesterNumber ?? null,
-          enrollmentSemesterType: enrollmentData.semesterType || "",
-          enrolledAt: enrollmentData.enrolledAt,
-        };
-      });
+    const studentFetches = dedupedEntries.map(async (enrollmentData) => {
+      const studentId = String(enrollmentData.studentId || "").trim();
+      if (!studentId) return null;
+
+      const studentRef = doc(
+        db,
+        STUDENTS_COLLECTION,
+        projectDocId,
+        "students_list",
+        studentId,
+      );
+      const studentSnap = await getDoc(studentRef);
+      if (!studentSnap.exists()) return null;
+      return {
+        id: studentSnap.id,
+        docId: studentSnap.id,
+        projectCode: normalizedProjectCode,
+        ...studentSnap.data(),
+        enrollmentStatus: enrollmentData.status || "enrolled",
+        enrollmentSemesterNumber: enrollmentData.semesterNumber ?? null,
+        enrollmentSemesterType: enrollmentData.semesterType || "",
+      };
+    });
 
     const results = await Promise.all(studentFetches);
     return results.filter(Boolean);
@@ -711,24 +866,15 @@ export const getStudentCertificateHistory = async (uid) => {
 
     if (docs.length === 0) return [];
 
-    const enrollments = [];
-    docs.forEach((enrollmentDoc) => {
-      const data = enrollmentDoc.data() || {};
-      const pathParts = String(enrollmentDoc.ref?.path || "")
-        .split("/")
-        .filter(Boolean);
-      const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
-
-      enrollments.push({
-        id: enrollmentDoc.id,
-        ...data,
-        projectCode:
-          String(data.projectCode || "").trim() ||
-          (projectDocId ? docIdToCode(projectDocId) : ""),
+    return docs
+      .flatMap((enrollmentDoc) => extractEnrollmentEntriesFromDoc(enrollmentDoc))
+      .map((entry) => {
+        const cleaned = { ...entry };
+        delete cleaned._sourceDocRef;
+        delete cleaned._sourceCollectionName;
+        delete cleaned._sourceMode;
+        return cleaned;
       });
-    });
-
-    return enrollments;
   } catch (error) {
     console.error("Error getting student certificate history:", error);
     throw error;
@@ -750,7 +896,6 @@ export const unenrollStudentsFromCertificate = async ({
 
     const enrollmentsSnapshotDocs = await loadProjectEnrollmentDocs({
       projectDocId,
-      certificateId,
     });
 
     const emailSet = studentEmails
@@ -760,24 +905,48 @@ export const unenrollStudentsFromCertificate = async ({
     const ops = [];
     let unenrolledCount = 0;
 
+    const touched = new Set();
     enrollmentsSnapshotDocs.forEach((enrollmentDoc) => {
-      const data = enrollmentDoc.data();
-      if (data.isDeleted || data.status === "unenrolled") return;
+      const entries = extractEnrollmentEntriesFromDoc(enrollmentDoc).filter(
+        (entry) =>
+          String(entry.certificateId || "").trim() ===
+          String(certificateId || "").trim(),
+      );
+      entries.forEach((entry) => {
+        if (entry.isDeleted || entry.status === "unenrolled") return;
 
-      const enrollmentEmail = String(data.email || "")
-        .trim()
-        .toLowerCase();
-      if (emailSet && !emailSet.has(enrollmentEmail)) return;
+        const enrollmentEmail = String(entry.email || "")
+          .trim()
+          .toLowerCase();
+        if (emailSet && !emailSet.has(enrollmentEmail)) return;
 
-      ops.push({
-        type: "update",
-        ref: enrollmentDoc.ref,
-        data: {
-          status: "unenrolled",
-          updatedAt: new Date(),
-        },
+        const uniq = `${entry._sourceDocRef.path}|${entry.certificateId}`;
+        if (touched.has(uniq)) return;
+        touched.add(uniq);
+
+        if (entry._sourceMode === "legacy") {
+          ops.push({
+            type: "update",
+            ref: entry._sourceDocRef,
+            data: {
+              status: "unenrolled",
+              updatedAt: new Date(),
+            },
+          });
+        } else {
+          ops.push({
+            type: "set",
+            ref: entry._sourceDocRef,
+            data: {
+              updatedAt: new Date(),
+              [`certificates.${entry.certificateId}.status`]: "unenrolled",
+              [`certificates.${entry.certificateId}.updatedAt`]: new Date(),
+            },
+            options: { merge: true },
+          });
+        }
+        unenrolledCount += 1;
       });
-      unenrolledCount += 1;
     });
 
     if (unenrolledCount > 0) {
@@ -817,34 +986,59 @@ export const declareResultsForCertificate = async ({
 
       const enrollmentsSnapshotDocs = await loadProjectEnrollmentDocs({
         projectDocId,
-        certificateId,
       });
-
+      const touched = new Set();
       enrollmentsSnapshotDocs.forEach((enrollmentDoc) => {
-        const enrollmentData = enrollmentDoc.data();
-        if (enrollmentData.isDeleted === true) return;
+        const entries = extractEnrollmentEntriesFromDoc(enrollmentDoc).filter(
+          (entry) =>
+            String(entry.certificateId || "").trim() ===
+            String(certificateId || "").trim(),
+        );
+        entries.forEach((enrollmentData) => {
+          if (enrollmentData.isDeleted === true) return;
 
-        const studentEmail = String(enrollmentData.email || "")
-          .trim()
-          .toLowerCase();
+          const studentEmail = String(enrollmentData.email || "")
+            .trim()
+            .toLowerCase();
 
-        // Determine status: use emailStatusMap if email present, else defaultStatus
-        let status = defaultStatus;
-        if (studentEmail && emailStatusMap.has(studentEmail)) {
-          status = emailStatusMap.get(studentEmail) || defaultStatus;
-        }
+          // Determine status: use emailStatusMap if email present, else defaultStatus
+          let status = defaultStatus;
+          if (studentEmail && emailStatusMap.has(studentEmail)) {
+            status = emailStatusMap.get(studentEmail) || defaultStatus;
+          }
 
-        ops.push({
-          type: "update",
-          ref: enrollmentDoc.ref,
-          data: {
-            status,
-            resultDeclaredAt: new Date(),
-            updatedAt: new Date(),
-          },
+          const uniq = `${enrollmentData._sourceDocRef.path}|${enrollmentData.certificateId}`;
+          if (touched.has(uniq)) return;
+          touched.add(uniq);
+
+          if (enrollmentData._sourceMode === "legacy") {
+            ops.push({
+              type: "update",
+              ref: enrollmentData._sourceDocRef,
+              data: {
+                status,
+                resultDeclaredAt: new Date(),
+                updatedAt: new Date(),
+              },
+            });
+          } else {
+            ops.push({
+              type: "set",
+              ref: enrollmentData._sourceDocRef,
+              data: {
+                updatedAt: new Date(),
+                [`certificates.${enrollmentData.certificateId}.status`]: status,
+                [`certificates.${enrollmentData.certificateId}.resultDeclaredAt`]:
+                  new Date(),
+                [`certificates.${enrollmentData.certificateId}.updatedAt`]:
+                  new Date(),
+              },
+              options: { merge: true },
+            });
+          }
+
+          status === "passed" ? passedCount++ : failedCount++;
         });
-
-        status === "passed" ? passedCount++ : failedCount++;
       });
     }
 
@@ -872,20 +1066,41 @@ export const getStudentEnrollmentsByProject = async (projectCode) => {
     const map = new Map();
 
     docs.forEach((enrollDoc) => {
-      const d = enrollDoc.data();
-      if (d.isDeleted === true) return;
-      const studentId = String(d.studentId || "").trim();
-      if (!studentId) return;
+      const entries = extractEnrollmentEntriesFromDoc(enrollDoc);
+      entries.forEach((entry) => {
+        if (entry.isDeleted === true) return;
+        const studentId = String(entry.studentId || "").trim();
+        if (!studentId) return;
 
-      if (!map.has(studentId)) map.set(studentId, []);
-      map.get(studentId).push({
-        certificateId: d.certificateId || "",
-        certificateName: d.certificateName || "",
-        examCode: d.examCode || "",
-        semesterNumber: d.semesterNumber ?? null,
-        semesterType: d.semesterType || "",
-        status: d.status || "enrolled",
-        isDeleted: false,
+        if (!map.has(studentId)) map.set(studentId, []);
+        const rows = map.get(studentId);
+        const row = {
+          certificateId: entry.certificateId || "",
+          certificateName: entry.certificateName || "",
+          examCode: entry.examCode || "",
+          semesterNumber: entry.semesterNumber ?? null,
+          semesterType: entry.semesterType || "",
+          status: entry.status || "enrolled",
+          isDeleted: false,
+        };
+        const key = [
+          String(row.certificateId || "").trim(),
+          String(toSemesterNumber(row.semesterNumber) || ""),
+          String(row.status || "").trim().toLowerCase(),
+        ].join("|");
+        if (
+          rows.some(
+            (existing) =>
+              [
+                String(existing.certificateId || "").trim(),
+                String(toSemesterNumber(existing.semesterNumber) || ""),
+                String(existing.status || "").trim().toLowerCase(),
+              ].join("|") === key,
+          )
+        ) {
+          return;
+        }
+        rows.push(row);
       });
     });
 
@@ -923,31 +1138,40 @@ export const getEnrollmentsByStudentEmail = async (email) => {
     const docs = dedupeEnrollmentDocsByPath(snapshots.flat());
     const rows = [];
     docs.forEach((docSnap) => {
-      const d = docSnap.data() || {};
-      if (d.isDeleted === true) return;
-      const pathParts = String(docSnap.ref?.path || "")
-        .split("/")
-        .filter(Boolean);
-      const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
-      rows.push({
-        certificateId: d.certificateId || "",
-        certificateName: d.certificateName || "",
-        examCode: d.examCode || "",
-        semesterNumber: d.semesterNumber ?? null,
-        semesterType: d.semesterType || "",
-        status: d.status || "enrolled",
-        projectCode:
-          String(d.projectCode || "").trim() ||
-          (projectDocId ? docIdToCode(projectDocId) : ""),
-        platform: d.platform || d.domain || "",
-        organizationName: d.organizationName || d.domain || "",
-        organizationLogoUrl: d.organizationLogoUrl || "",
-        level: d.level || "",
-        email: d.email || normalized,
-        studentId: d.studentId || "",
+      const entries = extractEnrollmentEntriesFromDoc(docSnap);
+      entries.forEach((entry) => {
+        if (entry.isDeleted === true) return;
+        rows.push({
+          certificateId: entry.certificateId || "",
+          certificateName: entry.certificateName || "",
+          examCode: entry.examCode || "",
+          semesterNumber: entry.semesterNumber ?? null,
+          semesterType: entry.semesterType || "",
+          status: entry.status || "enrolled",
+          projectCode: entry.projectCode || "",
+          platform: entry.platform || entry.domain || "",
+          organizationName: entry.organizationName || entry.domain || "",
+          organizationLogoUrl: entry.organizationLogoUrl || "",
+          level: entry.level || "",
+          email: entry.email || normalized,
+          studentId: entry.studentId || "",
+        });
       });
     });
-    return rows;
+    return Array.from(
+      new Map(
+        rows.map((row) => [
+          [
+            String(row.certificateId || "").trim(),
+            String(row.projectCode || "").trim(),
+            String(row.studentId || "").trim(),
+            String(toSemesterNumber(row.semesterNumber) || ""),
+            String(row.status || "").trim().toLowerCase(),
+          ].join("|"),
+          row,
+        ]),
+      ).values(),
+    );
   } catch (error) {
     console.error("Error getting enrollments by student email:", error);
     return [];
@@ -966,31 +1190,40 @@ export const getEnrollmentsByStudentId = async (studentId) => {
     });
     const rows = [];
     docs.forEach((docSnap) => {
-      const d = docSnap.data() || {};
-      if (d.isDeleted === true) return;
-      const pathParts = String(docSnap.ref?.path || "")
-        .split("/")
-        .filter(Boolean);
-      const projectDocId = pathParts.length >= 2 ? pathParts[1] : "";
-      rows.push({
-        certificateId: d.certificateId || "",
-        certificateName: d.certificateName || "",
-        examCode: d.examCode || "",
-        semesterNumber: d.semesterNumber ?? null,
-        semesterType: d.semesterType || "",
-        status: d.status || "enrolled",
-        projectCode:
-          String(d.projectCode || "").trim() ||
-          (projectDocId ? docIdToCode(projectDocId) : ""),
-        platform: d.platform || d.domain || "",
-        organizationName: d.organizationName || d.domain || "",
-        organizationLogoUrl: d.organizationLogoUrl || "",
-        level: d.level || "",
-        email: d.email || "",
-        studentId: d.studentId || normalized,
+      const entries = extractEnrollmentEntriesFromDoc(docSnap);
+      entries.forEach((entry) => {
+        if (entry.isDeleted === true) return;
+        rows.push({
+          certificateId: entry.certificateId || "",
+          certificateName: entry.certificateName || "",
+          examCode: entry.examCode || "",
+          semesterNumber: entry.semesterNumber ?? null,
+          semesterType: entry.semesterType || "",
+          status: entry.status || "enrolled",
+          projectCode: entry.projectCode || "",
+          platform: entry.platform || entry.domain || "",
+          organizationName: entry.organizationName || entry.domain || "",
+          organizationLogoUrl: entry.organizationLogoUrl || "",
+          level: entry.level || "",
+          email: entry.email || "",
+          studentId: entry.studentId || normalized,
+        });
       });
     });
-    return rows;
+    return Array.from(
+      new Map(
+        rows.map((row) => [
+          [
+            String(row.certificateId || "").trim(),
+            String(row.projectCode || "").trim(),
+            String(row.studentId || "").trim(),
+            String(toSemesterNumber(row.semesterNumber) || ""),
+            String(row.status || "").trim().toLowerCase(),
+          ].join("|"),
+          row,
+        ]),
+      ).values(),
+    );
   } catch (error) {
     console.error("Error getting enrollments by student id:", error);
     return [];
@@ -1015,31 +1248,33 @@ export const getCertificateEnrollmentStatsByProject = async (projectCode) => {
     const statsMap = new Map();
 
     docs.forEach((enrollDoc) => {
-      const d = enrollDoc.data();
-      if (d.isDeleted === true) return;
+      const entries = extractEnrollmentEntriesFromDoc(enrollDoc);
+      entries.forEach((entry) => {
+        if (entry.isDeleted === true) return;
 
-      const certId = String(d.certificateId || "").trim();
-      if (!certId) return;
+        const certId = String(entry.certificateId || "").trim();
+        if (!certId) return;
 
-      const current = statsMap.get(certId) || {
-        id: certId,
-        name: String(d.certificateName || "").trim(),
-        examCode: String(d.examCode || "").trim(),
-        enrolledCount: 0,
-        passedCount: 0,
-        failedCount: 0,
-      };
+        const current = statsMap.get(certId) || {
+          id: certId,
+          name: String(entry.certificateName || "").trim(),
+          examCode: String(entry.examCode || "").trim(),
+          enrolledCount: 0,
+          passedCount: 0,
+          failedCount: 0,
+        };
 
-      current.enrolledCount += 1;
-      const status = String(d.status || "").toLowerCase();
-      const isPass = ["passed", "completed", "certified", "pass"].includes(
-        status,
-      );
-      const isFail = ["failed", "fail"].includes(status);
-      if (isPass) current.passedCount += 1;
-      if (isFail) current.failedCount += 1;
+        current.enrolledCount += 1;
+        const status = String(entry.status || "").toLowerCase();
+        const isPass = ["passed", "completed", "certified", "pass"].includes(
+          status,
+        );
+        const isFail = ["failed", "fail"].includes(status);
+        if (isPass) current.passedCount += 1;
+        if (isFail) current.failedCount += 1;
 
-      statsMap.set(certId, current);
+        statsMap.set(certId, current);
+      });
     });
 
     return statsMap;

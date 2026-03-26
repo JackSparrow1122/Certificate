@@ -97,37 +97,7 @@ export const addStudent = async (studentData) => {
       ),
     );
 
-    await Promise.all([
-      setDoc(
-        doc(db, STUDENTS_COLLECTION, projectDocId, "sem_odd", "metadata"),
-        {
-          projectCode: studentData.projectId,
-          semesterDictionary,
-          availableSemesters: semesterOptions.filter((sem) => sem % 2 === 1),
-          selectedSemester:
-            validSelectedSemester && validSelectedSemester % 2 === 1
-              ? validSelectedSemester
-              : null,
-          updatedAt: new Date(),
-        },
-        { merge: true },
-      ),
-      setDoc(
-        doc(db, STUDENTS_COLLECTION, projectDocId, "sem_even", "metadata"),
-        {
-          projectCode: studentData.projectId,
-          semesterDictionary,
-          availableSemesters: semesterOptions.filter((sem) => sem % 2 === 0),
-          selectedSemester:
-            validSelectedSemester && validSelectedSemester % 2 === 0
-              ? validSelectedSemester
-              : null,
-          updatedAt: new Date(),
-        },
-        { merge: true },
-      ),
-      ...numericSemesterMetadataWrites,
-    ]);
+    await Promise.all([...numericSemesterMetadataWrites]);
 
     const studentRef = doc(
       db,

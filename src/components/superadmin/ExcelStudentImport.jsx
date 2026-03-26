@@ -744,34 +744,6 @@ async function processRows(
             { merge: true },
           );
 
-          batch.set(
-            doc(db, "students", projectDocId, "sem_odd", "metadata"),
-            {
-              projectCode,
-              semesterDictionary,
-              availableSemesters: availableSemesters.filter(
-                (semester) => semester % 2 === 1,
-              ),
-              selectedSemester: semesterType === "odd" ? semesterNumber : null,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-          );
-
-          batch.set(
-            doc(db, "students", projectDocId, "sem_even", "metadata"),
-            {
-              projectCode,
-              semesterDictionary,
-              availableSemesters: availableSemesters.filter(
-                (semester) => semester % 2 === 0,
-              ),
-              selectedSemester: semesterType === "even" ? semesterNumber : null,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-          );
-
           availableSemesters.forEach((semester) => {
             batch.set(
               doc(db, "students", projectDocId, `sem_${semester}`, "metadata"),
