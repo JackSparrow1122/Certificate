@@ -4,7 +4,6 @@ import { getStudentsByProject } from "../../../services/studentService";
 import { getStudentEnrollmentsByProject } from "../../../services/certificateService";
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import { parseProjectCode } from "../../utils/projectCodeParser";
-import { deriveSemesterDisplayFromEnrollments } from "../../utils/semesterUtils";
 import StudentModal from "../../components/StudentModal";
 
 const normalizeStatus = (status) => {
@@ -126,15 +125,8 @@ const toDisplayStudent = (student) => {
 
   const projectCode = student?.projectCode || student?.projectId || "-";
   const currentYearFromCode = getCurrentYearFromProjectCode(projectCode);
-  const derivedSemester = deriveSemesterDisplayFromEnrollments({
-    enrollments,
-    fallback:
-      currentYearFromCode ||
-      student?.currentYear ||
-      student?.currentSemester ||
-      student?.semesterLabel ||
-      "-",
-  });
+  const currentYear =
+    currentYearFromCode || String(student?.currentYear || "").trim() || "-";
 
   return {
     ...student,
@@ -146,7 +138,7 @@ const toDisplayStudent = (student) => {
       "-",
     email:
       student?.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
-    currentYear: derivedSemester,
+    currentYear,
     projectCode,
     enrolledCertificates:
       normalizedCertificates.length > 0

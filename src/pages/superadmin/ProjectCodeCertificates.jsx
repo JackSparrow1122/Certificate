@@ -5,6 +5,7 @@ import { getCertificatesForProjectCode } from "../../../services/certificateServ
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
+import { getSemesterOptionsFromProjectCode } from "../../utils/semesterUtils";
 
 export default function ProjectCodeCertificates() {
   const navigate = useNavigate();
@@ -61,18 +62,28 @@ export default function ProjectCodeCertificates() {
   };
 
   const filteredCertificates = useMemo(() => {
-    if (semesterFilter === "odd") {
-      return certificates.filter(
-        (certificate) => Number(certificate?.oddEnrolledCount || 0) > 0,
+    if (semesterFilter !== "all") {
+      const semesterNumber = Number.parseInt(
+        String(semesterFilter || "").trim(),
+        10,
       );
-    }
-    if (semesterFilter === "even") {
-      return certificates.filter(
-        (certificate) => Number(certificate?.evenEnrolledCount || 0) > 0,
+      if (!Number.isFinite(semesterNumber)) return certificates;
+
+      const isEven = semesterNumber % 2 === 0;
+      return certificates.filter((certificate) =>
+        isEven
+          ? Number(certificate?.evenEnrolledCount || 0) > 0
+          : Number(certificate?.oddEnrolledCount || 0) > 0,
       );
     }
     return certificates;
   }, [certificates, semesterFilter]);
+
+  const semesterFilterOptions = useMemo(() => {
+    const projectCodeValue = String(projectCode?.code || "").trim();
+    const options = getSemesterOptionsFromProjectCode(projectCodeValue);
+    return options.map((semester) => String(semester));
+  }, [projectCode]);
 
   if (loading) {
     return (
@@ -187,28 +198,20 @@ export default function ProjectCodeCertificates() {
                 >
                   All
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSemesterFilter("odd")}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                    semesterFilter === "odd"
-                      ? "bg-[#0B2A4A] text-white"
-                      : "text-[#0B2A4A]"
-                  }`}
-                >
-                  Odd
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSemesterFilter("even")}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                    semesterFilter === "even"
-                      ? "bg-[#0B2A4A] text-white"
-                      : "text-[#0B2A4A]"
-                  }`}
-                >
-                  Even
-                </button>
+                {semesterFilterOptions.map((semester) => (
+                  <button
+                    key={semester}
+                    type="button"
+                    onClick={() => setSemesterFilter(semester)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      semesterFilter === semester
+                        ? "bg-[#0B2A4A] text-white"
+                        : "text-[#0B2A4A]"
+                    }`}
+                  >
+                    Sem {semester}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -240,7 +243,7 @@ export default function ProjectCodeCertificates() {
               <div className="rounded-xl border border-[#D7E2F1] bg-white px-5 py-8 text-center text-sm text-gray-600">
                 {semesterFilter === "all"
                   ? "No certificates enrolled for this project code yet."
-                  : `No certificates found for ${semesterFilter} semester.`}
+                  : `No certificates found for semester ${semesterFilter}.`}
               </div>
             )}
           </section>

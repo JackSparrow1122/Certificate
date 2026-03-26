@@ -8,7 +8,9 @@ import {
 import {
   getCertificatesByIds,
   getStudentCertificateHistory,
+  getStudentEnrollmentsByProject,
 } from "../../../services/certificateService";
+import { deriveCurrentSemesterNumberFromEnrollments } from "../../utils/semesterUtils";
 
 const toCanonicalKey = (label) =>
   String(label || "")
@@ -40,6 +42,29 @@ const getCurrentYearFromProjectCode = (projectCodeValue) => {
   }
 
   return "";
+};
+
+const toSemesterNumber = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/\d+/);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const getCurrentSemesterNumber = ({ certificates, student }) => {
+  const fallbackSemester =
+    toSemesterNumber(student?.currentSemester) ||
+    toSemesterNumber(student?.semesterLabel) ||
+    "-";
+
+  const derived = deriveCurrentSemesterNumberFromEnrollments({
+    enrollments: Array.isArray(certificates) ? certificates : [],
+    fallback: fallbackSemester,
+  });
+
+  return toSemesterNumber(derived) || null;
 };
 
 export default function StudentCertificateProgress() {
@@ -85,6 +110,40 @@ export default function StudentCertificateProgress() {
       // Use UID-based multi-year certificate history if available,
       // otherwise fall back to legacy certificateIds array.
       const uid = studentData.uid || "";
+      const studentIdKey = String(
+        studentData.id || studentData.docId || studentDocId || "",
+      ).trim();
+      const fallbackProjectCode = String(
+        studentData.projectCode ||
+          studentData.projectId ||
+          projectCodeFromState,
+      ).trim();
+
+      const loadFromProjectEnrollments = async () => {
+        if (!fallbackProjectCode || !studentIdKey) {
+          setCertificates([]);
+          return false;
+        }
+
+        const enrollmentsMap =
+          await getStudentEnrollmentsByProject(fallbackProjectCode);
+        const enrollments = enrollmentsMap.get(studentIdKey) || [];
+        setCertificates(
+          enrollments.map((e, index) => ({
+            id: e.certificateId || `enrollment-${index}`,
+            name: e.certificateName || "",
+            examCode: e.examCode || "",
+            platform: e.platform || "",
+            status: e.status || "enrolled",
+            projectCode: fallbackProjectCode,
+            semesterNumber: e.semesterNumber ?? null,
+            semesterType: e.semesterType || "",
+            enrolledAt: e.enrolledAt,
+          })),
+        );
+        return true;
+      };
+
       if (uid) {
         try {
           const enrollments = await getStudentCertificateHistory(uid);
@@ -97,17 +156,45 @@ export default function StudentCertificateProgress() {
               platform: e.platform || "",
               status: e.status || "enrolled",
               projectCode: e.projectCode || "",
+              semesterNumber: e.semesterNumber ?? null,
+              semesterType: e.semesterType || "",
               enrolledAt: e.enrolledAt,
             })),
           );
         } catch (certErr) {
           console.error("Failed to load certificate history:", certErr);
-          setCertificates([]);
-          setCertificateWarning(
-            "Student profile loaded, but certificate history could not be loaded.",
-          );
+          try {
+            const fallbackLoaded = await loadFromProjectEnrollments();
+            if (!fallbackLoaded) {
+              setCertificates([]);
+              setCertificateWarning(
+                "Student profile loaded, but certificate history could not be loaded.",
+              );
+            }
+          } catch (fallbackErr) {
+            console.error(
+              "Fallback project enrollment load failed:",
+              fallbackErr,
+            );
+            setCertificates([]);
+            setCertificateWarning(
+              "Student profile loaded, but certificate history could not be loaded.",
+            );
+          }
         }
       } else {
+        try {
+          const fallbackLoaded = await loadFromProjectEnrollments();
+          if (fallbackLoaded) {
+            return;
+          }
+        } catch (fallbackErr) {
+          console.error(
+            "Fallback project enrollment load failed:",
+            fallbackErr,
+          );
+        }
+
         // Legacy fallback — use certificateIds if present
         const certificateIds = Array.isArray(studentData.certificateIds)
           ? studentData.certificateIds
@@ -213,11 +300,19 @@ export default function StudentCertificateProgress() {
                 const currentYearFromCode = getCurrentYearFromProjectCode(
                   structuredProjectCode,
                 );
+                const currentSemesterFromCertificates =
+                  getCurrentSemesterNumber({
+                    certificates,
+                    student,
+                  });
+                const currentSemesterValue =
+                  currentSemesterFromCertificates ||
+                  toSemesterNumber(student?.currentSemester) ||
+                  toSemesterNumber(student?.semesterLabel) ||
+                  "-";
                 const currentYear =
                   currentYearFromCode ||
-                  student?.currentYear ||
-                  student?.currentSemester ||
-                  student?.semesterLabel ||
+                  String(student?.currentYear || "").trim() ||
                   "-";
 
                 const seenKeys = new Set(
@@ -229,6 +324,7 @@ export default function StudentCertificateProgress() {
                     "EMAIL",
                     "PHONE",
                     "PASSING YEAR",
+                    "CURRENT SEMESTER",
                     "CURRENT YEAR",
                   ].map(toCanonicalKey),
                 );
@@ -265,6 +361,10 @@ export default function StudentCertificateProgress() {
                         <ProfileItem label="Roll No" value={rollNo} />
                         <ProfileItem label="Gender" value={gender} />
                         <ProfileItem label="Date of Birth" value={dob} />
+                        <ProfileItem
+                          label="Current Semester"
+                          value={currentSemesterValue}
+                        />
                         <ProfileItem label="Current Year" value={currentYear} />
                         <ProfileItem label="Passing Year" value={passingYear} />
                       </div>

@@ -22,6 +22,15 @@ const getCurrentYearFromProjectCode = (projectCodeValue) => {
   return "";
 };
 
+const toSemesterNumber = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  const match = text.match(/\d+/);
+  if (!match) return "-";
+  const number = Number.parseInt(match[0], 10);
+  return Number.isFinite(number) && number > 0 ? number : "-";
+};
+
 const toCanonicalKey = (label) => {
   const normalized = String(label || "")
     .trim()
@@ -115,7 +124,11 @@ export default function StudentProfile() {
     structuredProjectCode,
   );
   const currentYear =
-    currentYearFromCode || student?.currentYear || student?.currentSemester || "-";
+    currentYearFromCode || String(student?.currentYear || "").trim() || "-";
+  const currentSemester =
+    toSemesterNumber(student?.currentSemester) !== "-"
+      ? toSemesterNumber(student?.currentSemester)
+      : toSemesterNumber(student?.semesterLabel);
   const seenKeys = new Set(
     [
       "STUDENT NAME",
@@ -270,6 +283,7 @@ export default function StudentProfile() {
           <ProfileItem label="Gender" value={gender} />
           <ProfileItem label="Date of Birth" value={dob} />
           <ProfileItem label="Current Year" value={currentYear} />
+          <ProfileItem label="Current Semester" value={currentSemester} />
           <ProfileItem label="Passing Year" value={passingYear} />
         </div>
       </section>
@@ -382,9 +396,7 @@ export default function StudentProfile() {
 function ProfileItem({ label, value }) {
   return (
     <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm transition">
-      <p className="text-xs uppercase tracking-wide text-[#012920]">
-        {label}
-      </p>
+      <p className="text-xs uppercase tracking-wide text-[#012920]">{label}</p>
       <p className="mt-1 text-base font-semibold text-[#012920]">
         {value || "-"}
       </p>

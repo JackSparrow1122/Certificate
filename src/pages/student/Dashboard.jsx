@@ -1,12 +1,6 @@
-import {
-  Award,
-  BookOpenCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Target,
-} from "lucide-react";
+import { Award, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentForAuthUser } from "../../../services/studentService";
 import {
@@ -16,7 +10,7 @@ import {
   getEnrollmentsByStudentId,
 } from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
-import { deriveSemesterDisplayFromEnrollments } from "../../utils/semesterUtils";
+import { deriveCurrentSemesterNumberFromEnrollments } from "../../utils/semesterUtils";
 
 const getCurrentYearFromProjectCode = (projectCodeValue) => {
   const parts = String(projectCodeValue || "")
@@ -78,6 +72,12 @@ const getLogoFromCertificate = (certificate = {}) => {
   ).trim();
 };
 
+const STATUS_COLORS = {
+  enrolled: "#2563EB",
+  passed: "#16A34A",
+  failed: "#DC2626",
+};
+
 export default function StudentDashboard() {
   const { user, profile } = useAuth();
   const [currentStudent, setCurrentStudent] = useState(null);
@@ -136,14 +136,17 @@ export default function StudentDashboard() {
   const currentYearFromCode = getCurrentYearFromProjectCode(
     structuredProjectCode,
   );
-  const currentYearFallback =
+  const currentYear =
     currentYearFromCode ||
-    currentStudent?.currentYear ||
-    currentStudent?.currentSemester ||
+    String(currentStudent?.currentYear || "").trim() ||
     "-";
-  const currentYear = deriveSemesterDisplayFromEnrollments({
+  const currentSemesterFallback =
+    String(currentStudent?.currentSemester || "").trim() ||
+    String(currentStudent?.semesterLabel || "").trim() ||
+    "-";
+  const currentSemester = deriveCurrentSemesterNumberFromEnrollments({
     enrollments: enrolledCertificates,
-    fallback: currentYearFallback,
+    fallback: currentSemesterFallback,
   });
   const tenthPercentage =
     currentStudent?.tenthPercentage ??
@@ -542,7 +545,7 @@ export default function StudentDashboard() {
 
         const finalList = Array.from(finalById.values()).map((cert, index) => ({
           ...cert,
-          yearTag: cert.yearTag || projectYearTag || currentYear || "",
+          yearTag: cert.yearTag || projectYearTag || currentYearFromCode || "",
           id: cert.id || cert.certificateId || `cert-${index}`,
         }));
 
@@ -609,26 +612,23 @@ export default function StudentDashboard() {
         </select>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 ">
-        <StatCard
-          label="Enrolled"
-          value={statusSummary.enrolled}
-          icon={<Award size={18} />}
-        />
-        <StatCard
-          label="Passed"
-          value={statusSummary.passed}
-          icon={<BookOpenCheck size={18} />}
-        />
-        <StatCard
-          label="Failed"
-          value={statusSummary.failed}
-          icon={<Target size={18} />}
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1.9fr_0.55fr_0.55fr] ">
+        <SummaryCard
+          enrolled={statusSummary.enrolled}
+          passed={statusSummary.passed}
+          failed={statusSummary.failed}
         />
         <StatCard
           label="Current Year"
           value={currentYear}
           icon={<Clock3 size={18} />}
+          compact
+        />
+        <StatCard
+          label="Current Semester"
+          value={currentSemester}
+          icon={<Clock3 size={18} />}
+          compact
         />
       </section>
 
@@ -722,12 +722,6 @@ export default function StudentDashboard() {
                     <p className="text-xs text-[#012920]">Roll No: {rollNo}</p>
                   </div>
                 </div>
-                <div className="rounded-xl bg-white px-3 py-2 text-right">
-                  <p className="text-xs text-[#012920]">Current Year</p>
-                  <p className="text-lg text-[#012920] font-semibold">
-                    {currentYear}
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -764,16 +758,98 @@ export default function StudentDashboard() {
   );
 }
 
-function StatCard({ label, value, icon }) {
+function StatCard({ label, value, icon, compact = false }) {
   return (
-    <div className="rounded-2xl border border-xl bg-white p-4 shadow-sm">
+    <div
+      className={`rounded-2xl border border-xl bg-white shadow-sm ${compact ? "p-2.5" : "p-4"}`}
+    >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-[#012920]">{label}</p>
-        <span className="rounded-lg bg-[#F5F4EB] p-2 text-[#0B2A4A]">
+        <p
+          className={`${compact ? "text-[11px]" : "text-sm"} font-medium text-[#012920]`}
+        >
+          {label}
+        </p>
+        <span
+          className={`rounded-lg bg-[#F5F4EB] text-[#0B2A4A] ${compact ? "p-1" : "p-2"}`}
+        >
           {icon}
         </span>
       </div>
-      <p className="mt-2 text-2xl font-semibold text-[#0B2A4A]">{value}</p>
+      <p
+        className={`font-semibold text-[#0B2A4A] ${compact ? "mt-0.5 text-2xl" : "mt-2 text-2xl"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SummaryCard({ enrolled, passed, failed }) {
+  const chartData = [
+    {
+      name: "Enrolled",
+      value: Number(enrolled || 0),
+      color: STATUS_COLORS.enrolled,
+    },
+    { name: "Passed", value: Number(passed || 0), color: STATUS_COLORS.passed },
+    { name: "Failed", value: Number(failed || 0), color: STATUS_COLORS.failed },
+  ];
+  const hasData = chartData.some((item) => item.value > 0);
+
+  return (
+    <div className="rounded-2xl border border-xl bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-[#012920]">
+          Certificate Summary
+        </p>
+        <span className="rounded-lg bg-[#F5F4EB] p-2 text-[#0B2A4A]">
+          <Award size={18} />
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[270px_1fr]">
+        <div className="h-[240px] w-full">
+          {hasData ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={72}
+                  outerRadius={112}
+                  paddingAngle={2}
+                >
+                  {chartData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [value, "Count"]} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs text-[#012920]/70">
+              No data
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-2 text-sm text-[#0B2A4A]">
+          {chartData.map((item) => (
+            <div
+              key={item.name}
+              className="flex items-center justify-between rounded-lg border border-[#E7EEF9] px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-[#012920]/80">{item.name}</span>
+              </div>
+              <span className="font-semibold text-[#0B2A4A]">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

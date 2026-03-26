@@ -45,41 +45,85 @@ export const buildSemesterDictionary = (projectCode) => {
   };
 };
 
-export const deriveSemesterDisplayFromEnrollments = ({
+const toSemesterNumber = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const match = text.match(/\d+/);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+export const deriveCurrentSemesterFromEnrollments = ({
   enrollments,
   fallback = "-",
 }) => {
   const rows = Array.isArray(enrollments) ? enrollments : [];
+  const evenSemesters = [];
+  const oddSemesters = [];
+  let hasEvenType = false;
+  let hasOddType = false;
 
-  const hasEven = rows.some((item) => {
+  rows.forEach((item) => {
+    const number = toSemesterNumber(item?.semesterNumber);
+    if (Number.isFinite(number)) {
+      if (number % 2 === 0) {
+        evenSemesters.push(number);
+      } else {
+        oddSemesters.push(number);
+      }
+      return;
+    }
+
     const type = String(item?.semesterType || "")
       .trim()
       .toLowerCase();
-    if (type === "even") return true;
-
-    const number = Number.parseInt(
-      String(item?.semesterNumber || "").trim(),
-      10,
-    );
-    return Number.isFinite(number) && number > 0 && number % 2 === 0;
+    if (type === "even") hasEvenType = true;
+    if (type === "odd") hasOddType = true;
   });
 
-  if (hasEven) return "Even";
+  if (evenSemesters.length > 0) {
+    return Math.max(...evenSemesters);
+  }
 
-  const hasOdd = rows.some((item) => {
-    const type = String(item?.semesterType || "")
-      .trim()
-      .toLowerCase();
-    if (type === "odd") return true;
+  if (oddSemesters.length > 0) {
+    return Math.max(...oddSemesters);
+  }
 
-    const number = Number.parseInt(
-      String(item?.semesterNumber || "").trim(),
-      10,
-    );
-    return Number.isFinite(number) && number > 0 && number % 2 === 1;
-  });
-
-  if (hasOdd) return "Odd";
+  const fallbackSemester = toSemesterNumber(fallback);
+  if (Number.isFinite(fallbackSemester)) {
+    if (hasEvenType && fallbackSemester % 2 === 0) return fallbackSemester;
+    if (!hasEvenType && hasOddType && fallbackSemester % 2 === 1) {
+      return fallbackSemester;
+    }
+    return fallbackSemester;
+  }
 
   return fallback;
+};
+
+export const deriveSemesterDisplayFromEnrollments = ({
+  enrollments,
+  fallback = "-",
+}) => {
+  const derived = deriveCurrentSemesterFromEnrollments({
+    enrollments,
+    fallback,
+  });
+  const numeric = toSemesterNumber(derived);
+  if (Number.isFinite(numeric)) {
+    return `Semester ${numeric}`;
+  }
+  return derived;
+};
+
+export const deriveCurrentSemesterNumberFromEnrollments = ({
+  enrollments,
+  fallback = "-",
+}) => {
+  const derived = deriveCurrentSemesterFromEnrollments({
+    enrollments,
+    fallback,
+  });
+  return toSemesterNumber(derived) ?? derived;
 };
