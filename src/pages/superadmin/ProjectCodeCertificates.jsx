@@ -1,9 +1,8 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getProjectCodeById } from "../../../services/projectCodeService";
 import { getCertificatesForProjectCode } from "../../../services/certificateService";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
-import AssignCertificateModal from "../../components/superadmin/AssignCertificateModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { RotateCcw } from "lucide-react";
@@ -15,9 +14,34 @@ export default function ProjectCodeCertificates() {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [selectedSemester, setSelectedSemester] = useState("all");
+
+  const semesterOptions = useMemo(() => {
+    const set = new Set();
+    (certificates || []).forEach((cert) => {
+      const semesters = Array.isArray(cert?.semesterNumbers)
+        ? cert.semesterNumbers
+        : [];
+      semesters.forEach((semesterNo) => {
+        const value = Number(semesterNo || 0);
+        if (Number.isFinite(value) && value > 0) set.add(value);
+      });
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [certificates]);
+
+  const filteredCertificates = useMemo(() => {
+    if (selectedSemester === "all") return certificates;
+    const selected = Number(selectedSemester || 0);
+    if (!Number.isFinite(selected) || selected <= 0) return certificates;
+    return (certificates || []).filter((cert) =>
+      Array.isArray(cert?.semesterNumbers)
+        ? cert.semesterNumbers.includes(selected)
+        : false,
+    );
+  }, [certificates, selectedSemester]);
 
   useEffect(() => {
     fetchData();
@@ -40,6 +64,7 @@ export default function ProjectCodeCertificates() {
           projectData.code,
         );
         setCertificates(enrolledCerts);
+        setSelectedSemester("all");
       } catch (certErr) {
         console.error("Certificate fetch error:", certErr);
         // Gracefully handle — page still loads, user can assign certificates
@@ -132,13 +157,6 @@ export default function ProjectCodeCertificates() {
               >
                 + Add Student
               </button>
-              <button
-                type="button"
-                onClick={() => setShowAssignModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
-              >
-                + Enroll Certificate
-              </button>
             </div>
           </div>
 
@@ -166,6 +184,39 @@ export default function ProjectCodeCertificates() {
 
           {/* Table Header */}
           <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-3">
+              <p className="text-sm font-semibold text-[#0B2A4A]">
+                Available Certificates by Semester
+              </p>
+              <div className="inline-flex rounded-lg border border-[#C9D8E9] bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSemester("all")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                    selectedSemester === "all"
+                      ? "bg-[#0B2A4A] text-white"
+                      : "text-[#0B2A4A]"
+                  }`}
+                >
+                  All
+                </button>
+                {semesterOptions.map((semesterNo) => (
+                  <button
+                    key={semesterNo}
+                    type="button"
+                    onClick={() => setSelectedSemester(String(semesterNo))}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                      selectedSemester === String(semesterNo)
+                        ? "bg-[#0B2A4A] text-white"
+                        : "text-[#0B2A4A]"
+                    }`}
+                  >
+                    Sem {semesterNo}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="mb-2 grid grid-cols-[2fr_1.5fr_1fr_1fr] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
               <p>Certificate Name</p>
               <p>Exam Code</p>
@@ -174,7 +225,7 @@ export default function ProjectCodeCertificates() {
             </div>
 
             <div className="space-y-2.5">
-              {certificates.map((cert) => (
+              {filteredCertificates.map((cert) => (
                 <div
                   key={cert.id}
                   onClick={() => openStudentList(cert.id)}
@@ -184,32 +235,25 @@ export default function ProjectCodeCertificates() {
                   <p>{cert.examCode || "-"}</p>
                   <p>{cert.platform || "-"}</p>
                   <p className="text-right">
-                    {cert.enrolledInProject ?? 0} students
+                    {selectedSemester !== "all"
+                      ? cert?.semesterEnrollmentCounts?.[
+                          Number(selectedSemester)
+                        ] || 0
+                      : (cert.enrolledInProject ?? 0)}{" "}
+                    students
                   </p>
                 </div>
               ))}
             </div>
 
-            {certificates.length === 0 && (
+            {filteredCertificates.length === 0 && (
               <div className="rounded-xl border border-[#D7E2F1] bg-white px-5 py-8 text-center text-sm text-gray-600">
-                No certificates enrolled for this project code. Click "Enroll
-                Certificate" to assign one via Excel.
+                No certificates found for the selected semester.
               </div>
             )}
           </section>
         </div>
       </div>
-
-      {showAssignModal && (
-        <AssignCertificateModal
-          projectCode={projectCode?.code || ""}
-          onClose={() => setShowAssignModal(false)}
-          onAssigned={() => {
-            setShowAssignModal(false);
-            fetchData();
-          }}
-        />
-      )}
 
       {showAddStudentModal && (
         <AddStudentModal

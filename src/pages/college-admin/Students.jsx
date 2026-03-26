@@ -5,7 +5,7 @@ import { getStudentEnrollmentsByProject } from "../../../services/certificateSer
 import { getProjectCodesByCollege } from "../../../services/projectCodeService";
 import { parseProjectCode } from "../../utils/projectCodeParser";
 import StudentModal from "../../components/StudentModal";
-import { deriveCurrentSemesterFromEnrollments } from "../../utils/semesterUtils";
+import { deriveHighestSemesterFromEnrollments } from "../../utils/semesterUtils";
 
 const normalizeStatus = (status) => {
   const value = String(status || "")
@@ -126,7 +126,7 @@ const toDisplayStudent = (student) => {
 
   const projectCode = student?.projectCode || student?.projectId || "-";
   const currentYearFromCode = getCurrentYearFromProjectCode(projectCode);
-  const currentSemesterFromEnrollments = deriveCurrentSemesterFromEnrollments(
+  const currentSemesterFromEnrollments = deriveHighestSemesterFromEnrollments(
     enrollments,
     "",
   );
@@ -142,9 +142,13 @@ const toDisplayStudent = (student) => {
     email:
       student?.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
     currentYear:
-      currentSemesterFromEnrollments ||
-      currentYearFromCode ||
       student?.currentYear ||
+      currentYearFromCode ||
+      student?.currentSemester ||
+      student?.semesterLabel ||
+      "-",
+    currentSemester:
+      currentSemesterFromEnrollments ||
       student?.currentSemester ||
       student?.semesterLabel ||
       "-",
@@ -851,6 +855,9 @@ export default function Students() {
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">
                     Current Year
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">
+                    Current Semester
+                  </th>
                   <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider text-white">
                     <button
                       type="button"
@@ -905,7 +912,7 @@ export default function Students() {
                   <tr className="bg-gray-50">
                     <td
                       className="px-6 py-6 text-center text-sm text-gray-500"
-                      colSpan={5}
+                      colSpan={6}
                     >
                       Loading students...
                     </td>
@@ -918,7 +925,7 @@ export default function Students() {
                     <tr className="bg-gray-50">
                       <td
                         className="px-6 py-6 text-center text-sm text-gray-500"
-                        colSpan={5}
+                        colSpan={6}
                       >
                         No students found for the selected filters.
                       </td>
@@ -956,8 +963,13 @@ export default function Students() {
                         {student.email}
                       </td>
                       <td className="px-6 py-4 wrap-break-word">
-                        <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs">
                           {student.currentYear || "-"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 wrap-break-word">
+                        <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
+                          {student.currentSemester || "-"}
                         </span>
                       </td>
                       <td className="px-6 py-4">

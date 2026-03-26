@@ -42,3 +42,22 @@ export const deriveCurrentSemesterFromEnrollments = (
 
   return `${selected}`;
 };
+
+export const deriveHighestSemesterFromEnrollments = (
+  enrollments = [],
+  fallback = "",
+) => {
+  const semesterNumbers = (Array.isArray(enrollments) ? enrollments : [])
+    .map((entry) =>
+      parseSemesterNumber(
+        entry?.assignedSemesterNumber || entry?.semesterNumber || "",
+      ),
+    )
+    .filter((value) => Number.isFinite(value));
+
+  if (semesterNumbers.length === 0) {
+    return String(fallback || "").trim();
+  }
+
+  return `${Math.max(...semesterNumbers)}`;
+};

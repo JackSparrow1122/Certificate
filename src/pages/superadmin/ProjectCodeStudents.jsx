@@ -13,7 +13,7 @@ import { Pencil, RotateCcw } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
-import { deriveCurrentSemesterFromEnrollments } from "../../utils/semesterUtils";
+import { deriveHighestSemesterFromEnrollments } from "../../utils/semesterUtils";
 
 // Extract current year from the 3rd segment of a project code like "COLLEGE/BATCH/YEAR"
 function getCurrentYearFromProjectCode(projectCode) {
@@ -32,7 +32,7 @@ function extractStudentDisplayData(student, projectCodeStr) {
     ? student._enrollments
     : [];
   const official = student.OFFICIAL_DETAILS || {};
-  const derivedSemester = deriveCurrentSemesterFromEnrollments(
+  const derivedSemester = deriveHighestSemesterFromEnrollments(
     allEnrollments,
     "",
   );
@@ -43,8 +43,15 @@ function extractStudentDisplayData(student, projectCodeStr) {
     email:
       student.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
     currentYear:
-      derivedSemester ||
+      student.currentYear ||
       getCurrentYearFromProjectCode(projectCodeStr || student.projectCode) ||
+      student.currentSemester ||
+      student.semesterLabel ||
+      "-",
+    currentSemester:
+      derivedSemester ||
+      student.currentSemester ||
+      student.semesterLabel ||
       "-",
     enrollmentStatus,
     allEnrollments,
@@ -325,11 +332,12 @@ export default function ProjectCodeStudents() {
           </section>
 
           <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
-            <div className="mb-2 grid grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
+            <div className="mb-2 grid grid-cols-[1.3fr_2fr_2.2fr_1.1fr_1.1fr_2fr_40px] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
               <p>Student ID</p>
               <p>Name</p>
               <p>Email ID</p>
               <p>Current Year</p>
+              <p>Current Semester</p>
               <p>Result Status</p>
               <p />
             </div>
@@ -362,7 +370,7 @@ export default function ProjectCodeStudents() {
                       }
                     }
                   }}
-                  className="grid cursor-pointer grid-cols-[1.5fr_2fr_2.5fr_1.2fr_2fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
+                  className="grid cursor-pointer grid-cols-[1.3fr_2fr_2.2fr_1.1fr_1.1fr_2fr_40px] items-center gap-3 rounded-xl border border-[#D7E2F1] bg-white px-4 py-2.5 text-sm text-[#0B2A4A] transition-colors"
                 >
                   <p className="pointer-events-none justify-self-start text-left font-medium text-[#0B2A4A]">
                     {student.id || "-"}
@@ -370,8 +378,13 @@ export default function ProjectCodeStudents() {
                   <p>{student.name || "-"}</p>
                   <p className="truncate">{student.email || "-"}</p>
                   <p>
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs">
                       {student.currentYear || "-"}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">
+                      {student.currentSemester || "-"}
                     </span>
                   </p>
                   <div>

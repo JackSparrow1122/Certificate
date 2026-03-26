@@ -529,15 +529,24 @@ export const getCertificatesForProjectCode = async (projectCode) => {
         if (data.isDeleted) return;
         const certId = data.certificateId;
         if (!certId) return;
+        const semesterNumber = parseSemesterNumber(data.assignedSemesterNumber);
         if (!certMap.has(certId)) {
           certMap.set(certId, {
             certificateId: certId,
             certificateName: data.certificateName || "",
             examCode: data.examCode || "",
             enrolledCount: 0,
+            semesterNumbers: new Set(),
+            semesterEnrollmentCounts: {},
           });
         }
-        certMap.get(certId).enrolledCount += 1;
+        const entry = certMap.get(certId);
+        entry.enrolledCount += 1;
+        if (semesterNumber) {
+          entry.semesterNumbers.add(semesterNumber);
+          entry.semesterEnrollmentCounts[semesterNumber] =
+            (entry.semesterEnrollmentCounts[semesterNumber] || 0) + 1;
+        }
       });
     });
 
@@ -556,6 +565,10 @@ export const getCertificatesForProjectCode = async (projectCode) => {
         name: fullCert.name || entry.certificateName || "Certificate",
         examCode: fullCert.examCode || entry.examCode || "",
         enrolledInProject: entry.enrolledCount,
+        semesterNumbers: Array.from(entry.semesterNumbers || []).sort(
+          (a, b) => Number(a) - Number(b),
+        ),
+        semesterEnrollmentCounts: entry.semesterEnrollmentCounts || {},
       };
     });
   } catch (error) {
@@ -609,6 +622,20 @@ export const getStudentsByCertificateInProject = async (
           ...studentSnap.data(),
           enrollmentStatus: enrollmentData.status || "enrolled",
           enrolledAt: enrollmentData.enrolledAt,
+          assignedSemesterNumber:
+            parseSemesterNumber(enrollmentData.assignedSemesterNumber) || null,
+          assignedSemesterParity: enrollmentData.assignedSemesterParity || "",
+          _enrollments: [
+            {
+              certificateId: String(certificateId || "").trim(),
+              status: enrollmentData.status || "enrolled",
+              assignedSemesterNumber:
+                parseSemesterNumber(enrollmentData.assignedSemesterNumber) ||
+                null,
+              assignedSemesterParity:
+                enrollmentData.assignedSemesterParity || "",
+            },
+          ],
         };
       }),
     );

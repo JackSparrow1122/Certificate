@@ -153,12 +153,11 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
   );
 
   useEffect(() => {
-    if (!allowedSemesters.length) {
+    if (
+      !allowedSemesters.length ||
+      !allowedSemesters.includes(Number(selectedSemester || 0))
+    ) {
       setSelectedSemester("");
-      return;
-    }
-    if (!allowedSemesters.includes(Number(selectedSemester || 0))) {
-      setSelectedSemester(String(allowedSemesters[0]));
     }
   }, [allowedSemesters, selectedSemester]);
 
@@ -575,11 +574,14 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
                 No semester options for this project code
               </option>
             ) : (
-              allowedSemesters.map((semester) => (
-                <option key={semester} value={String(semester)}>
-                  Semester {semester}
-                </option>
-              ))
+              <>
+                <option value="">Select semester</option>
+                {allowedSemesters.map((semester) => (
+                  <option key={semester} value={String(semester)}>
+                    Semester {semester}
+                  </option>
+                ))}
+              </>
             )}
           </select>
         </div>
