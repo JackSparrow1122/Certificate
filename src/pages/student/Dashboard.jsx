@@ -16,6 +16,7 @@ import {
   getEnrollmentsByStudentId,
 } from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
+import { deriveSemesterDisplayFromEnrollments } from "../../utils/semesterUtils";
 
 const getCurrentYearFromProjectCode = (projectCodeValue) => {
   const parts = String(projectCodeValue || "")
@@ -135,11 +136,15 @@ export default function StudentDashboard() {
   const currentYearFromCode = getCurrentYearFromProjectCode(
     structuredProjectCode,
   );
-  const currentYear =
+  const currentYearFallback =
     currentYearFromCode ||
     currentStudent?.currentYear ||
     currentStudent?.currentSemester ||
     "-";
+  const currentYear = deriveSemesterDisplayFromEnrollments({
+    enrollments: enrolledCertificates,
+    fallback: currentYearFallback,
+  });
   const tenthPercentage =
     currentStudent?.tenthPercentage ??
     tenthDetails["10th OVERALL MARKS %"] ??
@@ -159,13 +164,23 @@ export default function StudentDashboard() {
         return;
       }
 
-      const projectCode = currentStudent.projectCode || currentStudent.projectId || "";
+      const projectCode =
+        currentStudent.projectCode || currentStudent.projectId || "";
       const projectYearTag = getCurrentYearFromProjectCode(projectCode);
 
       // Try collectionGroup enrollment lookup by student email/id first (captures multiple projects/years)
       try {
-        const email = String(currentStudent.email || currentStudent.OFFICIAL_DETAILS?.EMAIL_ID || "").trim();
-        const studentId = String(currentStudent.id || currentStudent.docId || currentStudent.rollNo || "").trim();
+        const email = String(
+          currentStudent.email ||
+            currentStudent.OFFICIAL_DETAILS?.EMAIL_ID ||
+            "",
+        ).trim();
+        const studentId = String(
+          currentStudent.id ||
+            currentStudent.docId ||
+            currentStudent.rollNo ||
+            "",
+        ).trim();
 
         const [byEmail, byId] = await Promise.all([
           email ? getEnrollmentsByStudentEmail(email) : [],
@@ -184,7 +199,8 @@ export default function StudentDashboard() {
 
           let linkedCertificates = [];
           try {
-            linkedCertificates = await getCertificatesByIds(uniqueCertificateIds);
+            linkedCertificates =
+              await getCertificatesByIds(uniqueCertificateIds);
           } catch (certificateError) {
             console.warn(
               "Unable to fetch certificate metadata for email/id enrollments:",
@@ -239,17 +255,15 @@ export default function StudentDashboard() {
             return {
               id: certificateId || `enroll-${idx}`,
               name:
-                entry.certificateName ||
-                certificateDoc.name ||
-                "Certificate",
+                entry.certificateName || certificateDoc.name || "Certificate",
               platform:
-                entry.platform ||
-                certificateDoc.platform ||
-                "Certification",
+                entry.platform || certificateDoc.platform || "Certification",
               organizationName,
               organizationLogoUrl,
               level: entry.level || certificateDoc.level || "",
               status: normalizeCertificateStatus(entry.status || "enrolled"),
+              semesterNumber: entry.semesterNumber ?? null,
+              semesterType: entry.semesterType || "",
               yearTag:
                 entry.yearTag ||
                 getCurrentYearFromProjectCode(entry.projectCode) ||
@@ -260,12 +274,16 @@ export default function StudentDashboard() {
           return;
         }
       } catch (err) {
-        console.warn("Email/id enrollment lookup failed, fallback to project lookup", err);
+        console.warn(
+          "Email/id enrollment lookup failed, fallback to project lookup",
+          err,
+        );
       }
 
       // Fallback: per-project enrollments for this student's project
       try {
-        const enrollmentsMap = await getStudentEnrollmentsByProject(projectCode);
+        const enrollmentsMap =
+          await getStudentEnrollmentsByProject(projectCode);
         const enrollmentEntries = enrollmentsMap.get(
           String(currentStudent.id || currentStudent.docId || "").trim(),
         );
@@ -319,6 +337,8 @@ export default function StudentDashboard() {
                   ?.logoUrl || "",
               level: certDoc.level || "",
               status: normalizeCertificateStatus(entry.status || "enrolled"),
+              semesterNumber: entry.semesterNumber ?? null,
+              semesterType: entry.semesterType || "",
               yearTag: entry.yearTag || projectYearTag,
             };
           });
@@ -427,6 +447,8 @@ export default function StudentDashboard() {
               )?.logoUrl || "",
             level: certificateDoc?.level || "Beginner",
             status: "enrolled",
+            semesterNumber: null,
+            semesterType: "",
           });
         });
 
@@ -460,6 +482,8 @@ export default function StudentDashboard() {
               "",
             level: certificateDoc?.level || existing?.level || "Beginner",
             status: normalizeCertificateStatus(resolvedStatus),
+            semesterNumber: existing?.semesterNumber ?? null,
+            semesterType: existing?.semesterType || "",
           });
         });
 
@@ -511,6 +535,8 @@ export default function StudentDashboard() {
                 existing?.status ||
                 "enrolled",
             ),
+            semesterNumber: existing?.semesterNumber ?? null,
+            semesterType: existing?.semesterType || "",
           });
         }
 
@@ -567,7 +593,9 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-7">
       <section className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="text-lg font-medium text-[#0B2A4A]">Welcome, {fullName}. </span>
+        <span className="text-lg font-medium text-[#0B2A4A]">
+          Welcome, {fullName}.{" "}
+        </span>
         <select
           className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-3 py-1.5 text-sm text-white"
           value={selectedYear}
@@ -696,7 +724,9 @@ export default function StudentDashboard() {
                 </div>
                 <div className="rounded-xl bg-white px-3 py-2 text-right">
                   <p className="text-xs text-[#012920]">Current Year</p>
-                  <p className="text-lg text-[#012920] font-semibold">{currentYear}</p>
+                  <p className="text-lg text-[#012920] font-semibold">
+                    {currentYear}
+                  </p>
                 </div>
               </div>
             </div>

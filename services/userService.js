@@ -19,6 +19,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { isLocalDbMode } from "./dbModeService";
+import { codeToDocId } from "../src/utils/projectCodeUtils";
 import {
   localCreateCollegeAdmin,
   localCreateStudentAuthUser,
@@ -63,6 +64,7 @@ export const createStudentAuthUser = async (studentData) => {
   const name = String(studentData?.name || "").trim();
   const mobilePassword = formatMobilePassword(studentData?.mobile);
   const projectCode = String(studentData?.projectCode || "").trim();
+  const projectDocId = codeToDocId(projectCode);
   const collegeCode =
     String(studentData?.collegeCode || "").trim() ||
     String(projectCode || "").split("/")[0] ||
@@ -119,6 +121,10 @@ export const createStudentAuthUser = async (studentData) => {
           name,
           role: "student",
           projectCode,
+          projectDocId,
+          studentPath: studentId
+            ? `students/${projectDocId}/students_list/${studentId}`
+            : "",
           collegeCode,
           studentId,
           isActive: true,
@@ -151,6 +157,10 @@ export const createStudentAuthUser = async (studentData) => {
         name,
         role: "student",
         projectCode,
+        projectDocId,
+        studentPath: studentId
+          ? `students/${projectDocId}/students_list/${studentId}`
+          : "",
         collegeCode,
         studentId,
         isActive: true,

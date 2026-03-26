@@ -13,6 +13,7 @@ import { Pencil, RotateCcw } from "lucide-react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
+import { deriveSemesterDisplayFromEnrollments } from "../../utils/semesterUtils";
 
 // Extract current year from the 3rd segment of a project code like "COLLEGE/BATCH/YEAR"
 function getCurrentYearFromProjectCode(projectCode) {
@@ -31,15 +32,26 @@ function extractStudentDisplayData(student, projectCodeStr) {
     ? student._enrollments
     : [];
   const official = student.OFFICIAL_DETAILS || {};
+  const fallbackCurrentYear =
+    getCurrentYearFromProjectCode(projectCodeStr || student.projectCode) || "-";
+  const derivedSemester = deriveSemesterDisplayFromEnrollments({
+    enrollments: [
+      ...allEnrollments,
+      {
+        semesterNumber: student.enrollmentSemesterNumber,
+        semesterType: student.enrollmentSemesterType,
+      },
+    ],
+    fallback: fallbackCurrentYear,
+  });
+
   return {
     id: student.id,
     docId: student.docId || student.id,
     name: official["FULL NAME OF STUDENT"] || "-",
     email:
       student.email || official["EMAIL_ID"] || official["EMAIL_ID."] || "-",
-    currentYear:
-      getCurrentYearFromProjectCode(projectCodeStr || student.projectCode) ||
-      "-",
+    currentYear: derivedSemester,
     enrollmentStatus,
     allEnrollments,
   };

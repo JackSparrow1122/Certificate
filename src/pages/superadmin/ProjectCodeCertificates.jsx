@@ -1,12 +1,10 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getProjectCodeById } from "../../../services/projectCodeService";
 import { getCertificatesForProjectCode } from "../../../services/certificateService";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
-import AssignCertificateModal from "../../components/superadmin/AssignCertificateModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
-import { RotateCcw } from "lucide-react";
 
 export default function ProjectCodeCertificates() {
   const navigate = useNavigate();
@@ -15,9 +13,9 @@ export default function ProjectCodeCertificates() {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [semesterFilter, setSemesterFilter] = useState("all");
 
   useEffect(() => {
     fetchData();
@@ -61,6 +59,20 @@ export default function ProjectCodeCertificates() {
       },
     });
   };
+
+  const filteredCertificates = useMemo(() => {
+    if (semesterFilter === "odd") {
+      return certificates.filter(
+        (certificate) => Number(certificate?.oddEnrolledCount || 0) > 0,
+      );
+    }
+    if (semesterFilter === "even") {
+      return certificates.filter(
+        (certificate) => Number(certificate?.evenEnrolledCount || 0) > 0,
+      );
+    }
+    return certificates;
+  }, [certificates, semesterFilter]);
 
   if (loading) {
     return (
@@ -132,13 +144,6 @@ export default function ProjectCodeCertificates() {
               >
                 + Add Student
               </button>
-              <button
-                type="button"
-                onClick={() => setShowAssignModal(true)}
-                className="rounded-lg bg-[#DCE5F1] px-4 py-2.5 text-sm font-semibold text-[#0B2A4A]"
-              >
-                + Enroll Certificate
-              </button>
             </div>
           </div>
 
@@ -166,6 +171,47 @@ export default function ProjectCodeCertificates() {
 
           {/* Table Header */}
           <section className="rounded-2xl border border-[#D7E2F1] bg-[#E9EEF5] p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-[#0B2A4A]">
+                Filter by Semester
+              </p>
+              <div className="inline-flex rounded-lg border border-[#CBD8EA] bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => setSemesterFilter("all")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                    semesterFilter === "all"
+                      ? "bg-[#0B2A4A] text-white"
+                      : "text-[#0B2A4A]"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSemesterFilter("odd")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                    semesterFilter === "odd"
+                      ? "bg-[#0B2A4A] text-white"
+                      : "text-[#0B2A4A]"
+                  }`}
+                >
+                  Odd
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSemesterFilter("even")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                    semesterFilter === "even"
+                      ? "bg-[#0B2A4A] text-white"
+                      : "text-[#0B2A4A]"
+                  }`}
+                >
+                  Even
+                </button>
+              </div>
+            </div>
+
             <div className="mb-2 grid grid-cols-[2fr_1.5fr_1fr_1fr] gap-3 px-3 text-sm font-semibold text-[#0B2A4A]">
               <p>Certificate Name</p>
               <p>Exam Code</p>
@@ -174,7 +220,7 @@ export default function ProjectCodeCertificates() {
             </div>
 
             <div className="space-y-2.5">
-              {certificates.map((cert) => (
+              {filteredCertificates.map((cert) => (
                 <div
                   key={cert.id}
                   onClick={() => openStudentList(cert.id)}
@@ -190,26 +236,16 @@ export default function ProjectCodeCertificates() {
               ))}
             </div>
 
-            {certificates.length === 0 && (
+            {filteredCertificates.length === 0 && (
               <div className="rounded-xl border border-[#D7E2F1] bg-white px-5 py-8 text-center text-sm text-gray-600">
-                No certificates enrolled for this project code. Click "Enroll
-                Certificate" to assign one via Excel.
+                {semesterFilter === "all"
+                  ? "No certificates enrolled for this project code yet."
+                  : `No certificates found for ${semesterFilter} semester.`}
               </div>
             )}
           </section>
         </div>
       </div>
-
-      {showAssignModal && (
-        <AssignCertificateModal
-          projectCode={projectCode?.code || ""}
-          onClose={() => setShowAssignModal(false)}
-          onAssigned={() => {
-            setShowAssignModal(false);
-            fetchData();
-          }}
-        />
-      )}
 
       {showAddStudentModal && (
         <AddStudentModal

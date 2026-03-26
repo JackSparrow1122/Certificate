@@ -116,7 +116,26 @@ service cloud.firestore {
         (isCollegeAdmin() && projectDocBelongsToRequester(projectDocId));
       allow create, update, delete: if isSuperAdmin();
 
-      // Flat certificate_enrollments subcollection directly under project doc
+      // Semester enrollment docs under project doc
+      match /sem_odd/{enrollmentDocId} {
+        allow read: if isSuperAdmin() ||
+          (isCollegeAdmin() &&
+            projectDocBelongsToRequester(projectDocId)) ||
+          (isSignedIn() &&
+            sameAuthEmail(resource.data.email));
+        allow create, update, delete: if isSuperAdmin();
+      }
+
+      match /sem_even/{enrollmentDocId} {
+        allow read: if isSuperAdmin() ||
+          (isCollegeAdmin() &&
+            projectDocBelongsToRequester(projectDocId)) ||
+          (isSignedIn() &&
+            sameAuthEmail(resource.data.email));
+        allow create, update, delete: if isSuperAdmin();
+      }
+
+      // Flat certificate_enrollments subcollection (legacy)
       match /certificate_enrollments/{enrollmentDocId} {
         allow read: if isSuperAdmin() ||
           (isCollegeAdmin() &&
@@ -159,6 +178,23 @@ service cloud.firestore {
     // CollectionGroup rule for certificate_enrollments — required for collectionGroup queries
     // (e.g. getCertificateEnrollmentCounts, softDeleteCertificate across all projects)
     match /{path=**}/certificate_enrollments/{enrollmentDocId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          ("" + resource.data.collegeCode).lower() == requesterCollegeCode()) ||
+        (isSignedIn() && sameAuthEmail(resource.data.email));
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // CollectionGroup rules for semester enrollment docs
+    match /{path=**}/sem_odd/{enrollmentDocId} {
+      allow read: if isSuperAdmin() ||
+        (isCollegeAdmin() &&
+          ("" + resource.data.collegeCode).lower() == requesterCollegeCode()) ||
+        (isSignedIn() && sameAuthEmail(resource.data.email));
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /{path=**}/sem_even/{enrollmentDocId} {
       allow read: if isSuperAdmin() ||
         (isCollegeAdmin() &&
           ("" + resource.data.collegeCode).lower() == requesterCollegeCode()) ||

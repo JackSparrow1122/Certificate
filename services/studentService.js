@@ -18,6 +18,11 @@ import {
   getCountFromServer,
 } from "firebase/firestore";
 import { codeToDocId, docIdToCode } from "../src/utils/projectCodeUtils";
+import {
+  buildSemesterDictionary,
+  getSemesterOptionsFromProjectCode,
+  getSemesterType,
+} from "../src/utils/semesterUtils";
 import { isLocalDbMode } from "./dbModeService";
 import {
   localAddStudent,
@@ -57,6 +62,51 @@ export const addStudent = async (studentData) => {
       { merge: true },
     );
 
+    const semesterOptions = getSemesterOptionsFromProjectCode(
+      studentData.projectId,
+    );
+    const selectedSemester = Number.parseInt(
+      String(
+        studentData.currentSemester || studentData.currentYear || "",
+      ).trim(),
+      10,
+    );
+    const validSelectedSemester = Number.isFinite(selectedSemester)
+      ? selectedSemester
+      : semesterOptions[0] || null;
+    const semesterDictionary = buildSemesterDictionary(studentData.projectId);
+
+    await Promise.all([
+      setDoc(
+        doc(db, STUDENTS_COLLECTION, projectDocId, "sem_odd", "metadata"),
+        {
+          projectCode: studentData.projectId,
+          semesterDictionary,
+          availableSemesters: semesterOptions.filter((sem) => sem % 2 === 1),
+          selectedSemester:
+            validSelectedSemester && validSelectedSemester % 2 === 1
+              ? validSelectedSemester
+              : null,
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      ),
+      setDoc(
+        doc(db, STUDENTS_COLLECTION, projectDocId, "sem_even", "metadata"),
+        {
+          projectCode: studentData.projectId,
+          semesterDictionary,
+          availableSemesters: semesterOptions.filter((sem) => sem % 2 === 0),
+          selectedSemester:
+            validSelectedSemester && validSelectedSemester % 2 === 0
+              ? validSelectedSemester
+              : null,
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      ),
+    ]);
+
     const studentRef = doc(
       db,
       STUDENTS_COLLECTION,
@@ -84,8 +134,12 @@ export const addStudent = async (studentData) => {
       tenthPercentage: studentData.tenthPercentage,
       twelfthPercentage: studentData.twelfthPercentage,
       admissionYear: studentData.admissionYear,
-      currentYear:
-        studentData.currentYear ?? studentData.currentSemester ?? "",
+      currentYear: studentData.currentYear ?? studentData.currentSemester ?? "",
+      currentSemester:
+        studentData.currentSemester ?? studentData.currentYear ?? "",
+      semesterType:
+        studentData.semesterType ||
+        getSemesterType(studentData.currentSemester ?? studentData.currentYear),
       email: studentData.email,
       phone: studentData.phone,
       isActive: true,
@@ -94,7 +148,7 @@ export const addStudent = async (studentData) => {
       OFFICIAL_DETAILS: {
         SN: String(studentData.id || ""),
         "FULL NAME OF STUDENT": studentData.name || "",
-        "EMAIL_ID": studentData.email || "",
+        EMAIL_ID: studentData.email || "",
         "MOBILE NO.": studentData.phone || "",
         "BIRTH DATE": studentData.dob || "",
         GENDER: studentData.gender || "",
