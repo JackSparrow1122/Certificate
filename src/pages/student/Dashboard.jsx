@@ -5,6 +5,17 @@ import {
   ChevronRight,
   Clock3,
   Target,
+  GraduationCap,
+  Mail,
+  Phone,
+  Calendar,
+  User,
+  TrendingUp,
+  CheckCircle2,
+  XCircle,
+  BookOpen,
+  LayersIcon,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -95,9 +106,9 @@ const getLogoFromCertificate = (certificate = {}) => {
 };
 
 const STATUS_COLORS = {
-  enrolled: "#2563EB",
-  passed: "#16A34A",
-  failed: "#DC2626",
+  enrolled: "#3B82F6",
+  passed: "#22C55E",
+  failed: "#EF4444",
 };
 
 export default function StudentDashboard() {
@@ -111,7 +122,7 @@ export default function StudentDashboard() {
   const scrollCerts = (direction) => {
     const container = certScrollRef.current;
     if (!container) return;
-    const cardWidth = 270 + 16; // card min-width + gap
+    const cardWidth = 270 + 16;
     container.scrollBy({
       left: direction === "next" ? cardWidth : -cardWidth,
       behavior: "smooth",
@@ -186,7 +197,6 @@ export default function StudentDashboard() {
         currentStudent.projectCode || currentStudent.projectId || "";
       const projectYearTag = getCurrentYearFromProjectCode(projectCode);
 
-      // Try collectionGroup enrollment lookup by student email/id first (captures multiple projects/years)
       try {
         const email = String(
           currentStudent.email ||
@@ -205,8 +215,6 @@ export default function StudentDashboard() {
           studentId ? getEnrollmentsByStudentId(studentId) : [],
         ]);
 
-        // Same enrollment can be returned by both email and studentId queries.
-        // Deduplicate by project+certificate to avoid duplicate cards/counts.
         const mergedMap = new Map();
         [...byEmail, ...byId].forEach((entry) => {
           const certId = String(entry?.certificateId || "").trim();
@@ -309,7 +317,6 @@ export default function StudentDashboard() {
         );
       }
 
-      // Fallback: per-project enrollments for this student's project
       try {
         const enrollmentsMap =
           await getStudentEnrollmentsByProject(projectCode);
@@ -318,7 +325,6 @@ export default function StudentDashboard() {
         );
 
         if (enrollmentEntries && enrollmentEntries.length > 0) {
-          // Fetch all organizations for logos
           let organizations = [];
           try {
             organizations = await getAllOrganizations();
@@ -339,7 +345,6 @@ export default function StudentDashboard() {
               ]),
           );
 
-          // Fetch full certificate details for platform, level, domain
           const certIds = enrollmentEntries.map((e) => e.certificateId);
           let linkedCertificates = [];
           try {
@@ -399,7 +404,6 @@ export default function StudentDashboard() {
       const certificateIdSet = new Set(
         Array.isArray(currentStudent.certificateIds)
           ? currentStudent.certificateIds.filter((id) => {
-              // Exclude IDs whose certificateResult entry is marked isDeleted
               const entry = resultMap[id];
               return id && (!entry || !entry.isDeleted);
             })
@@ -621,270 +625,445 @@ export default function StudentDashboard() {
     { enrolled: 0, passed: 0, failed: 0 },
   );
 
-  return (
-    <div className="space-y-8">
-      <section className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="text-xl font-semibold tracking-tight text-[#0B2A4A]">
-          Welcome back, {fullName}
-        </span>
-        <select
-          className="rounded-xl border text-white border-[#C8D8EE] bg-linear-to-r from-[#0E3C67] to-[#14558E] px-3.5 py-2 text-sm font-medium text-bl shadow-sm outline-none transition "
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-        >
-         {certYearOptions.map((year) => (
-    <option 
-      key={year} 
-      value={year} 
-      style={{ backgroundColor: 'white', color: 'black' }}
-    >
-      {year}
-            </option>
-          ))}
-        </select>
-      </section>
+  const firstLetter = String(fullName || "S").charAt(0).toUpperCase();
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[1.9fr_0.55fr_0.55fr] ">
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+
+      {/* ── HERO WELCOME BANNER ── */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, #0B2A4A 0%, #1a4a7a 50%, #0e3a63 100%)",
+          borderRadius: "24px",
+          padding: "28px 32px",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 20px 60px -15px rgba(11,42,74,0.5)",
+        }}
+      >
+        {/* decorative blobs */}
+        <div style={{
+          position: "absolute", top: "-40px", right: "-40px",
+          width: "200px", height: "200px", borderRadius: "50%",
+          background: "rgba(183,255,105,0.08)", pointerEvents: "none",
+        }} />
+        <div style={{
+          position: "absolute", bottom: "-60px", left: "30%",
+          width: "280px", height: "280px", borderRadius: "50%",
+          background: "rgba(59,130,246,0.07)", pointerEvents: "none",
+        }} />
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+            {/* Avatar */}
+            <div style={{
+              width: "56px", height: "56px", borderRadius: "16px",
+              background: "linear-gradient(135deg, #B7FF69 0%, #7DE237 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "22px", fontWeight: "800", color: "#012920",
+              boxShadow: "0 4px 16px rgba(183,255,105,0.35)",
+              flexShrink: 0,
+            }}>
+              {firstLetter}
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                <Sparkles size={14} style={{ color: "#B7FF69" }} />
+                <span style={{ fontSize: "12px", color: "rgba(183,255,105,0.85)", fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Welcome back
+                </span>
+              </div>
+              <h1 style={{ fontSize: "24px", fontWeight: "800", color: "#ffffff", margin: 0, lineHeight: 1.2 }}>
+                {fullName}
+              </h1>
+              <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", margin: "4px 0 0", fontWeight: "500" }}>
+                Roll No: {rollNo}
+              </p>
+            </div>
+          </div>
+
+          {/* Year selector */}
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            style={{
+              background: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "12px",
+              color: "#fff",
+              padding: "10px 16px",
+              fontSize: "13px",
+              fontWeight: "600",
+              outline: "none",
+              cursor: "pointer",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            {certYearOptions.map((year) => (
+              <option key={year} value={year} style={{ backgroundColor: "#0B2A4A", color: "#fff" }}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── STATS ROW ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+        <StatPill
+          icon={<BookOpen size={20} />}
+          label="Enrolled"
+          value={statusSummary.enrolled}
+          color="#3B82F6"
+          bg="linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)"
+        />
+        <StatPill
+          icon={<CheckCircle2 size={20} />}
+          label="Passed"
+          value={statusSummary.passed}
+          color="#22C55E"
+          bg="linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)"
+        />
+        <StatPill
+          icon={<XCircle size={20} />}
+          label="Failed"
+          value={statusSummary.failed}
+          color="#EF4444"
+          bg="linear-gradient(135deg, #FFF5F5 0%, #FEE2E2 100%)"
+        />
+        <StatPill
+          icon={<GraduationCap size={20} />}
+          label="Current Year"
+          value={currentYear}
+          color="#8B5CF6"
+          bg="linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)"
+        />
+        <StatPill
+          icon={<LayersIcon size={20} />}
+          label="Current Semester"
+          value={currentSemester}
+          color="#F59E0B"
+          bg="linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)"
+        />
+      </div>
+
+      {/* ── MIDDLE ROW: Summary Chart + IRP Training ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "20px", alignItems: "stretch" }}>
         <SummaryCard
           enrolled={statusSummary.enrolled}
           passed={statusSummary.passed}
           failed={statusSummary.failed}
         />
-        <StatCard
-          label="Current Year"
-          value={currentYear}
-          icon={<Clock3 size={18} />}
-          compact
-        />
-        <StatCard
-          label="Current Semester"
-          value={currentSemester}
-          icon={<Clock3 size={18} />}
-          compact
-        />
-      </section>
+        <TrainingProgressCard title="IRP Training" progress={0} />
+      </div>
 
-      <section className="student-navbar-card rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white via-[#F8FBFF] to-[#EEF5FF] p-5 shadow-[0_12px_40px_-28px_rgba(11,42,74,0.55)] sm:p-6">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-          <div className="space-y-3">
-            <h3 className="text-2xl font-semibold leading-tight tracking-tight text-[#0B2A4A]">
+      {/* ── CERTIFICATE CAROUSEL ── */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, #ffffff 0%, #F8FBFF 100%)",
+          borderRadius: "24px",
+          border: "1px solid #E2EAF5",
+          padding: "24px",
+          boxShadow: "0 8px 32px -12px rgba(11,42,74,0.15)",
+        }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "24px", alignItems: "center" }}>
+          <div>
+            <h3 style={{ fontSize: "20px", fontWeight: "700", color: "#0B2A4A", margin: "0 0 8px" }}>
               Learning that drives results
             </h3>
-            <p className="text-sm text-[#0B2A4A]/80">
-              View all certificates you are enrolled in and their completion
-              status.
+            <p style={{ fontSize: "13px", color: "#64748B", margin: "0 0 16px", lineHeight: "1.5" }}>
+              All certificates you are enrolled in and their completion status.
             </p>
-            <button
-              type="button"
-              className="w-fit rounded-full border border-[#1D5FA8]/30 bg-[#EAF2FF] px-4 py-2 text-sm font-semibold text-[#0B4F9B]"
-            >
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              background: "#EAF2FF", borderRadius: "99px",
+              padding: "6px 14px",
+              fontSize: "13px", fontWeight: "600", color: "#0B4F9B",
+              border: "1px solid rgba(29,95,168,0.2)",
+            }}>
+              <BookOpenCheck size={14} />
               {filteredCertificates.length} shown
-            </button>
+            </div>
           </div>
 
-          <div className="relative flex items-center gap-2 min-w-0">
-            {/* Left arrow */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
             <button
-              type="button"
               onClick={() => scrollCerts("prev")}
               disabled={certLoading || enrolledCertificates.length === 0}
-              className="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#C8D8EE] bg-white text-[#1D5FA8] shadow-sm transition hover:bg-[#F1F7FF] disabled:cursor-not-allowed disabled:opacity-30"
+              style={{
+                width: "40px", height: "40px", borderRadius: "50%",
+                border: "1px solid #D1DCF0", background: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", color: "#1D5FA8", flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(11,42,74,0.1)",
+                opacity: (certLoading || enrolledCertificates.length === 0) ? 0.35 : 1,
+              }}
               aria-label="Previous certificate"
             >
               <ChevronLeft size={20} />
             </button>
 
-            {/* Card strip */}
             <div
               ref={certScrollRef}
-              className="cert-carousel flex min-w-0 flex-1 gap-4 overflow-x-auto pb-2 scroll-smooth"
+              className="cert-carousel"
               style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                scrollSnapType: "x mandatory",
+                display: "flex", gap: "16px", overflowX: "auto",
+                paddingBottom: "8px", flex: 1, minWidth: 0,
+                scrollSnapType: "x mandatory", scrollbarWidth: "none",
               }}
             >
               {certLoading ? (
-                <div className="flex min-h-55 w-full min-w-67.5 items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-[#0B2A4A]/70">
-                  Loading certificates...
+                <div style={{
+                  minHeight: "200px", minWidth: "270px", flex: 1,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "16px", border: "1px solid #E2EAF5",
+                  background: "white", fontSize: "14px", color: "#64748B",
+                }}>
+                  Loading certificates…
                 </div>
               ) : filteredCertificates.length > 0 ? (
                 filteredCertificates.map((certificate) => (
-                  <CertificateCard
-                    key={certificate.id}
-                    certificate={certificate}
-                  />
+                  <CertificateCard key={certificate.id} certificate={certificate} />
                 ))
               ) : (
-                <div className="flex min-h-55 w-full min-w-67.5 items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-[#0B2A4A]/70">
-                  No enrolled certificates found.
+                <div style={{
+                  minHeight: "200px", minWidth: "270px", flex: 1,
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  justifyContent: "center", gap: "10px",
+                  borderRadius: "16px", border: "1px dashed #C8D8EE",
+                  background: "linear-gradient(135deg, #F8FBFF 0%, #EEF5FF 100%)",
+                  fontSize: "14px", color: "#64748B",
+                }}>
+                  <BookOpenCheck size={32} style={{ color: "#C8D8EE" }} />
+                  <span>No enrolled certificates found.</span>
                 </div>
               )}
             </div>
 
-            {/* Right arrow */}
             <button
-              type="button"
               onClick={() => scrollCerts("next")}
               disabled={certLoading || enrolledCertificates.length === 0}
-              className="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#C8D8EE] bg-white text-[#1D5FA8] shadow-sm transition hover:bg-[#F1F7FF] disabled:cursor-not-allowed disabled:opacity-30"
+              style={{
+                width: "40px", height: "40px", borderRadius: "50%",
+                border: "1px solid #D1DCF0", background: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", color: "#1D5FA8", flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(11,42,74,0.1)",
+                opacity: (certLoading || enrolledCertificates.length === 0) ? 0.35 : 1,
+              }}
               aria-label="Next certificate"
             >
               <ChevronRight size={20} />
             </button>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="grid grid-cols-1 gap-6 rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white to-[#F2F8FF] p-1">
-        <Panel title="Profile Snapshot">
-          <div className="space-y-4">
-            <div className="rounded-2xl bg-linear-to-r from-[#B7FF69] via-[#9AF24B] to-[#7DE237] p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-lg font-bold text-[#012920]">
-                    {String(fullName || "S")
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold leading-tight text-[#012920]">
-                      {fullName}
-                    </p>
-                    <p className="text-xs text-[#012920]">Roll No: {rollNo}</p>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white px-3 py-2 text-right">
-                  <p className="text-xs text-[#012920]">Current Year</p>
-                  <p className="text-lg text-[#012920] font-semibold">
-                    {currentYear}
-                  </p>
-                </div>
-              </div>
+      {/* ── PROFILE SNAPSHOT ── */}
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "24px",
+          border: "1px solid #E2EAF5",
+          padding: "24px",
+          boxShadow: "0 8px 32px -12px rgba(11,42,74,0.12)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+          <div style={{
+            width: "32px", height: "32px", borderRadius: "10px",
+            background: "linear-gradient(135deg, #B7FF69 0%, #7DE237 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <User size={16} style={{ color: "#012920" }} />
+          </div>
+          <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#0B2A4A", margin: 0 }}>
+            Profile Snapshot
+          </h2>
+        </div>
+
+        {/* Name banner */}
+        <div style={{
+          background: "linear-gradient(135deg, #0B2A4A 0%, #164B78 100%)",
+          borderRadius: "16px",
+          padding: "16px 20px",
+          marginBottom: "20px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: "12px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{
+              width: "46px", height: "46px", borderRadius: "12px",
+              background: "linear-gradient(135deg, #B7FF69 0%, #7DE237 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "18px", fontWeight: "800", color: "#012920",
+            }}>
+              {firstLetter}
             </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ">
-              <SnapshotItem label="Gender" value={gender} />
-              <SnapshotItem label="Date of Birth" value={dob} />
-              <SnapshotItem label="Passing Year" value={passingYear} />
-              <SnapshotItem label="Email" value={email} />
-              <SnapshotItem label="Phone" value={phone} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[#012920]">
-                  10th Percentage
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-[#012920]">
-                  {tenthPercentage !== "-" ? `${tenthPercentage}%` : "-"}
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#D7E2F1] bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[#012920]">
-                  12th / Diploma Percentage
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-[#012920]">
-                  {twelfthPercentage !== "-" ? `${twelfthPercentage}%` : "-"}
-                </p>
-              </div>
+            <div>
+              <p style={{ fontSize: "17px", fontWeight: "700", color: "#fff", margin: 0 }}>{fullName}</p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", margin: "2px 0 0" }}>Roll No: {rollNo}</p>
             </div>
           </div>
-        </Panel>
-      </section>
-    </div>
-  );
-}
+          <div style={{
+            background: "rgba(183,255,105,0.15)",
+            border: "1px solid rgba(183,255,105,0.3)",
+            borderRadius: "10px", padding: "8px 14px", textAlign: "center",
+          }}>
+            <p style={{ fontSize: "11px", color: "rgba(183,255,105,0.8)", margin: "0 0 2px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em" }}>Passing Year</p>
+            <p style={{ fontSize: "18px", fontWeight: "800", color: "#B7FF69", margin: 0 }}>{passingYear}</p>
+          </div>
+        </div>
 
-function StatCard({ label, value, icon, compact = false }) {
-  return (
-    <div
-      className={`rounded-2xl border border-xl bg-white shadow-sm ${compact ? "p-2.5" : "p-4"}`}
-    >
-      <div className="flex items-center justify-between">
-        <p
-          className={`${compact ? "text-[11px]" : "text-sm"} font-medium text-[#012920]`}
-        >
-          {label}
-        </p>
-        <span
-          className={`rounded-lg bg-[#F5F4EB] text-[#0B2A4A] ${compact ? "p-1" : "p-2"}`}
-        >
-          {icon}
-        </span>
+        {/* Detail grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+          <ProfileField icon={<User size={14} />} label="Gender" value={gender} />
+          <ProfileField icon={<Calendar size={14} />} label="Date of Birth" value={dob} />
+          <ProfileField icon={<Mail size={14} />} label="Email" value={email} />
+          <ProfileField icon={<Phone size={14} />} label="Phone" value={phone} />
+        </div>
+
+        {/* Academic percentages */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <AcademicBadge
+            label="10th Percentage"
+            value={tenthPercentage !== "-" ? `${tenthPercentage}%` : "-"}
+            color="#3B82F6"
+          />
+          <AcademicBadge
+            label="12th / Diploma Percentage"
+            value={twelfthPercentage !== "-" ? `${twelfthPercentage}%` : "-"}
+            color="#8B5CF6"
+          />
+        </div>
       </div>
-      <p
-        className={`font-semibold text-[#0B2A4A] ${compact ? "mt-0.5 text-2xl" : "mt-2 text-2xl"}`}
-      >
-        {value}
-      </p>
     </div>
   );
 }
 
+/* ─────────── STAT PILL ─────────── */
+function StatPill({ icon, label, value, color, bg }) {
+  return (
+    <div style={{
+      background: bg,
+      borderRadius: "16px",
+      border: `1px solid ${color}22`,
+      padding: "16px 20px",
+      display: "flex", alignItems: "center", gap: "14px",
+      boxShadow: "0 4px 16px -6px rgba(0,0,0,0.07)",
+      transition: "transform 0.2s, box-shadow 0.2s",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 24px -6px ${color}30`; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 16px -6px rgba(0,0,0,0.07)"; }}
+    >
+      <div style={{
+        width: "42px", height: "42px", borderRadius: "12px",
+        background: `${color}18`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color, flexShrink: 0,
+      }}>
+        {icon}
+      </div>
+      <div>
+        <p style={{ fontSize: "11px", fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: "26px", fontWeight: "800", color: "#0B2A4A", margin: "2px 0 0", lineHeight: 1 }}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── SUMMARY CARD ─────────── */
 function SummaryCard({ enrolled, passed, failed }) {
+  const total = enrolled + passed + failed;
   const chartData = [
-    {
-      name: "Enrolled",
-      value: Number(enrolled || 0),
-      color: STATUS_COLORS.enrolled,
-    },
-    { name: "Passed", value: Number(passed || 0), color: STATUS_COLORS.passed },
-    { name: "Failed", value: Number(failed || 0), color: STATUS_COLORS.failed },
+    { name: "Enrolled", value: Number(enrolled || 0), color: STATUS_COLORS.enrolled },
+    { name: "Passed",   value: Number(passed || 0),   color: STATUS_COLORS.passed   },
+    { name: "Failed",   value: Number(failed || 0),   color: STATUS_COLORS.failed   },
   ];
   const hasData = chartData.some((item) => item.value > 0);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white via-[#F8FBFF] to-[#ECF4FF] p-4 shadow-[0_16px_40px_-28px_rgba(11,42,74,0.65)] sm:p-5">
-      <div className="pointer-events-none absolute -left-16 -top-20 h-52 w-52 rounded-full bg-[#D4E6FF]/50" />
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-[#012920]">
-          Certificate Summary
-        </p>
-        <span className="rounded-lg bg-[#F5F4EB] p-2 text-[#0B2A4A]">
-          <Award size={18} />
-        </span>
-      </div>
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[270px_1fr]">
-        <div className="h-60 w-full">
-          {hasData ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={72}
-                  outerRadius={112}
-                  paddingAngle={2}
-                >
-                  {chartData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [value, "Count"]} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-xs text-[#012920]/70">
-              No data
-            </div>
-          )}
+    <div style={{
+      background: "linear-gradient(135deg, #ffffff 0%, #F8FBFF 100%)",
+      borderRadius: "24px",
+      border: "1px solid #E2EAF5",
+      padding: "24px",
+      boxShadow: "0 8px 32px -12px rgba(11,42,74,0.15)",
+      position: "relative", overflow: "hidden",
+    }}>
+      {/* BG blob */}
+      <div style={{
+        position: "absolute", top: "-40px", left: "-40px",
+        width: "160px", height: "160px", borderRadius: "50%",
+        background: "rgba(59,130,246,0.06)", pointerEvents: "none",
+      }} />
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", position: "relative" }}>
+        <div>
+          <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Certificate Summary</p>
+          <p style={{ fontSize: "13px", color: "#94A3B8", margin: "4px 0 0" }}>Total: <strong style={{ color: "#0B2A4A" }}>{total}</strong></p>
         </div>
-        <div className="grid grid-cols-1 gap-2 text-sm text-[#0B2A4A]">
+        <div style={{
+          width: "36px", height: "36px", borderRadius: "10px",
+          background: "#EFF6FF", display: "flex", alignItems: "center",
+          justifyContent: "center", color: "#3B82F6",
+        }}>
+          <Award size={18} />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "20px", alignItems: "center" }}>
+        {/* Donut */}
+        <div style={{ position: "relative", height: "200px" }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={hasData ? chartData : [{ name: "empty", value: 1, color: "#E2E8F0" }]}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={60}
+                outerRadius={90}
+                paddingAngle={hasData ? 3 : 0}
+                startAngle={90}
+                endAngle={-270}
+              >
+                {(hasData ? chartData : [{ name: "empty", value: 1, color: "#E2E8F0" }]).map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Pie>
+              {hasData && <Tooltip formatter={(value) => [value, "Count"]} />}
+            </PieChart>
+          </ResponsiveContainer>
+          {/* Center label */}
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", pointerEvents: "none",
+          }}>
+            <span style={{ fontSize: "28px", fontWeight: "800", color: "#0B2A4A", lineHeight: 1 }}>{total}</span>
+            <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: "600" }}>total</span>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {chartData.map((item) => (
-            <div
-              key={item.name}
-              className="flex items-center justify-between rounded-lg border border-[#E7EEF9] px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
-                <span className="text-[#012920]/80">{item.name}</span>
+            <div key={item.name} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: `${item.color}0D`,
+              borderRadius: "12px",
+              border: `1px solid ${item.color}22`,
+              padding: "10px 14px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{
+                  width: "10px", height: "10px", borderRadius: "50%",
+                  background: item.color, flexShrink: 0,
+                }} />
+                <span style={{ fontSize: "13px", color: "#475569", fontWeight: "500" }}>{item.name}</span>
               </div>
-              <span className="font-semibold text-[#0B2A4A]">{item.value}</span>
+              <span style={{ fontSize: "18px", fontWeight: "800", color: "#0B2A4A" }}>{item.value}</span>
             </div>
           ))}
         </div>
@@ -893,135 +1072,209 @@ function SummaryCard({ enrolled, passed, failed }) {
   );
 }
 
-function TrainingProgressCard({ title, progress = 0, className = "" }) {
+/* ─────────── IRP TRAINING CARD ─────────── */
+function TrainingProgressCard({ title, progress = 0 }) {
   const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
   return (
-    <div
-      className={`relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white via-[#F8FBFF] to-[#EDF4FF] p-4 shadow-[0_10px_30px_-24px_rgba(11,42,74,0.65)] ${className}`}
-    >
-      <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#DCEAFF]/55" />
-      <div className="relative flex h-full flex-col justify-between gap-5">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#0B2A4A]/80">
-            {title}
-          </p>
-          <span className="rounded-xl border border-[#C8D8EE] bg-white px-2.5 py-1 text-sm font-semibold text-[#0B2A4A]">
-            {safeProgress}%
+    <div style={{
+      background: "linear-gradient(135deg, #ffffff 0%, #F8FBFF 100%)",
+      borderRadius: "24px",
+      border: "1px solid #E2EAF5",
+      padding: "24px",
+      boxShadow: "0 8px 32px -12px rgba(11,42,74,0.15)",
+      minWidth: "220px", maxWidth: "260px",
+      display: "flex", flexDirection: "column", gap: "16px",
+      position: "relative", overflow: "hidden",
+    }}>
+      <div style={{
+        position: "absolute", top: "-30px", right: "-30px",
+        width: "120px", height: "120px", borderRadius: "50%",
+        background: "rgba(59,130,246,0.06)", pointerEvents: "none",
+      }} />
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
+          {title}
+        </p>
+        <span style={{
+          fontSize: "12px", fontWeight: "700",
+          background: "#EFF6FF", color: "#3B82F6",
+          borderRadius: "8px", padding: "4px 10px",
+          border: "1px solid #DBEAFE",
+        }}>
+          {safeProgress}%
+        </span>
+      </div>
+
+      {/* Logo card */}
+      <div style={{
+        borderRadius: "14px", border: "1px solid #E2EAF5",
+        background: "#fff", overflow: "hidden",
+      }}>
+        <div style={{
+          height: "80px", display: "flex", alignItems: "center",
+          justifyContent: "center", padding: "12px",
+          background: "linear-gradient(180deg, #F8FBFF 0%, #fff 100%)",
+        }}>
+          <img
+            src={irpTrainingLogo}
+            alt="IRP Training logo"
+            style={{ height: "100%", width: "100%", objectFit: "contain" }}
+          />
+        </div>
+        <div style={{ padding: "10px 14px 12px" }}>
+          <p style={{ fontSize: "14px", fontWeight: "700", color: "#0B2A4A", margin: 0 }}>IRP Training</p>
+          <span style={{
+            display: "inline-block", marginTop: "4px",
+            fontSize: "11px", fontWeight: "600",
+            background: "#FEF3C7", color: "#92400E",
+            borderRadius: "6px", padding: "2px 8px",
+          }}>
+            Not Enrolled
           </span>
         </div>
+      </div>
 
-        <div className="overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white/95">
-          <div className="flex h-20 items-center justify-center bg-linear-to-b from-[#F8FBFF] to-white px-3 py-2">
-            <div className="flex h-14 w-full items-center justify-center rounded-lg bg-white px-2">
-              <img
-                src={irpTrainingLogo}
-                alt="IRP Training logo"
-                className="h-full w-full object-contain object-center"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5 px-3 pb-3 pt-1">
-            <p className="text-sm font-semibold leading-tight text-[#0B2A4A]">
-              IRP Training
-            </p>
-            <p className="text-xs text-[#0B2A4A]/70">Not Enrolled</p>
-          </div>
+      {/* Progress bar */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+          <span style={{ fontSize: "12px", color: "#64748B", fontWeight: "500" }}>Progress</span>
+          <span style={{ fontSize: "12px", fontWeight: "700", color: "#0B2A4A" }}>{safeProgress}%</span>
         </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between text-xs text-[#0B2A4A]/75">
-            <span>Progress</span>
-            <span className="font-semibold text-[#0B2A4A]">
-              {safeProgress}%
-            </span>
-          </div>
-          <div className="h-3 overflow-hidden rounded-full bg-[#E3ECF9]">
-            <div
-              className="h-full rounded-full bg-linear-to-r from-[#1D5FA8] to-[#2E86E0]"
-              style={{ width: `${safeProgress}%` }}
-            />
-          </div>
+        <div style={{ height: "8px", borderRadius: "99px", background: "#E2E8F0", overflow: "hidden" }}>
+          <div style={{
+            height: "100%", borderRadius: "99px",
+            background: "linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%)",
+            width: `${safeProgress}%`,
+            transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)",
+          }} />
         </div>
       </div>
     </div>
   );
 }
 
-function Panel({ title, children }) {
+/* ─────────── PROFILE FIELD ─────────── */
+function ProfileField({ icon, label, value }) {
   return (
-    <div className="rounded-3xl border border-[#D7E2F1] bg-white p-5 shadow-[0_10px_35px_-28px_rgba(11,42,74,0.7)]">
-      <h3 className="mb-4 text-lg font-semibold tracking-tight text-[#0B2A4A]">
-        {title}
-      </h3>
-      {children}
+    <div style={{
+      background: "#FAFBFF",
+      borderRadius: "14px",
+      border: "1px solid #E8EEF8",
+      padding: "12px 16px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+        <span style={{ color: "#94A3B8" }}>{icon}</span>
+        <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>{label}</p>
+      </div>
+      <p style={{ fontSize: "15px", fontWeight: "600", color: "#0B2A4A", margin: 0, wordBreak: "break-word" }}>{value || "-"}</p>
     </div>
   );
 }
 
-function SnapshotItem({ label, value }) {
+/* ─────────── ACADEMIC BADGE ─────────── */
+function AcademicBadge({ label, value, color }) {
   return (
-    <div className="rounded-xl border border-[#D7E2F1] bg-[#FBFDFF] p-3 shadow-sm">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-[#012920]/80">
-        {label}
-      </p>
-      <p className="mt-1 text-base font-semibold tracking-tight text-[#0B2A4A]">
-        {value || "-"}
-      </p>
+    <div style={{
+      background: `linear-gradient(135deg, ${color}08 0%, ${color}14 100%)`,
+      borderRadius: "16px",
+      border: `1px solid ${color}22`,
+      padding: "16px 20px",
+      display: "flex", flexDirection: "column", gap: "6px",
+    }}>
+      <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>{label}</p>
+      <p style={{ fontSize: "28px", fontWeight: "800", color, margin: 0, lineHeight: 1 }}>{value}</p>
     </div>
   );
 }
 
+/* ─────────── CERTIFICATE CARD ─────────── */
 function CertificateCard({ certificate }) {
   const logoUrl = getOptimizedLogoUrl(getLogoFromCertificate(certificate));
-  const statusLabel = normalizeCertificateStatus(
-    certificate.status || "enrolled",
-  );
-  const statusBadgeClass =
+  const statusLabel = normalizeCertificateStatus(certificate.status || "enrolled");
+
+  const statusStyle =
     statusLabel === "passed"
-      ? "bg-[#E5FAED] text-[#15803D]"
+      ? { bg: "#F0FDF4", color: "#16A34A", border: "#BBF7D0" }
       : statusLabel === "failed"
-        ? "bg-[#FEECEC] text-[#C03535]"
-        : "bg-[#E9F1FF] text-[#0B4F9B]";
+      ? { bg: "#FFF5F5", color: "#DC2626", border: "#FECACA" }
+      : { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" };
 
   return (
     <article
-      style={{ scrollSnapAlign: "start", scrollSnapStop: "always" }}
-      className="min-w-67.5 max-w-75 flex-1 overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white shadow-[0_12px_30px_-26px_rgba(11,42,74,0.75)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_-28px_rgba(11,42,74,0.75)]"
+      style={{
+        minWidth: "240px", maxWidth: "280px", flex: "0 0 auto",
+        background: "#ffffff",
+        borderRadius: "18px",
+        border: "1px solid #E2EAF5",
+        boxShadow: "0 4px 20px -8px rgba(11,42,74,0.2)",
+        overflow: "hidden",
+        transition: "transform 0.2s, box-shadow 0.2s",
+        scrollSnapAlign: "start",
+        cursor: "pointer",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = "translateY(-4px)";
+        e.currentTarget.style.boxShadow = "0 16px 36px -10px rgba(11,42,74,0.28)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = "";
+        e.currentTarget.style.boxShadow = "0 4px 20px -8px rgba(11,42,74,0.2)";
+      }}
     >
-      <div className="flex h-28 items-center justify-center bg-linear-to-b from-[#F8FBFF] to-white px-3 py-2">
+      {/* Logo area */}
+      <div style={{
+        height: "110px", background: "linear-gradient(180deg, #F8FBFF 0%, #EEF5FF 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "12px",
+      }}>
         {logoUrl ? (
-          <div className="flex h-20 w-full items-center justify-center rounded-lg bg-white px-2">
-            <img
-              src={logoUrl}
-              alt={`${certificate.organizationName || "Organisation"} logo`}
-              className="h-full w-full object-contain object-center"
-            />
-          </div>
+          <img
+            src={logoUrl}
+            alt={`${certificate.organizationName || "Organisation"} logo`}
+            style={{ height: "100%", width: "100%", objectFit: "contain" }}
+          />
         ) : (
-          <div className="flex h-20 w-full items-center justify-center rounded-lg bg-linear-to-r from-[#0B2A4A] to-[#164B78]">
-            <p className="text-xs font-medium uppercase tracking-wide text-white/80">
-              Certificate
-            </p>
+          <div style={{
+            height: "70px", width: "100%",
+            background: "linear-gradient(135deg, #0B2A4A 0%, #164B78 100%)",
+            borderRadius: "12px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Award size={28} style={{ color: "rgba(255,255,255,0.7)" }} />
           </div>
         )}
       </div>
-      <div className="space-y-3 p-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-[#0B2A4A]/65">
-            {certificate.platform}
-          </p>
-          <h4 className="mt-1 text-lg font-semibold leading-tight text-[#0B2A4A]">
-            {certificate.name}
-          </h4>
-          <p className="mt-1 text-xs text-gray-600">{certificate.level}</p>
-        </div>
 
-        <div className="flex items-center justify-between text-xs">
-          <span
-            className={`rounded-full px-2 py-1 font-medium capitalize ${statusBadgeClass}`}
-          >
+      {/* Content */}
+      <div style={{ padding: "16px" }}>
+        <p style={{ fontSize: "10px", fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 4px" }}>
+          {certificate.platform}
+        </p>
+        <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#0B2A4A", margin: "0 0 4px", lineHeight: "1.3" }}>
+          {certificate.name}
+        </h4>
+        {certificate.level && (
+          <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 12px" }}>{certificate.level}</p>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{
+            fontSize: "11px", fontWeight: "700",
+            background: statusStyle.bg,
+            color: statusStyle.color,
+            border: `1px solid ${statusStyle.border}`,
+            borderRadius: "99px",
+            padding: "4px 10px",
+            textTransform: "capitalize",
+          }}>
             {statusLabel}
           </span>
+          {certificate.semesterNumber && (
+            <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: "500" }}>
+              Sem {certificate.semesterNumber}
+            </span>
+          )}
         </div>
       </div>
     </article>
