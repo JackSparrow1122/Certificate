@@ -116,7 +116,8 @@ service cloud.firestore {
         (isCollegeAdmin() && projectDocBelongsToRequester(projectDocId));
       allow create, update, delete: if isSuperAdmin();
 
-      // Flat certificate_enrollments subcollection directly under project doc
+      // Flat certificate_enrollments subcollection under project doc
+      // Legacy/compat path: keep readable and superAdmin-writable
       match /certificate_enrollments/{enrollmentDocId} {
         allow read: if isSuperAdmin() ||
           (isCollegeAdmin() &&
@@ -131,9 +132,15 @@ service cloud.firestore {
           (isCollegeAdmin() &&
             studentBelongsToRequester(resource.data, projectDocId)) ||
           sameAuthEmailFromStudentDoc(resource.data);
-        allow create, update, delete: if isSuperAdmin();
+        allow create, delete: if isSuperAdmin();
+        // Result declaration updates student mirror fields under certificateEnrollments.{certificateId}
+        allow update: if isSuperAdmin() ||
+          (isCollegeAdmin() &&
+            studentBelongsToRequester(resource.data, projectDocId) &&
+            studentBelongsToRequester(request.resource.data, projectDocId));
 
-        // Legacy nested path — kept for backward compat reads only
+        // Current primary enrollment path
+        // students/{projectDocId}/students_list/{studentId}/certificate_enrollments/{certEnrollmentId}
         match /certificate_enrollments/{certEnrollmentId} {
           allow read: if isSuperAdmin() ||
             (isCollegeAdmin() &&
@@ -141,7 +148,11 @@ service cloud.firestore {
             sameAuthEmailFromStudentDoc(
               get(/databases/$(database)/documents/students/$(projectDocId)/students_list/$(studentId)).data
             );
-          allow create, update, delete: if isSuperAdmin();
+          allow create, delete: if isSuperAdmin();
+          // Result declaration updates enrollment status/resultDeclaredAt here
+          allow update: if isSuperAdmin() ||
+            (isCollegeAdmin() &&
+              projectDocBelongsToRequester(projectDocId));
         }
       }
     }
