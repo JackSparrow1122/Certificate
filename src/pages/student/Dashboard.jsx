@@ -628,7 +628,7 @@ export default function StudentDashboard() {
           Welcome back, {fullName}
         </span>
         <select
-          className="rounded-xl border border-[#C8D8EE] bg-gradient-to-r from-[#0E3C67] to-[#14558E] px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:shadow"
+          className="rounded-xl border border-[#C8D8EE] bg-linear-to-r from-[#0E3C67] to-[#14558E] px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:shadow"
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
         >
@@ -660,7 +660,7 @@ export default function StudentDashboard() {
         />
       </section>
 
-      <section className="student-navbar-card rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF5FF] p-5 shadow-[0_12px_40px_-28px_rgba(11,42,74,0.55)] sm:p-6">
+      <section className="student-navbar-card rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white via-[#F8FBFF] to-[#EEF5FF] p-5 shadow-[0_12px_40px_-28px_rgba(11,42,74,0.55)] sm:p-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
           <div className="space-y-3">
             <h3 className="text-2xl font-semibold leading-tight tracking-tight text-[#0B2A4A]">
@@ -684,7 +684,7 @@ export default function StudentDashboard() {
               type="button"
               onClick={() => scrollCerts("prev")}
               disabled={certLoading || enrolledCertificates.length === 0}
-              className="z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-[#C8D8EE] bg-white text-[#1D5FA8] shadow-sm transition hover:bg-[#F1F7FF] disabled:cursor-not-allowed disabled:opacity-30"
+              className="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#C8D8EE] bg-white text-[#1D5FA8] shadow-sm transition hover:bg-[#F1F7FF] disabled:cursor-not-allowed disabled:opacity-30"
               aria-label="Previous certificate"
             >
               <ChevronLeft size={20} />
@@ -701,7 +701,7 @@ export default function StudentDashboard() {
               }}
             >
               {certLoading ? (
-                <div className="flex min-h-[220px] w-full min-w-[270px] items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-[#0B2A4A]/70">
+                <div className="flex min-h-55 w-full min-w-67.5 items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-[#0B2A4A]/70">
                   Loading certificates...
                 </div>
               ) : filteredCertificates.length > 0 ? (
@@ -712,7 +712,7 @@ export default function StudentDashboard() {
                   />
                 ))
               ) : (
-                <div className="flex min-h-[220px] w-full min-w-[270px] items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-[#0B2A4A]/70">
+                <div className="flex min-h-55 w-full min-w-67.5 items-center justify-center rounded-2xl border border-[#D7E2F1] bg-white text-sm text-[#0B2A4A]/70">
                   No enrolled certificates found.
                 </div>
               )}
@@ -723,7 +723,7 @@ export default function StudentDashboard() {
               type="button"
               onClick={() => scrollCerts("next")}
               disabled={certLoading || enrolledCertificates.length === 0}
-              className="z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-[#C8D8EE] bg-white text-[#1D5FA8] shadow-sm transition hover:bg-[#F1F7FF] disabled:cursor-not-allowed disabled:opacity-30"
+              className="z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#C8D8EE] bg-white text-[#1D5FA8] shadow-sm transition hover:bg-[#F1F7FF] disabled:cursor-not-allowed disabled:opacity-30"
               aria-label="Next certificate"
             >
               <ChevronRight size={20} />
@@ -732,10 +732,10 @@ export default function StudentDashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white to-[#F2F8FF] p-1">
+      <section className="grid grid-cols-1 gap-6 rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white to-[#F2F8FF] p-1">
         <Panel title="Profile Snapshot">
           <div className="space-y-4">
-            <div className="rounded-2xl bg-gradient-to-r from-[#B7FF69] via-[#9AF24B] to-[#7DE237] p-4 shadow-sm">
+            <div className="rounded-2xl bg-linear-to-r from-[#B7FF69] via-[#9AF24B] to-[#7DE237] p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-lg font-bold text-[#012920]">
@@ -831,7 +831,7 @@ function SummaryCard({ enrolled, passed, failed }) {
   const hasData = chartData.some((item) => item.value > 0);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white via-[#F8FBFF] to-[#ECF4FF] p-4 shadow-[0_16px_40px_-28px_rgba(11,42,74,0.65)] sm:p-5">
+    <div className="relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white via-[#F8FBFF] to-[#ECF4FF] p-4 shadow-[0_16px_40px_-28px_rgba(11,42,74,0.65)] sm:p-5">
       <div className="pointer-events-none absolute -left-16 -top-20 h-52 w-52 rounded-full bg-[#D4E6FF]/50" />
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-[#012920]">
@@ -842,7 +842,7 @@ function SummaryCard({ enrolled, passed, failed }) {
         </span>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[270px_1fr]">
-        <div className="h-[240px] w-full">
+        <div className="h-60 w-full">
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -893,7 +893,7 @@ function TrainingProgressCard({ title, progress = 0, className = "" }) {
   const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EDF4FF] p-4 shadow-[0_10px_30px_-24px_rgba(11,42,74,0.65)] ${className}`}
+      className={`relative overflow-hidden rounded-3xl border border-[#C8D8EE] bg-linear-to-br from-white via-[#F8FBFF] to-[#EDF4FF] p-4 shadow-[0_10px_30px_-24px_rgba(11,42,74,0.65)] ${className}`}
     >
       <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#DCEAFF]/55" />
       <div className="relative flex h-full flex-col justify-between gap-5">
@@ -907,7 +907,7 @@ function TrainingProgressCard({ title, progress = 0, className = "" }) {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white/95">
-          <div className="flex h-20 items-center justify-center bg-gradient-to-b from-[#F8FBFF] to-white px-3 py-2">
+          <div className="flex h-20 items-center justify-center bg-linear-to-b from-[#F8FBFF] to-white px-3 py-2">
             <div className="flex h-14 w-full items-center justify-center rounded-lg bg-white px-2">
               <img
                 src={irpTrainingLogo}
@@ -933,7 +933,7 @@ function TrainingProgressCard({ title, progress = 0, className = "" }) {
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-[#E3ECF9]">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#1D5FA8] to-[#2E86E0]"
+              className="h-full rounded-full bg-linear-to-r from-[#1D5FA8] to-[#2E86E0]"
               style={{ width: `${safeProgress}%` }}
             />
           </div>
@@ -982,9 +982,9 @@ function CertificateCard({ certificate }) {
   return (
     <article
       style={{ scrollSnapAlign: "start", scrollSnapStop: "always" }}
-      className="min-w-[270px] max-w-[300px] flex-1 overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white shadow-[0_12px_30px_-26px_rgba(11,42,74,0.75)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_-28px_rgba(11,42,74,0.75)]"
+      className="min-w-67.5 max-w-75 flex-1 overflow-hidden rounded-2xl border border-[#D7E2F1] bg-white shadow-[0_12px_30px_-26px_rgba(11,42,74,0.75)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_-28px_rgba(11,42,74,0.75)]"
     >
-      <div className="flex h-28 items-center justify-center bg-gradient-to-b from-[#F8FBFF] to-white px-3 py-2">
+      <div className="flex h-28 items-center justify-center bg-linear-to-b from-[#F8FBFF] to-white px-3 py-2">
         {logoUrl ? (
           <div className="flex h-20 w-full items-center justify-center rounded-lg bg-white px-2">
             <img
@@ -994,7 +994,7 @@ function CertificateCard({ certificate }) {
             />
           </div>
         ) : (
-          <div className="flex h-20 w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#0B2A4A] to-[#164B78]">
+          <div className="flex h-20 w-full items-center justify-center rounded-lg bg-linear-to-r from-[#0B2A4A] to-[#164B78]">
             <p className="text-xs font-medium uppercase tracking-wide text-white/80">
               Certificate
             </p>
