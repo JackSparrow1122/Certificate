@@ -628,13 +628,17 @@ export default function StudentDashboard() {
           Welcome back, {fullName}
         </span>
         <select
-          className="rounded-xl border border-[#C8D8EE] bg-linear-to-r from-[#0E3C67] to-[#14558E] px-3.5 py-2 text-sm font-medium text-white shadow-sm outline-none transition hover:shadow"
+          className="rounded-xl border text-white border-[#C8D8EE] bg-linear-to-r from-[#0E3C67] to-[#14558E] px-3.5 py-2 text-sm font-medium text-bl shadow-sm outline-none transition "
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
         >
-          {certYearOptions.map((year) => (
-            <option key={year} value={year}>
-              {year}
+         {certYearOptions.map((year) => (
+    <option 
+      key={year} 
+      value={year} 
+      style={{ backgroundColor: 'white', color: 'black' }}
+    >
+      {year}
             </option>
           ))}
         </select>

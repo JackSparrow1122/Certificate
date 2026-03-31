@@ -19,6 +19,23 @@ export default function DeclareResultModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const parseStatusValue = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (!normalized) return null;
+
+    if (
+      ["pass", "passed", "yes", "y", "true", "1", "p"].includes(normalized)
+    ) {
+      return "passed";
+    }
+
+    if (["fail", "failed", "no", "n", "false", "0", "f"].includes(normalized)) {
+      return "failed";
+    }
+
+    return null;
+  };
+
   // Fetch project codes that have students enrolled in this certificate
   useEffect(() => {
     const fetchEnrolledProjectCodes = async () => {
@@ -83,6 +100,7 @@ export default function DeclareResultModal({
 
       // Extract emails and statuses
       const emailMap = new Map(); // email -> status (or null)
+      let explicitStatusCount = 0;
 
       rows.forEach((row) => {
         const email = String(row[emailKey] || "")
@@ -90,16 +108,8 @@ export default function DeclareResultModal({
           .toLowerCase();
 
         if (email) {
-          let status = null;
-          if (statusKey) {
-            const statusValue = String(row[statusKey] || "").toLowerCase();
-            status =
-              statusValue.includes("pass") || statusValue.includes("yes")
-                ? "passed"
-                : statusValue.includes("fail") || statusValue.includes("no")
-                  ? "failed"
-                  : null;
-          }
+          const status = statusKey ? parseStatusValue(row[statusKey]) : null;
+          if (status) explicitStatusCount += 1;
           emailMap.set(email, status);
         }
       });
@@ -114,6 +124,7 @@ export default function DeclareResultModal({
         emails: Array.from(emailMap.keys()),
         emailMap,
         hasStatus: !!statusKey,
+        explicitStatusCount,
       });
       setStep("confirm");
     } catch (err) {
@@ -143,12 +154,9 @@ export default function DeclareResultModal({
       // Build emailStatusMap for the service function
       const emailStatusMap = new Map();
       for (const [email, status] of excelData.emailMap.entries()) {
-        if (excelData.hasStatus) {
-          emailStatusMap.set(email, status || "failed");
-        } else {
-          // email present = passed
-          emailStatusMap.set(email, "passed");
-        }
+        // email present = passed by default
+        // explicit pass/fail in sheet overrides this
+        emailStatusMap.set(email, status || "passed");
       }
 
       const result = await declareResultsForCertificate({
@@ -266,15 +274,11 @@ export default function DeclareResultModal({
             <div className="bg-blue-50 border border-blue-200 p-3 rounded text-sm text-blue-800">
               <p className="font-medium mb-2">Excel Format Requirements:</p>
               <ul className="space-y-1 text-xs">
-                <li>✓ Required: Column with "email" in header</li>
-                <li>
-                  ✓ Optional: Column with "status" containing "pass"/"fail"
-                </li>
-                <li>
-                  • If no status column: emails present = passed, absent =
-                  failed
-                </li>
-                <li>• If status column: use it to determine result</li>
+                <li>- Required: column with "email" in header</li>
+                <li>- Optional: "status"/"result" column with pass or fail</li>
+                <li>- Email present in sheet = passed, absent = failed</li>
+                <li>- Status column value overrides default pass/fail logic</li>
+                <li>- Blank/invalid status value defaults to passed</li>
               </ul>
             </div>
 
@@ -296,8 +300,9 @@ export default function DeclareResultModal({
             {excelData && (
               <div className="bg-green-50 border border-green-200 p-3 rounded">
                 <p className="text-sm font-medium text-green-800">
-                  ✓ Extracted {excelData.emails.length} email(s)
-                  {excelData.hasStatus && " + Status column found"}
+                  Extracted {excelData.emails.length} email(s)
+                  {excelData.hasStatus &&
+                    ` + Status column found (${excelData.explicitStatusCount} explicit pass/fail)`}
                 </p>
               </div>
             )}
@@ -340,7 +345,8 @@ export default function DeclareResultModal({
                 </li>
                 {excelData?.hasStatus && (
                   <li className="text-green-700">
-                    <strong>Status:</strong> Using status column from Excel
+                    <strong>Status:</strong> Using pass/fail column where
+                    provided, else default pass
                   </li>
                 )}
                 {!excelData?.hasStatus && (
