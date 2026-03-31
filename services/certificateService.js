@@ -783,6 +783,7 @@ export const declareResultsForCertificate = async ({
     let passedCount = 0;
     let failedCount = 0;
     const ops = [];
+    const normalizedCertificateId = String(certificateId || "").trim();
 
     for (const projectCode of projectCodes) {
       const normalizedProjectCode = String(projectCode).trim();
@@ -804,22 +805,37 @@ export const declareResultsForCertificate = async ({
           "students_list",
           studentDoc.id,
         );
-        const enrollmentRef = doc(
+        const enrollmentsRef = collection(
           db,
           STUDENTS_COLLECTION,
           projectDocId,
           "students_list",
           studentDoc.id,
           CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
-          String(certificateId || "").trim(),
         );
-        const enrollmentSnap = await getDoc(enrollmentRef);
-        if (!enrollmentSnap.exists()) continue;
 
-        const enrollmentData = enrollmentSnap.data() || {};
-        if (enrollmentData.isDeleted === true) continue;
+        // Primary lookup by doc ID (common path), with query fallback by field.
+        const enrollmentByIdRef = doc(enrollmentsRef, normalizedCertificateId);
+        const enrollmentByIdSnap = await getDoc(enrollmentByIdRef);
 
-        const studentEmail = String(enrollmentData.email || "")
+        let enrollmentDocs = [];
+        if (enrollmentByIdSnap.exists()) {
+          enrollmentDocs = [enrollmentByIdSnap];
+        } else {
+          const enrollmentQuery = query(
+            enrollmentsRef,
+            where("certificateId", "==", normalizedCertificateId),
+          );
+          const enrollmentQuerySnap = await getDocs(enrollmentQuery);
+          enrollmentDocs = enrollmentQuerySnap.docs;
+        }
+
+        if (!enrollmentDocs.length) continue;
+
+        const firstEnrollmentData = enrollmentDocs[0]?.data?.() || {};
+        if (firstEnrollmentData.isDeleted === true) continue;
+
+        const studentEmail = String(firstEnrollmentData.email || "")
           .trim()
           .toLowerCase();
 
@@ -828,15 +844,20 @@ export const declareResultsForCertificate = async ({
           status = emailStatusMap.get(studentEmail) || defaultStatus;
         }
 
-        ops.push({
-          type: "update",
-          ref: enrollmentRef,
-          data: {
-            status,
-            resultDeclaredAt: new Date(),
-            updatedAt: new Date(),
-          },
+        enrollmentDocs.forEach((enrollmentDocSnap) => {
+          const enrollmentData = enrollmentDocSnap.data() || {};
+          if (enrollmentData.isDeleted === true) return;
+          ops.push({
+            type: "update",
+            ref: enrollmentDocSnap.ref,
+            data: {
+              status,
+              resultDeclaredAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
         });
+
         ops.push({
           type: "update",
           ref: studentRef,

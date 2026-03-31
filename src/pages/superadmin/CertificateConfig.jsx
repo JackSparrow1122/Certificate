@@ -53,6 +53,26 @@ export default function CertificateConfig() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const handlePageVisible = () => {
+      if (document.visibilityState === "visible") {
+        handleRefreshEnrolledCounts({ silent: true });
+      }
+    };
+
+    const handleWindowFocus = () => {
+      handleRefreshEnrolledCounts({ silent: true });
+    };
+
+    document.addEventListener("visibilitychange", handlePageVisible);
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handlePageVisible);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [certifications]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -64,7 +84,21 @@ export default function CertificateConfig() {
           getAllOrganizations(),
         ]);
 
-      setCertifications(certificateData || []);
+      const certificateIds = (certificateData || [])
+        .map((certificate) => certificate?.id)
+        .filter(Boolean);
+
+      let mergedCertificates = certificateData || [];
+      if (certificateIds.length > 0) {
+        const liveEnrollmentCounts =
+          await getCertificateEnrollmentCounts(certificateIds);
+        mergedCertificates = (certificateData || []).map((certificate) => ({
+          ...certificate,
+          enrolledCount: Number(liveEnrollmentCounts?.[certificate.id] ?? 0),
+        }));
+      }
+
+      setCertifications(mergedCertificates);
       console.log("Project codes loaded:", projectCodeData);
       setProjectCodes(projectCodeData || []);
       setOrganizations(organizationData || []);
@@ -174,10 +208,10 @@ export default function CertificateConfig() {
     }
   };
 
-  const handleRefreshEnrolledCounts = async () => {
+  const handleRefreshEnrolledCounts = async ({ silent = false } = {}) => {
     try {
       setRefreshingCounts(true);
-      setError("");
+      if (!silent) setError("");
 
       const certificateIds = certifications
         .map((certificate) => certificate?.id)
@@ -197,10 +231,12 @@ export default function CertificateConfig() {
         })),
       );
 
-      setSuccessMessage("Enrolled counts refreshed from live student data.");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      if (!silent) {
+        setSuccessMessage("Enrolled counts refreshed from live student data.");
+        setTimeout(() => setSuccessMessage(""), 3000);
+      }
     } catch (refreshError) {
-      setError("Failed to refresh enrolled counts");
+      if (!silent) setError("Failed to refresh enrolled counts");
       console.error("Refresh counts error:", refreshError);
     } finally {
       setRefreshingCounts(false);
