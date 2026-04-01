@@ -1142,53 +1142,7 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </Panel>
       </div>
-      <Panel title="Overview">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">
-                  College
-                </th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">
-                  Course
-                </th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">
-                  Year
-                </th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">
-                  Passing Year
-                </th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700">
-                  Enrollment
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p, idx) => (
-                <tr
-                  key={p.id || p.code}
-                  className="border-b border-gray-100 transition hover:bg-gray-50"
-                >
-                  <td className="px-6 py-3 text-gray-600">
-                    {p.college || "-"}
-                  </td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {p.course || p.courseCode || "-"}
-                  </td>
-                  <td className="px-6 py-3 text-gray-600">{p.year || "-"}</td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {extractPassYearFromProjectCode(p.code) || "-"}
-                  </td>
-                  <td className="px-6 py-3 font-semibold text-gray-900">
-                    {projectStudentCounts[String(p.code || "").trim()] || 0}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+    
     </div>
   );
 }
