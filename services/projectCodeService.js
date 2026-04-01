@@ -27,10 +27,6 @@ const PROJECT_CODES_COLLECTION = "projectCodes";
 const STUDENTS_COLLECTION = "students";
 const BATCH_CHUNK_SIZE = 400;
 
-const normalizeValue = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase();
 const normalizeCode = (value) =>
   String(value || "")
     .trim()
@@ -236,25 +232,83 @@ export const getAllProjectCodes = async () => {
   }
 };
 
-// Get project codes by college ID
+// Get project codes by college ID or collegeCode/college alias; fallback to code prefix matching.
 export const getProjectCodesByCollege = async (collegeId) => {
   if (isLocalDbMode()) {
     return localGetProjectCodesByCollege(collegeId);
   }
+
+  const normalizeValue = (value) =>
+    String(value || "").trim().toUpperCase();
+
+  const normalizedCollegeId = normalizeValue(collegeId);
+  if (!normalizedCollegeId) return [];
+
   try {
-    const q = query(
-      collection(db, PROJECT_CODES_COLLECTION),
-      where("collegeId", "==", collegeId),
-    );
-    const querySnapshot = await getDocs(q);
-    const projectCodes = [];
-    querySnapshot.forEach((doc) => {
-      projectCodes.push({
-        id: doc.id,
-        ...doc.data(),
+    const fetchActive = (snapshot) => {
+      const list = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
       });
+      return list.filter((projectCode) => projectCode.isActive !== false);
+    };
+
+    // Try explicit collegeId field first
+    const byCollegeIdSnapshot = await getDocs(
+      query(
+        collection(db, PROJECT_CODES_COLLECTION),
+        where("collegeId", "==", collegeId),
+      ),
+    );
+    let projectCodes = fetchActive(byCollegeIdSnapshot);
+    if (projectCodes.length > 0) return projectCodes;
+
+    // Try collegeCode field (legacy path)
+    const byCollegeCodeSnapshot = await getDocs(
+      query(
+        collection(db, PROJECT_CODES_COLLECTION),
+        where("collegeCode", "==", collegeId),
+      ),
+    );
+    projectCodes = fetchActive(byCollegeCodeSnapshot);
+    if (projectCodes.length > 0) return projectCodes;
+
+    // Try college field
+    const byCollegeSnapshot = await getDocs(
+      query(
+        collection(db, PROJECT_CODES_COLLECTION),
+        where("college", "==", collegeId),
+      ),
+    );
+    projectCodes = fetchActive(byCollegeSnapshot);
+    if (projectCodes.length > 0) return projectCodes;
+
+    // Fallback: code prefix match (`ABC/...` or `ABC-...`) or normalized college fields
+    const allSnapshot = await getDocs(collection(db, PROJECT_CODES_COLLECTION));
+    projectCodes = [];
+    allSnapshot.forEach((doc) => {
+      const data = doc.data() || {};
+      const code = String(data.code || "").trim();
+      const dataCollegeId = normalizeValue(data.collegeId);
+      const dataCollegeCode = normalizeValue(data.collegeCode);
+      const dataCollegeLegacy = normalizeValue(data.college);
+      const normalizedCode = normalizeValue(code).replace(/\\\\/g, "-");
+      const prefixMatch =
+        normalizedCode.startsWith(`${normalizedCollegeId}/`.toUpperCase()) ||
+        normalizedCode.startsWith(`${normalizedCollegeId}-`.toUpperCase());
+
+      if (
+        data.isActive !== false &&
+        (dataCollegeId === normalizedCollegeId ||
+          dataCollegeCode === normalizedCollegeId ||
+          dataCollegeLegacy === normalizedCollegeId ||
+          prefixMatch)
+      ) {
+        projectCodes.push({ id: doc.id, ...data });
+      }
     });
-    return projectCodes.filter((projectCode) => projectCode.isActive !== false);
+
+    return projectCodes;
   } catch (error) {
     console.error("Error getting project codes by college:", error);
     throw error;

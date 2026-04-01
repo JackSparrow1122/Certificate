@@ -4,8 +4,6 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -42,18 +40,7 @@ import {
 const SIDEBAR_BLUE = "#0B2A4A";
 const ACCENT_BLUE = "#1D5FA8";
 const MINT = "#6BC7A7";
-const AMBER = "#D29A2D";
 const ROSE = "#CA5D7C";
-const COLORS = [ACCENT_BLUE, MINT, AMBER, ROSE];
-
-const parseProgress = (progressValue) => {
-  const parsed = Number(
-    String(progressValue || "")
-      .replace("%", "")
-      .trim(),
-  );
-  return Number.isFinite(parsed) ? parsed : 0;
-};
 
 const isCollegeAdminRole = (roleValue) => {
   const normalized = String(roleValue || "")
@@ -93,6 +80,20 @@ const resolveCollegeCodeForStudent = (student) => {
   );
   if (explicitCode) return explicitCode;
   return deriveCollegeCodeFromProject(student?.projectId || student?.projectCode);
+};
+
+const resolveCollegeCodeForAdmin = (admin) => {
+  const explicitCode = normalizeCode(
+    admin?.collegeCode ||
+      admin?.college_code ||
+      admin?.collegeId ||
+      admin?.institutionCode ||
+      "",
+  );
+  if (explicitCode) return explicitCode;
+  return deriveCollegeCodeFromProject(
+    admin?.projectCode || admin?.projectId || admin?.assignedProjectCode || "",
+  );
 };
 
 const getStudentResultStatus = (statusValue) => {
@@ -354,18 +355,9 @@ export default function Dashboard() {
     }
   };
 
-  const totalStudents = Math.max(
-    Number(totalStudentsCount || 0),
-    Number(students.length || 0),
-  );
   const totalColleges = colleges.length;
   const activeColleges = colleges.filter(
     (college) => String(college.status || "Active") === "Active",
-  ).length;
-  const totalProjectCodes = projectCodes.length;
-  const totalCertificates = certifications.length;
-  const totalCollegeAdmins = admins.filter((admin) =>
-    isCollegeAdminRole(admin?.role),
   ).length;
 
   const collegeOptions = useMemo(() => {
@@ -428,6 +420,35 @@ export default function Dashboard() {
     );
   }, [students, selectedCollegeCode, selectedProjectCodeSet]);
 
+  const selectedCollegeStudentCount = useMemo(() => {
+    if (selectedCollegeCode === "ALL") {
+      return Math.max(Number(totalStudentsCount || 0), Number(students.length || 0));
+    }
+    return chartStudents.length;
+  }, [selectedCollegeCode, totalStudentsCount, students.length, chartStudents.length]);
+
+  const selectedCollegeActiveColleges = useMemo(() => {
+    if (selectedCollegeCode === "ALL") return activeColleges;
+    const selectedCollege = colleges.find(
+      (college) =>
+        normalizeCode(college?.college_code || college?.collegeCode) ===
+        selectedCollegeCode,
+    );
+    if (!selectedCollege) return 0;
+    return String(selectedCollege.status || "Active") === "Active" ? 1 : 0;
+  }, [selectedCollegeCode, colleges, activeColleges]);
+
+  const selectedCollegeProjectCodeCount =
+    selectedCollegeCode === "ALL" ? projectCodes.length : selectedProjects.length;
+
+  const selectedCollegeAdminCount = useMemo(() => {
+    const collegeAdmins = admins.filter((admin) => isCollegeAdminRole(admin?.role));
+    if (selectedCollegeCode === "ALL") return collegeAdmins.length;
+    return collegeAdmins.filter(
+      (admin) => resolveCollegeCodeForAdmin(admin) === selectedCollegeCode,
+    ).length;
+  }, [admins, selectedCollegeCode]);
+
   const studentsByProject = Object.entries(
     chartStudents.reduce((accumulator, student) => {
       const key = student.projectId || student.projectCode || "Unknown";
@@ -438,32 +459,6 @@ export default function Dashboard() {
     .map(([projectId, count]) => ({ projectId, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
-
-  const progressBuckets = useMemo(() => {
-    const buckets = [
-      { bucket: "0-40%", count: 0 },
-      { bucket: "41-70%", count: 0 },
-      { bucket: "71-100%", count: 0 },
-    ];
-
-    chartStudents.forEach((student) => {
-      const progress = parseProgress(student.progress);
-      if (progress <= 40) buckets[0].count += 1;
-      else if (progress <= 70) buckets[1].count += 1;
-      else buckets[2].count += 1;
-    });
-
-    return buckets;
-  }, [chartStudents]);
-
-  const progressDistributionData = useMemo(
-    () =>
-      progressBuckets.map((entry) => ({
-        name: entry.bucket,
-        value: entry.count,
-      })),
-    [progressBuckets],
-  );
 
   const certificateToOrganization = new Map(
     certifications.map((certificate) => [
@@ -599,6 +594,77 @@ export default function Dashboard() {
       .slice(0, 10);
   }, [selectedProjects, certStatsByProject, chartStudents]);
 
+  const certificateEnrollmentCountsAll = useMemo(() => {
+    const byCertificate = new Map();
+
+    selectedProjects.forEach((projectCodeRow) => {
+      const projectCode = getProjectCodeValue(projectCodeRow);
+      if (!projectCode) return;
+      const statsRows = certStatsByProject[projectCode] || [];
+
+      statsRows.forEach((stat) => {
+        const certificateId = String(stat?.id || "").trim();
+        const label = String(stat?.name || stat?.examCode || certificateId).trim();
+        if (!label) return;
+        const current = byCertificate.get(label) || { label, count: 0 };
+        current.count += Number(stat?.enrolledCount || 0);
+        byCertificate.set(label, current);
+      });
+    });
+
+    if (byCertificate.size === 0) {
+      chartStudents.forEach((student) => {
+        const certificateResults =
+          student?.certificateResults &&
+          typeof student.certificateResults === "object"
+            ? Object.values(student.certificateResults).filter(
+                (entry) => !entry?.isDeleted,
+              )
+            : [];
+
+        certificateResults.forEach((result) => {
+          const label = String(
+            result?.certificateName || result?.name || result?.certificateId,
+          ).trim();
+          if (!label) return;
+          const current = byCertificate.get(label) || { label, count: 0 };
+          current.count += 1;
+          byCertificate.set(label, current);
+        });
+      });
+    }
+
+    return Array.from(byCertificate.values()).sort((a, b) => b.count - a.count);
+  }, [selectedProjects, certStatsByProject, chartStudents]);
+
+  const certificateEnrollmentCountData = useMemo(
+    () => certificateEnrollmentCountsAll.slice(0, 10),
+    [certificateEnrollmentCountsAll],
+  );
+
+  const selectedCollegeCertificateCount =
+    selectedCollegeCode === "ALL"
+      ? certifications.length
+      : certificateEnrollmentCountsAll.length;
+
+  const resultStatusMix = useMemo(() => {
+    const totals = certificationResultsData.reduce(
+      (accumulator, row) => {
+        accumulator.Passed += Number(row.Passed || 0);
+        accumulator.Ongoing += Number(row.Ongoing || 0);
+        accumulator.Failed += Number(row.Failed || 0);
+        return accumulator;
+      },
+      { Passed: 0, Ongoing: 0, Failed: 0 },
+    );
+
+    return [
+      { status: "Passed", count: totals.Passed, fill: MINT },
+      { status: "Ongoing", count: totals.Ongoing, fill: ACCENT_BLUE },
+      { status: "Failed", count: totals.Failed, fill: ROSE },
+    ];
+  }, [certificationResultsData]);
+
   return (
     <SuperAdminLayout>
       <section className="mb-4 flex flex-wrap items-center justify-end gap-2">
@@ -641,53 +707,65 @@ export default function Dashboard() {
         <MetricCard
           icon={<Users size={18} />}
           label="Total Students"
-          value={totalStudents}
-          helper="Across all project groups"
+          value={selectedCollegeStudentCount}
+          helper={
+            selectedCollegeCode === "ALL"
+              ? "Across all project groups"
+              : "In selected college"
+          }
         />
         <MetricCard
           icon={<Building2 size={18} />}
           label="Active Colleges"
-          value={`${activeColleges}/${totalColleges}`}
-          helper="Current institution status"
+          value={
+            selectedCollegeCode === "ALL"
+              ? `${selectedCollegeActiveColleges}/${totalColleges}`
+              : `${selectedCollegeActiveColleges}/1`
+          }
+          helper={
+            selectedCollegeCode === "ALL"
+              ? "Current institution status"
+              : "Selected institution status"
+          }
         />
         <MetricCard
           icon={<GraduationCap size={18} />}
           label="Project Codes"
-          value={totalProjectCodes}
-          helper="Configured for batches"
+          value={selectedCollegeProjectCodeCount}
+          helper={
+            selectedCollegeCode === "ALL"
+              ? "Configured for batches"
+              : "Configured in selected college"
+          }
         />
         <MetricCard
           icon={<BookOpenCheck size={18} />}
           label="Certificates"
-          value={totalCertificates}
-          helper={`${totalCollegeAdmins} college admins assigned`}
+          value={selectedCollegeCertificateCount}
+          helper={`${selectedCollegeAdminCount} college admins assigned`}
         />
       </section>
 
       <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.6fr_1fr]">
-        <ChartCard title="Progress Breakdown">
+        <ChartCard title="Result Status Mix">
           <ResponsiveContainer width="100%" height={240} debounce={75}>
-            <PieChart>
-              <Pie
-                data={progressBuckets}
+            <BarChart data={resultStatusMix}>
+              <Tooltip cursor={false} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="status" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} />
+              <Bar
                 dataKey="count"
-                nameKey="bucket"
-                innerRadius={52}
-                outerRadius={82}
+                radius={[8, 8, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
                 animationDuration={220}
                 animationEasing="ease-out"
               >
-                {progressBuckets.map((entry, index) => (
-                  <Cell
-                    key={entry.bucket}
-                    fill={COLORS[index % COLORS.length]}
-                  />
+                {resultStatusMix.map((entry, index) => (
+                  <Cell key={`${entry.status}-${index}`} fill={entry.fill} />
                 ))}
-              </Pie>
-              <Tooltip cursor={false} />
-              <Legend />
-            </PieChart>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
@@ -778,28 +856,35 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Student Progress Distribution">
+        <ChartCard title="Certificate Enrollment Counts">
           <ResponsiveContainer width="100%" height={240} debounce={75}>
-            <PieChart>
-              <Pie
-                data={progressDistributionData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={52}
-                outerRadius={82}
+            <BarChart
+              data={certificateEnrollmentCountData}
+              margin={{ top: 12, right: 12, left: 0, bottom: 52 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="label"
+                interval={0}
+                height={54}
+                angle={-24}
+                textAnchor="end"
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis allowDecimals={false} />
+              <Tooltip
+                cursor={false}
+                formatter={(value) => [`${Number(value || 0)} students`, "Enrolled"]}
+              />
+              <Bar
+                dataKey="count"
+                fill={ACCENT_BLUE}
+                radius={[8, 8, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
                 animationDuration={220}
                 animationEasing="ease-out"
-              >
-                {progressDistributionData.map((entry, index) => (
-                  <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip cursor={false} />
-              <Legend />
-            </PieChart>
+              />
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </section>

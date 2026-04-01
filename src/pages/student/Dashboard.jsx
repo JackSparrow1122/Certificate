@@ -3,14 +3,11 @@ import {
   BookOpenCheck,
   ChevronLeft,
   ChevronRight,
-  Clock3,
-  Target,
   GraduationCap,
   Mail,
   Phone,
   Calendar,
   User,
-  TrendingUp,
   CheckCircle2,
   XCircle,
   BookOpen,
@@ -21,13 +18,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentForAuthUser } from "../../../services/studentService";
-import irpTrainingLogo from "../../assets/image.jpg";
 import {
   getCertificatesByIds,
   getStudentEnrollmentsByProject,
   getEnrollmentsByStudentEmail,
   getEnrollmentsByStudentId,
-  getStudentCertificateHistory,
 } from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
 
@@ -116,6 +111,7 @@ export default function StudentDashboard() {
   const [currentStudent, setCurrentStudent] = useState(null);
   const [enrolledCertificates, setEnrolledCertificates] = useState([]);
   const [selectedYear, setSelectedYear] = useState("All Years");
+  const [selectedSemester, setSelectedSemester] = useState("All Semesters");
   const [certLoading, setCertLoading] = useState(false);
   const certScrollRef = useRef(null);
 
@@ -598,12 +594,43 @@ export default function StudentDashboard() {
     return ["All Years", ...Array.from(years).sort()];
   }, [enrolledCertificates]);
 
-  const filteredCertificates = useMemo(() => {
-    if (selectedYear === "All Years") return enrolledCertificates;
-    return enrolledCertificates.filter(
-      (cert) => String(cert.yearTag || "").trim() === selectedYear,
+  const certSemesterOptions = useMemo(() => {
+    const semesters = new Set(
+      enrolledCertificates
+        .map((cert) => {
+          const sem = cert?.semesterNumber;
+          return Number.isFinite(Number(sem)) && sem !== null && sem !== undefined
+            ? String(sem)
+            : "";
+        })
+        .filter(Boolean),
     );
-  }, [enrolledCertificates, selectedYear]);
+
+    const sorted = Array.from(semesters)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b)
+      .map((value) => String(value));
+
+    return ["All Semesters", ...sorted];
+  }, [enrolledCertificates]);
+
+  const filteredCertificates = useMemo(() => {
+    let filtered = enrolledCertificates;
+    if (selectedYear !== "All Years") {
+      filtered = filtered.filter(
+        (cert) => String(cert.yearTag || "").trim() === selectedYear,
+      );
+    }
+
+    if (selectedSemester !== "All Semesters") {
+      filtered = filtered.filter(
+        (cert) => String(cert.semesterNumber || "").trim() === selectedSemester,
+      );
+    }
+
+    return filtered;
+  }, [enrolledCertificates, selectedYear, selectedSemester]);
 
   const currentSemester = useMemo(
     () =>
@@ -625,12 +652,40 @@ export default function StudentDashboard() {
     { enrolled: 0, passed: 0, failed: 0 },
   );
 
+  const featuredIrpCertificate = useMemo(() => {
+    return filteredCertificates.find((certificate) => {
+      const searchable = [
+        certificate?.name,
+        certificate?.platform,
+        certificate?.organizationName,
+        certificate?.level,
+      ]
+        .map((value) => String(value || "").toLowerCase())
+        .join(" ");
+
+      return (
+        searchable.includes("irp") ||
+        searchable.includes("ga-irp") ||
+        searchable.includes("ga-training")
+      );
+    });
+  }, [filteredCertificates]);
+
+  const visibleCertificates = useMemo(() => {
+    if (!featuredIrpCertificate) return filteredCertificates;
+    const featuredId = String(featuredIrpCertificate.id || "").trim();
+    if (!featuredId) return filteredCertificates;
+    return filteredCertificates.filter(
+      (certificate) => String(certificate?.id || "").trim() !== featuredId,
+    );
+  }, [filteredCertificates, featuredIrpCertificate]);
+
   const firstLetter = String(fullName || "S").charAt(0).toUpperCase();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
 
-      {/* ── HERO WELCOME BANNER ── */}
+      {/* -- HERO WELCOME BANNER -- */}
       <div
         style={{
           background: "linear-gradient(135deg, #0B2A4A 0%, #1a4a7a 50%, #0e3a63 100%)",
@@ -682,33 +737,62 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Year selector */}
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              borderRadius: "12px",
-              color: "#fff",
-              padding: "10px 16px",
-              fontSize: "13px",
-              fontWeight: "600",
-              outline: "none",
-              cursor: "pointer",
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            {certYearOptions.map((year) => (
-              <option key={year} value={year} style={{ backgroundColor: "#0B2A4A", color: "#fff" }}>
-                {year}
-              </option>
-            ))}
-          </select>
+          {/* Year & Semester selectors */}
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "12px",
+                color: "#fff",
+                padding: "10px 16px",
+                fontSize: "13px",
+                fontWeight: "600",
+                outline: "none",
+                cursor: "pointer",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              {certYearOptions.map((year) => (
+                <option key={year} value={year} style={{ backgroundColor: "#0B2A4A", color: "#fff" }}>
+                  {year}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "12px",
+                color: "#fff",
+                padding: "10px 16px",
+                fontSize: "13px",
+                fontWeight: "600",
+                outline: "none",
+                cursor: "pointer",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              {certSemesterOptions.map((semester) => (
+                <option
+                  key={semester}
+                  value={semester}
+                  style={{ backgroundColor: "#0B2A4A", color: "#fff" }}
+                >
+                  {semester}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* ── STATS ROW ── */}
+      {/* -- STATS ROW -- */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
         <StatPill
           icon={<BookOpen size={20} />}
@@ -747,17 +831,27 @@ export default function StudentDashboard() {
         />
       </div>
 
-      {/* ── MIDDLE ROW: Summary Chart + IRP Training ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "20px", alignItems: "stretch" }}>
+      {/* -- MIDDLE ROW: Summary Chart -- */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: featuredIrpCertificate ? "1fr auto" : "1fr",
+          gap: "20px",
+          alignItems: "stretch",
+        }}
+      >
         <SummaryCard
           enrolled={statusSummary.enrolled}
           passed={statusSummary.passed}
           failed={statusSummary.failed}
         />
-        <TrainingProgressCard title="IRP Training" progress={0} />
+        {featuredIrpCertificate && (
+          <FeaturedCertificateCard certificate={featuredIrpCertificate} />
+        )}
       </div>
 
-      {/* ── CERTIFICATE CAROUSEL ── */}
+      {/* -- CERTIFICATE CAROUSEL -- */}
+      {(certLoading || visibleCertificates.length > 0) && (
       <div
         style={{
           background: "linear-gradient(135deg, #ffffff 0%, #F8FBFF 100%)",
@@ -783,21 +877,21 @@ export default function StudentDashboard() {
               border: "1px solid rgba(29,95,168,0.2)",
             }}>
               <BookOpenCheck size={14} />
-              {filteredCertificates.length} shown
+              {visibleCertificates.length} shown
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
             <button
               onClick={() => scrollCerts("prev")}
-              disabled={certLoading || enrolledCertificates.length === 0}
+              disabled={certLoading || visibleCertificates.length === 0}
               style={{
                 width: "40px", height: "40px", borderRadius: "50%",
                 border: "1px solid #D1DCF0", background: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", color: "#1D5FA8", flexShrink: 0,
                 boxShadow: "0 2px 8px rgba(11,42,74,0.1)",
-                opacity: (certLoading || enrolledCertificates.length === 0) ? 0.35 : 1,
+                opacity: (certLoading || visibleCertificates.length === 0) ? 0.35 : 1,
               }}
               aria-label="Previous certificate"
             >
@@ -822,35 +916,23 @@ export default function StudentDashboard() {
                 }}>
                   Loading certificates…
                 </div>
-              ) : filteredCertificates.length > 0 ? (
-                filteredCertificates.map((certificate) => (
+              ) : (
+                visibleCertificates.map((certificate) => (
                   <CertificateCard key={certificate.id} certificate={certificate} />
                 ))
-              ) : (
-                <div style={{
-                  minHeight: "200px", minWidth: "270px", flex: 1,
-                  display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", gap: "10px",
-                  borderRadius: "16px", border: "1px dashed #C8D8EE",
-                  background: "linear-gradient(135deg, #F8FBFF 0%, #EEF5FF 100%)",
-                  fontSize: "14px", color: "#64748B",
-                }}>
-                  <BookOpenCheck size={32} style={{ color: "#C8D8EE" }} />
-                  <span>No enrolled certificates found.</span>
-                </div>
               )}
             </div>
 
             <button
               onClick={() => scrollCerts("next")}
-              disabled={certLoading || enrolledCertificates.length === 0}
+              disabled={certLoading || visibleCertificates.length === 0}
               style={{
                 width: "40px", height: "40px", borderRadius: "50%",
                 border: "1px solid #D1DCF0", background: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", color: "#1D5FA8", flexShrink: 0,
                 boxShadow: "0 2px 8px rgba(11,42,74,0.1)",
-                opacity: (certLoading || enrolledCertificates.length === 0) ? 0.35 : 1,
+                opacity: (certLoading || visibleCertificates.length === 0) ? 0.35 : 1,
               }}
               aria-label="Next certificate"
             >
@@ -859,8 +941,9 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* ── PROFILE SNAPSHOT ── */}
+      {/* -- PROFILE SNAPSHOT -- */}
       <div
         style={{
           background: "#ffffff",
@@ -942,7 +1025,7 @@ export default function StudentDashboard() {
   );
 }
 
-/* ─────────── STAT PILL ─────────── */
+/* ----------- STAT PILL ----------- */
 function StatPill({ icon, label, value, color, bg }) {
   return (
     <div style={{
@@ -973,7 +1056,7 @@ function StatPill({ icon, label, value, color, bg }) {
   );
 }
 
-/* ─────────── SUMMARY CARD ─────────── */
+/* ----------- SUMMARY CARD ----------- */
 function SummaryCard({ enrolled, passed, failed }) {
   const total = enrolled + passed + failed;
   const chartData = [
@@ -1072,89 +1155,115 @@ function SummaryCard({ enrolled, passed, failed }) {
   );
 }
 
-/* ─────────── IRP TRAINING CARD ─────────── */
-function TrainingProgressCard({ title, progress = 0 }) {
-  const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+function FeaturedCertificateCard({ certificate }) {
+  const statusLabel = normalizeCertificateStatus(certificate?.status || "enrolled");
+  const logoUrl = getOptimizedLogoUrl(getLogoFromCertificate(certificate));
+
+  const statusStyle =
+    statusLabel === "passed"
+      ? { bg: "#F0FDF4", color: "#16A34A", border: "#BBF7D0" }
+      : statusLabel === "failed"
+      ? { bg: "#FFF5F5", color: "#DC2626", border: "#FECACA" }
+      : { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE" };
+
   return (
-    <div style={{
-      background: "linear-gradient(135deg, #ffffff 0%, #F8FBFF 100%)",
-      borderRadius: "24px",
-      border: "1px solid #E2EAF5",
-      padding: "24px",
-      boxShadow: "0 8px 32px -12px rgba(11,42,74,0.15)",
-      minWidth: "220px", maxWidth: "260px",
-      display: "flex", flexDirection: "column", gap: "16px",
-      position: "relative", overflow: "hidden",
-    }}>
-      <div style={{
-        position: "absolute", top: "-30px", right: "-30px",
-        width: "120px", height: "120px", borderRadius: "50%",
-        background: "rgba(59,130,246,0.06)", pointerEvents: "none",
-      }} />
+    <div
+      style={{
+        background: "linear-gradient(135deg, #ffffff 0%, #F8FBFF 100%)",
+        borderRadius: "24px",
+        border: "1px solid #E2EAF5",
+        padding: "18px",
+        boxShadow: "0 8px 32px -12px rgba(11,42,74,0.15)",
+        width: "260px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+      }}
+    >
+      <p
+        style={{
+          fontSize: "11px",
+          fontWeight: "700",
+          color: "#64748B",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          margin: 0,
+        }}
+      >
+        Featured Certificate
+      </p>
+
+      <div
+        style={{
+          borderRadius: "12px",
+          border: "1px solid #E2EAF5",
+          background: "#fff",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "74px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "10px",
+            background: "linear-gradient(180deg, #F8FBFF 0%, #fff 100%)",
+          }}
+        >
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`${certificate?.organizationName || "Organisation"} logo`}
+              style={{ height: "100%", width: "100%", objectFit: "contain" }}
+            />
+          ) : (
+            <Award size={24} style={{ color: "#94A3B8" }} />
+          )}
+        </div>
+      </div>
+
+      <p
+        style={{
+          fontSize: "14px",
+          fontWeight: "700",
+          color: "#0B2A4A",
+          margin: 0,
+          lineHeight: 1.3,
+        }}
+      >
+        {certificate?.name || "Certificate"}
+      </p>
+      <p style={{ fontSize: "12px", color: "#64748B", margin: 0 }}>
+        {certificate?.platform || "Certification"}
+      </p>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-          {title}
-        </p>
-        <span style={{
-          fontSize: "12px", fontWeight: "700",
-          background: "#EFF6FF", color: "#3B82F6",
-          borderRadius: "8px", padding: "4px 10px",
-          border: "1px solid #DBEAFE",
-        }}>
-          {safeProgress}%
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: "700",
+            background: statusStyle.bg,
+            color: statusStyle.color,
+            border: `1px solid ${statusStyle.border}`,
+            borderRadius: "99px",
+            padding: "4px 10px",
+            textTransform: "capitalize",
+          }}
+        >
+          {statusLabel}
         </span>
-      </div>
-
-      {/* Logo card */}
-      <div style={{
-        borderRadius: "14px", border: "1px solid #E2EAF5",
-        background: "#fff", overflow: "hidden",
-      }}>
-        <div style={{
-          height: "80px", display: "flex", alignItems: "center",
-          justifyContent: "center", padding: "12px",
-          background: "linear-gradient(180deg, #F8FBFF 0%, #fff 100%)",
-        }}>
-          <img
-            src={irpTrainingLogo}
-            alt="IRP Training logo"
-            style={{ height: "100%", width: "100%", objectFit: "contain" }}
-          />
-        </div>
-        <div style={{ padding: "10px 14px 12px" }}>
-          <p style={{ fontSize: "14px", fontWeight: "700", color: "#0B2A4A", margin: 0 }}>IRP Training</p>
-          <span style={{
-            display: "inline-block", marginTop: "4px",
-            fontSize: "11px", fontWeight: "600",
-            background: "#FEF3C7", color: "#92400E",
-            borderRadius: "6px", padding: "2px 8px",
-          }}>
-            Not Enrolled
+        {certificate?.semesterNumber ? (
+          <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: "500" }}>
+            Sem {certificate.semesterNumber}
           </span>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-          <span style={{ fontSize: "12px", color: "#64748B", fontWeight: "500" }}>Progress</span>
-          <span style={{ fontSize: "12px", fontWeight: "700", color: "#0B2A4A" }}>{safeProgress}%</span>
-        </div>
-        <div style={{ height: "8px", borderRadius: "99px", background: "#E2E8F0", overflow: "hidden" }}>
-          <div style={{
-            height: "100%", borderRadius: "99px",
-            background: "linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%)",
-            width: `${safeProgress}%`,
-            transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)",
-          }} />
-        </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-/* ─────────── PROFILE FIELD ─────────── */
+/* ----------- PROFILE FIELD ----------- */
 function ProfileField({ icon, label, value }) {
   return (
     <div style={{
@@ -1172,7 +1281,7 @@ function ProfileField({ icon, label, value }) {
   );
 }
 
-/* ─────────── ACADEMIC BADGE ─────────── */
+/* ----------- ACADEMIC BADGE ----------- */
 function AcademicBadge({ label, value, color }) {
   return (
     <div style={{
@@ -1188,7 +1297,7 @@ function AcademicBadge({ label, value, color }) {
   );
 }
 
-/* ─────────── CERTIFICATE CARD ─────────── */
+/* ----------- CERTIFICATE CARD ----------- */
 function CertificateCard({ certificate }) {
   const logoUrl = getOptimizedLogoUrl(getLogoFromCertificate(certificate));
   const statusLabel = normalizeCertificateStatus(certificate.status || "enrolled");
@@ -1280,3 +1389,4 @@ function CertificateCard({ certificate }) {
     </article>
   );
 }
+

@@ -1068,14 +1068,14 @@ export const getCertificateEnrollmentStatsByProject = async (projectCode) => {
   }
   try {
     const normalizedProjectCode = String(projectCode || "").trim();
-    const projectDocId = codeToDocId(normalizedProjectCode);
-    const enrollmentsRef = collection(
-      db,
-      STUDENTS_COLLECTION,
-      projectDocId,
-      CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
+    if (!normalizedProjectCode) return new Map();
+
+    // Read from nested students/*/certificate_enrollments via collectionGroup.
+    const enrollmentsQuery = query(
+      collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
+      where("projectCode", "==", normalizedProjectCode),
     );
-    const snapshot = await getDocs(enrollmentsRef);
+    const snapshot = await getDocs(enrollmentsQuery);
     const statsMap = new Map();
 
     snapshot.forEach((enrollDoc) => {

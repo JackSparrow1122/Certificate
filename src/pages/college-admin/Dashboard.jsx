@@ -81,6 +81,16 @@ const deriveCourseFromProjectCode = (code) => {
   return normalizeCourseLabel(courseToken);
 };
 
+const deriveYearFromProjectCode = (code) => {
+  const parts = String(code || "")
+    .split("/")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  // Expect project code format like YEAR/COURSE/PASSYEAR, e.g. 2024/ENGG/2027
+  return parts[0] || "";
+};
+
 export default function AdminDashboard() {
   const { profile, user } = useAuth();
   const COLORS = [
@@ -382,7 +392,10 @@ export default function AdminDashboard() {
   const courseOptions = useMemo(() => {
     const courses = new Set(
       projects
-        .map((p) => String(p.course || p.courseCode || "").trim())
+        .map((p) =>
+          String(p.course || p.courseCode || deriveCourseFromProjectCode(p.code) || "")
+            .trim(),
+        )
         .filter(Boolean),
     );
     return ["All", ...Array.from(courses).sort()];
@@ -391,7 +404,11 @@ export default function AdminDashboard() {
   const academicYears = useMemo(() => {
     const years = new Set(
       projects
-        .map((p) => String(p.year || p.academicYear || "").trim())
+        .map((p) =>
+          String(
+            p.year || p.academicYear || deriveYearFromProjectCode(p.code) || "",
+          ).trim(),
+        )
         .filter(Boolean),
     );
     return ["All", ...Array.from(years).sort()];
@@ -410,7 +427,9 @@ export default function AdminDashboard() {
       projects.map((p) => [
         String(p.code || "").trim(),
         {
-          year: String(p.year || p.academicYear || "").trim(),
+          year: String(
+            p.year || p.academicYear || deriveYearFromProjectCode(p.code) || "",
+          ).trim(),
           course: String(
             p.course || p.courseCode || deriveCourseFromProjectCode(p.code),
           ).trim(),
