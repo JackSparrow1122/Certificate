@@ -1011,12 +1011,12 @@ export default function StudentDashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
           <AcademicBadge
             label="10th Percentage"
-            value={tenthPercentage !== "-" ? `${tenthPercentage}%` : "-"}
+            value={tenthPercentage !== "-" ? `${tenthPercentage}` : "-"}
             color="#3B82F6"
           />
           <AcademicBadge
             label="12th / Diploma Percentage"
-            value={twelfthPercentage !== "-" ? `${twelfthPercentage}%` : "-"}
+            value={twelfthPercentage !== "-" ? `${twelfthPercentage}` : "-"}
             color="#8B5CF6"
           />
         </div>
