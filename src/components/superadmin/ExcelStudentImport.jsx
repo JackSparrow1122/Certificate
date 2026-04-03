@@ -790,16 +790,20 @@ function parseCsvLines(text) {
 }
 
 const WRITE_BATCH_LIMIT = 400;
-const AUTH_CONCURRENCY = 10;
+const AUTH_CONCURRENCY = 1;
+const AUTH_CHUNK_DELAY_MS = 0;
 
 function pauseMainThread() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-async function processInChunks(items, chunkSize, handler) {
+async function processInChunks(items, chunkSize, handler, delayMs = 0) {
   for (let i = 0; i < items.length; i += chunkSize) {
     const chunk = items.slice(i, i + chunkSize);
     await handler(chunk, i / chunkSize);
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
     await pauseMainThread();
   }
 }
@@ -1004,6 +1008,7 @@ async function processRows(
           });
         });
       },
+      AUTH_CHUNK_DELAY_MS,
     );
 
     setSuccess(

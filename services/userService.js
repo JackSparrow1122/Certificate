@@ -35,10 +35,31 @@ const USERS_COLLECTION = "users";
 const STUDENT_USERS_COLLECTION = "student_users";
 const SECONDARY_APP_NAME = "secondary-user-creation";
 const ACTIVE_FILTER = (data) => (data?.isActive ?? true) !== false;
+const AUTH_MAX_RETRIES = 7;
+const AUTH_RETRY_BASE_DELAY_MS = 1200;
 const normalizeEmail = (email) =>
   String(email || "")
     .trim()
     .toLowerCase();
+
+const wait = (ms) =>
+  new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+
+const isRetryableAuthError = (error) => {
+  const code = String(error?.code || "").toLowerCase();
+  return (
+    code === "auth/too-many-requests" ||
+    code === "auth/network-request-failed" ||
+    code === "auth/internal-error"
+  );
+};
+
+const getRetryDelayMs = (attempt) => {
+  const exponent = Math.max(0, Number(attempt) || 0);
+  const backoff = AUTH_RETRY_BASE_DELAY_MS * 2 ** exponent;
+  const jitter = Math.floor(Math.random() * 500);
+  return Math.min(60000, backoff + jitter);
+};
 
 const getSecondaryAuth = () => {
   const existingApp = getApps().find((app) => app.name === SECONDARY_APP_NAME);
@@ -135,11 +156,38 @@ export const createStudentAuthUser = async (studentData) => {
       };
     }
 
-    const userCredential = await createUserWithEmailAndPassword(
-      secondaryAuth,
-      email,
-      mobilePassword,
-    );
+    let userCredential = null;
+    let lastAuthError = null;
+
+    for (let attempt = 0; attempt <= AUTH_MAX_RETRIES; attempt += 1) {
+      try {
+        userCredential = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          email,
+          mobilePassword,
+        );
+        lastAuthError = null;
+        break;
+      } catch (authError) {
+        lastAuthError = authError;
+        if (
+          !isRetryableAuthError(authError) ||
+          attempt === AUTH_MAX_RETRIES
+        ) {
+          throw authError;
+        }
+
+        const delayMs = getRetryDelayMs(attempt);
+        console.warn(
+          `Retrying student auth create for ${email} (attempt ${attempt + 1}/${AUTH_MAX_RETRIES + 1}) in ${delayMs}ms due to ${authError?.code || "unknown-error"}`,
+        );
+        await wait(delayMs);
+      }
+    }
+
+    if (!userCredential && lastAuthError) {
+      throw lastAuthError;
+    }
 
     const uid = userCredential.user.uid;
 
