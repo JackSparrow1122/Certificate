@@ -90,12 +90,29 @@ export default function CertificateConfig() {
 
       let mergedCertificates = certificateData || [];
       if (certificateIds.length > 0) {
-        const liveEnrollmentCounts =
-          await getCertificateEnrollmentCounts(certificateIds);
-        mergedCertificates = (certificateData || []).map((certificate) => ({
-          ...certificate,
-          enrolledCount: Number(liveEnrollmentCounts?.[certificate.id] ?? 0),
-        }));
+        const activeProjectCodes = (projectCodeData || [])
+          .map((row) => String(row?.code || "").trim())
+          .filter(Boolean);
+        try {
+          const liveEnrollmentCounts = await getCertificateEnrollmentCounts(
+            certificateIds,
+            { projectCodes: activeProjectCodes },
+          );
+          mergedCertificates = (certificateData || []).map((certificate) => {
+            const liveValue = Number(liveEnrollmentCounts?.[certificate.id]);
+            return {
+              ...certificate,
+              enrolledCount: Number.isFinite(liveValue)
+                ? liveValue
+                : Number(certificate?.enrolledCount || 0),
+            };
+          });
+        } catch (countError) {
+          console.warn(
+            "Using stored certificate enrolledCount because live count fetch failed:",
+            countError,
+          );
+        }
       }
 
       setCertifications(mergedCertificates);
@@ -222,12 +239,20 @@ export default function CertificateConfig() {
       }
 
       const liveEnrollmentCounts =
-        await getCertificateEnrollmentCounts(certificateIds);
+        await getCertificateEnrollmentCounts(certificateIds, {
+          projectCodes: (projectCodes || [])
+            .map((row) => String(row?.code || "").trim())
+            .filter(Boolean),
+        });
 
       setCertifications((prev) =>
         prev.map((certificate) => ({
           ...certificate,
-          enrolledCount: Number(liveEnrollmentCounts?.[certificate.id] ?? 0),
+          enrolledCount: Number.isFinite(
+            Number(liveEnrollmentCounts?.[certificate.id]),
+          )
+            ? Number(liveEnrollmentCounts?.[certificate.id])
+            : Number(certificate?.enrolledCount || 0),
         })),
       );
 
@@ -236,7 +261,11 @@ export default function CertificateConfig() {
         setTimeout(() => setSuccessMessage(""), 3000);
       }
     } catch (refreshError) {
-      if (!silent) setError("Failed to refresh enrolled counts");
+      if (!silent) {
+        setError(
+          "Live enrolled count refresh failed. Showing last known enrolled counts.",
+        );
+      }
       console.error("Refresh counts error:", refreshError);
     } finally {
       setRefreshingCounts(false);

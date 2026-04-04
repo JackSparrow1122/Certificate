@@ -514,8 +514,6 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
         toImportRows,
         headerMap,
         projectCode,
-        onStudentAdded,
-        setLoading,
         setError,
         setSuccess,
       );
@@ -541,6 +539,8 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
             : ""
         }`;
       });
+      onStudentAdded?.(true);
+      setLoading(false);
     } catch (e) {
       console.error(e);
       const isXlsxImportError = String(e?.message || "").includes(
@@ -551,6 +551,7 @@ export function ExcelStudentImport({ projectCode, onStudentAdded }) {
           ? "XLSX parser not available in this environment. Please import CSV for now."
           : e.message || "Failed during duplicate detection/import",
       );
+      onStudentAdded?.(false);
       setLoading(false);
     }
   }
@@ -811,8 +812,6 @@ async function processRows(
   rows,
   headerMap,
   projectCode,
-  onStudentAdded,
-  setLoading,
   setError,
   setSuccess,
 ) {
@@ -1007,14 +1006,9 @@ async function processRows(
           .join(", ")}${loginFailures.length > 10 ? " ..." : ""}`,
       );
     }
-
-    onStudentAdded?.(true);
   } catch (e) {
     console.error(e);
     setError(e.message || "Failed to process rows");
-    onStudentAdded?.(false);
-  } finally {
-    setLoading(false);
   }
 }
 

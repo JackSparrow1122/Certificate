@@ -5,7 +5,7 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { Lock, Mail, Shield, UserCircle2 } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Shield, UserCircle2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase/config";
 
@@ -211,18 +211,30 @@ export default function AdminProfilePanel({ roleLabel = "Admin" }) {
 }
 
 function Field({ label, name, value, onChange, placeholder }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
-      <input
-        type="password"
-        name={name}
-        value={value}
-        onChange={onChange}
-        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#1D5FA8]"
-        placeholder={placeholder}
-        autoComplete={name === "currentPassword" ? "current-password" : "new-password"}
-      />
+      <div className="relative">
+        <input
+          type={showPassword ? "text" : "password"}
+          name={name}
+          value={value}
+          onChange={onChange}
+          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 pr-10 text-sm outline-none focus:border-[#1D5FA8]"
+          placeholder={placeholder}
+          autoComplete={name === "currentPassword" ? "current-password" : "new-password"}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword((prev) => !prev)}
+          className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
     </label>
   );
 }

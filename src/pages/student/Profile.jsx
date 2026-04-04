@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentForAuthUser } from "../../../services/studentService";
 import { changeStudentLoginPassword } from "../../../services/userService";
@@ -59,6 +60,11 @@ export default function StudentProfile() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [showPasswords, setShowPasswords] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -149,6 +155,13 @@ export default function StudentProfile() {
   const handlePasswordFieldChange = (event) => {
     const { name, value } = event.target;
     setPasswordForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const togglePasswordVisibility = (fieldName) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [fieldName]: !prev[fieldName],
+    }));
   };
 
   const handlePasswordChange = async (event) => {
@@ -291,42 +304,96 @@ export default function StudentProfile() {
             <span className="mb-1 block text-sm font-medium text-[#012920]">
               Current Password
             </span>
-            <input
-              type="password"
-              name="currentPassword"
-              value={passwordForm.currentPassword}
-              onChange={handlePasswordFieldChange}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
-              autoComplete="current-password"
-            />
+            <div className="relative">
+              <input
+                type={showPasswords.currentPassword ? "text" : "password"}
+                name="currentPassword"
+                value={passwordForm.currentPassword}
+                onChange={handlePasswordFieldChange}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 pr-10 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => togglePasswordVisibility("currentPassword")}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+                aria-label={
+                  showPasswords.currentPassword
+                    ? "Hide current password"
+                    : "Show current password"
+                }
+              >
+                {showPasswords.currentPassword ? (
+                  <EyeOff size={16} />
+                ) : (
+                  <Eye size={16} />
+                )}
+              </button>
+            </div>
           </label>
 
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-gray-700">
               New Password
             </span>
-            <input
-              type="password"
-              name="newPassword"
-              value={passwordForm.newPassword}
-              onChange={handlePasswordFieldChange}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <input
+                type={showPasswords.newPassword ? "text" : "password"}
+                name="newPassword"
+                value={passwordForm.newPassword}
+                onChange={handlePasswordFieldChange}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 pr-10 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => togglePasswordVisibility("newPassword")}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+                aria-label={
+                  showPasswords.newPassword
+                    ? "Hide new password"
+                    : "Show new password"
+                }
+              >
+                {showPasswords.newPassword ? (
+                  <EyeOff size={16} />
+                ) : (
+                  <Eye size={16} />
+                )}
+              </button>
+            </div>
           </label>
 
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-gray-700">
               Confirm New Password
             </span>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={passwordForm.confirmPassword}
-              onChange={handlePasswordFieldChange}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <input
+                type={showPasswords.confirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={passwordForm.confirmPassword}
+                onChange={handlePasswordFieldChange}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 pr-10 text-sm outline-none transition focus:border-[#1D5FA8] focus:bg-white"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => togglePasswordVisibility("confirmPassword")}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+                aria-label={
+                  showPasswords.confirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
+              >
+                {showPasswords.confirmPassword ? (
+                  <EyeOff size={16} />
+                ) : (
+                  <Eye size={16} />
+                )}
+              </button>
+            </div>
           </label>
 
           <div className="md:col-span-3">

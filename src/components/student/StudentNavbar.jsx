@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import {
-  getAllColleges,
-  getCollegeByCode,
-} from "../../../services/collegeService";
+import { getCollegeByCode } from "../../../services/collegeService";
 import { getStudentForAuthUser } from "../../../services/studentService";
 import { db } from "../../firebase/config";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
@@ -147,23 +144,6 @@ export default function StudentNavbar({ onMenuClick }) {
             }
           } catch (error) {
             console.warn("Fallback college query failed:", error);
-          }
-        }
-        if (!college) {
-          try {
-            const allColleges = await getAllColleges();
-            college =
-              (allColleges || []).find((row) => {
-                const byDocId =
-                  normalizeCode(row?.collegeCode) ===
-                  normalizeCode(enrolledCollegeCode);
-                const byField =
-                  normalizeCode(row?.college_code) ===
-                  normalizeCode(enrolledCollegeCode);
-                return byDocId || byField;
-              }) || null;
-          } catch (error) {
-            console.warn("Bulk college fetch failed:", error);
           }
         }
         if (!mounted) return;

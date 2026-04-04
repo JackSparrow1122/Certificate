@@ -4,7 +4,6 @@ import {
   collection,
   collectionGroup,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   query,
@@ -219,7 +218,10 @@ export const updateCertificate = async (certificateId, updateData) => {
 // Enrollment counts — from certificate_enrollments collectionGroup
 // ---------------------------------------------------------------------------
 
-export const getCertificateEnrollmentCounts = async (certificateIds) => {
+export const getCertificateEnrollmentCounts = async (
+  certificateIds,
+  { projectCodes = [] } = {},
+) => {
   const ids = Array.isArray(certificateIds)
     ? [
         ...new Set(
@@ -233,23 +235,39 @@ export const getCertificateEnrollmentCounts = async (certificateIds) => {
   }
 
   if (ids.length === 0) return {};
+  const projectCodeSet = new Set(
+    (projectCodes || []).map((code) => String(code || "").trim()).filter(Boolean),
+  );
 
   try {
     const countEntries = await Promise.all(
       ids.map(async (certificateId) => {
-        const countQuery = query(
+        const enrollmentsQuery = query(
           collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
           where("certificateId", "==", certificateId),
         );
-        const countSnapshot = await getCountFromServer(countQuery);
-        return [certificateId, Number(countSnapshot?.data?.()?.count || 0)];
+        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+        let count = 0;
+        enrollmentsSnapshot.forEach((enrollmentDoc) => {
+          const data = enrollmentDoc.data() || {};
+          if (data?.isDeleted === true) return;
+          if (String(data?.status || "").trim().toLowerCase() === "unenrolled") {
+            return;
+          }
+          if (projectCodeSet.size > 0) {
+            const rowProjectCode = String(data?.projectCode || "").trim();
+            if (!rowProjectCode || !projectCodeSet.has(rowProjectCode)) return;
+          }
+          count += 1;
+        });
+        return [certificateId, count];
       }),
     );
 
     return Object.fromEntries(countEntries);
   } catch (error) {
     console.error("Error getting enrollment counts:", error);
-    return Object.fromEntries(ids.map((id) => [id, 0]));
+    throw error;
   }
 };
 

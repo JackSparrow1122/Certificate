@@ -595,9 +595,12 @@ export const getAllProjectCodesFromStudents = async () => {
     const projectCodesSet = new Set();
 
     studentsProjectsSnapshot.forEach((projectDoc) => {
+      const projectData = projectDoc.data() || {};
+      if ((projectData?.isActive ?? true) === false) return;
+      const explicitProjectCode = String(projectData?.projectCode || "").trim();
       const projectDocId = String(projectDoc.id || "").trim();
-      if (!projectDocId) return;
-      const projectCode = docIdToCode(projectDocId);
+      const projectCode =
+        explicitProjectCode || (projectDocId ? docIdToCode(projectDocId) : "");
       if (projectCode) {
         projectCodesSet.add(projectCode);
       }
@@ -608,13 +611,22 @@ export const getAllProjectCodesFromStudents = async () => {
       const allStudentsQuery = collectionGroup(db, "students_list");
       const querySnapshot = await getDocs(allStudentsQuery);
       querySnapshot.forEach((studentDoc) => {
+        const studentData = studentDoc.data() || {};
+        if ((studentData?.isActive ?? true) === false) return;
+        const explicitProjectCode = String(
+          studentData?.projectCode || studentData?.projectId || "",
+        ).trim();
+        if (explicitProjectCode) {
+          projectCodesSet.add(explicitProjectCode);
+          return;
+        }
+
         const pathSegments = studentDoc.ref.path.split("/");
-        if (pathSegments.length >= 2) {
-          const projectDocId = pathSegments[1];
-          const projectCode = docIdToCode(projectDocId);
-          if (projectCode) {
-            projectCodesSet.add(projectCode);
-          }
+        if (pathSegments.length < 2) return;
+        const projectDocId = pathSegments[1];
+        const projectCode = docIdToCode(projectDocId);
+        if (projectCode) {
+          projectCodesSet.add(projectCode);
         }
       });
     }

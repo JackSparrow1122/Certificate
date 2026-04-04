@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import {
-  getAllColleges,
-  getCollegeByCode,
-} from "../../../services/collegeService";
+import { getCollegeByCode } from "../../../services/collegeService";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { db } from "../../firebase/config";
 
 const normalizeCode = (value) =>
   String(value || "")
@@ -51,13 +50,19 @@ export default function CollegeAdminNavbar({ onMenuClick }) {
 
       if (!college) {
         try {
-          const allColleges = await getAllColleges();
-          college =
-            (allColleges || []).find((row) => {
-              const byDocId = normalizeCode(row?.collegeCode) === collegeCode;
-              const byField = normalizeCode(row?.college_code) === collegeCode;
-              return byDocId || byField;
-            }) || null;
+          const lookupSnapshot = await getDocs(
+            query(
+              collection(db, "college"),
+              where("college_code", "==", collegeCode),
+              limit(1),
+            ),
+          );
+          if (!lookupSnapshot.empty) {
+            college = {
+              collegeCode: lookupSnapshot.docs[0].id,
+              ...lookupSnapshot.docs[0].data(),
+            };
+          }
         } catch {
           college = null;
         }

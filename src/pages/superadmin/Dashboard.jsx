@@ -96,6 +96,29 @@ const resolveCollegeCodeForAdmin = (admin) => {
   );
 };
 
+const getStudentUniqueKey = (student) => {
+  const official = student?.OFFICIAL_DETAILS || {};
+  const email = String(
+    student?.email || official?.EMAIL_ID || official?.["EMAIL_ID."] || "",
+  )
+    .trim()
+    .toLowerCase();
+  if (email) return `email:${email}`;
+
+  const phone = String(student?.phone || official?.["MOBILE NO."] || "")
+    .replace(/\D/g, "")
+    .trim();
+  if (phone) return `phone:${phone}`;
+
+  const rollNo = String(student?.id || student?.docId || official?.SN || "")
+    .trim()
+    .toUpperCase();
+  const collegeCode = resolveCollegeCodeForStudent(student);
+  if (rollNo) return `roll:${collegeCode}:${rollNo}`;
+
+  return "";
+};
+
 const getStudentResultStatus = (statusValue) => {
   const normalized = String(statusValue || "")
     .trim()
@@ -118,7 +141,7 @@ export default function Dashboard() {
   const [colleges, setColleges] = useState([]);
   const [projectCodes, setProjectCodes] = useState([]);
   const [certStatsByProject, setCertStatsByProject] = useState({});
-  const [totalStudentsCount, setTotalStudentsCount] = useState(0);
+  const [, setTotalStudentsCount] = useState(0);
   const [selectedCollegeCode, setSelectedCollegeCode] = useState("ALL");
   const [dbMode, setDbModeState] = useState(getDbMode());
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
@@ -146,9 +169,9 @@ export default function Dashboard() {
       {
         key: "students",
         label: "students/students_list",
-        // Sample up to 3000 students for chart rendering — stat card uses
+        // Sample up to 500 students for chart rendering — stat card uses
         // server-side count via getAllStudentsCount for the accurate total.
-        run: () => getAllStudents({ maxDocs: 3000 }),
+        run: () => getAllStudents({ maxDocs: 500 }),
       },
       {
         key: "totalStudentsCount",
@@ -266,9 +289,9 @@ export default function Dashboard() {
     if (nextStudents.length === 0 && nextProjectCodes.length > 0) {
       try {
         const projectStudentGroups = await Promise.allSettled(
-          nextProjectCodes.slice(0, 15).map((projectCodeRow) =>
+          nextProjectCodes.slice(0, 8).map((projectCodeRow) =>
             getStudentsByProject(String(projectCodeRow?.code || "").trim(), {
-              maxDocs: 200,
+              maxDocs: 100,
             }),
           ),
         );
@@ -435,11 +458,13 @@ export default function Dashboard() {
   }, [students, selectedCollegeCode, selectedProjectCodeSet]);
 
   const selectedCollegeStudentCount = useMemo(() => {
-    if (selectedCollegeCode === "ALL") {
-      return Math.max(Number(totalStudentsCount || 0), Number(students.length || 0));
-    }
-    return chartStudents.length;
-  }, [selectedCollegeCode, totalStudentsCount, students.length, chartStudents.length]);
+    const unique = new Set(
+      chartStudents
+        .map((student) => getStudentUniqueKey(student))
+        .filter(Boolean),
+    );
+    return unique.size;
+  }, [chartStudents]);
 
   const selectedCollegeActiveColleges = useMemo(() => {
     if (selectedCollegeCode === "ALL") return activeColleges;
