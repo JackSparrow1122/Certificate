@@ -292,8 +292,8 @@ export default function AdminDashboard() {
 
         const [countEntries, sampledGroups, perProjectStats] =
           await Promise.all([
-            // Server-side counts for ALL projects — lightweight
-            Promise.all(
+            // Server-side counts for ALL projects — lightweight and quota-safe.
+            Promise.allSettled(
               normalizedProjects.map(async (project) => {
                 const projectCode = String(project.code || "").trim();
                 const count = await getStudentsByProjectCount(projectCode);
@@ -321,7 +321,26 @@ export default function AdminDashboard() {
             ),
           ]);
 
-        const countsByProject = Object.fromEntries(countEntries);
+        const countsByProject = {};
+        countEntries.forEach((entry, index) => {
+          const projectCode = String(normalizedProjects[index]?.code || "").trim();
+          if (!projectCode) return;
+          if (entry.status === "fulfilled" && Array.isArray(entry.value)) {
+            countsByProject[projectCode] = Number(entry.value[1] || 0);
+            return;
+          }
+          const error = entry.reason;
+          const message = String(error?.message || "");
+          const code = String(error?.code || "").toLowerCase();
+          const isQuotaError =
+            code.includes("resource-exhausted") ||
+            code.includes("quota") ||
+            /quota exceeded|too many requests|resource-exhausted/i.test(message);
+          if (!isQuotaError) {
+            console.warn(`Student count failed for ${projectCode}:`, error);
+          }
+          countsByProject[projectCode] = 0;
+        });
         const studentsForCollege = sampledGroups.flatMap(
           (group) => group || [],
         );
@@ -379,7 +398,19 @@ export default function AdminDashboard() {
         });
         setCacheInfo({ cachedAt: Date.now(), isStale: false });
       } catch (error) {
-        console.error("Failed to load dashboard data:", error);
+        const message = String(error?.message || "");
+        const code = String(error?.code || "").toLowerCase();
+        const isQuotaError =
+          code.includes("resource-exhausted") ||
+          code.includes("quota") ||
+          /quota exceeded|too many requests|resource-exhausted/i.test(message);
+        if (!isQuotaError) {
+          console.error("Failed to load dashboard data:", error);
+        } else {
+          console.warn(
+            "Dashboard load throttled by Firestore quota; showing available cached/fallback data.",
+          );
+        }
         // Do NOT zero out state here — cached values stay visible when offline
       }
     };

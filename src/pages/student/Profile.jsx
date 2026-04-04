@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebase/config";
 import { getStudentForAuthUser } from "../../../services/studentService";
+import { changeStudentLoginPassword } from "../../../services/userService";
 
 const getCurrentYearFromProjectCode = (projectCodeValue) => {
   const parts = String(projectCodeValue || "")
@@ -166,8 +160,11 @@ export default function StudentProfile() {
     const newPassword = String(passwordForm.newPassword || "").trim();
     const confirmPassword = String(passwordForm.confirmPassword || "").trim();
 
-    if (!user || !user.email) {
-      setPasswordError("Authenticated user not found.");
+    const loginId = String(profile?.id || profile?.uid || "").trim();
+    const loginEmail = String(profile?.email || user?.email || "").trim();
+
+    if (!loginId && !loginEmail) {
+      setPasswordError("Student login profile not found.");
       return;
     }
 
@@ -193,35 +190,12 @@ export default function StudentProfile() {
 
     setPasswordLoading(true);
     try {
-      const credential = EmailAuthProvider.credential(
-        user.email,
+      await changeStudentLoginPassword({
+        loginId,
+        email: loginEmail,
         currentPassword,
-      );
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, newPassword);
-
-      const studentUsersRef = doc(db, "student_users", user.uid);
-      const usersRef = doc(db, "users", user.uid);
-      const [studentUsersSnap, usersSnap] = await Promise.all([
-        getDoc(studentUsersRef),
-        getDoc(usersRef),
-      ]);
-
-      const targetRef = studentUsersSnap.exists()
-        ? studentUsersRef
-        : usersSnap.exists()
-          ? usersRef
-          : studentUsersRef;
-
-      await setDoc(
-        targetRef,
-        {
-          passwordLastUpdatedAt: new Date(),
-          passwordUpdatedBy: "student",
-          updatedAt: new Date(),
-        },
-        { merge: true },
-      );
+        newPassword,
+      });
 
       setPasswordForm({
         currentPassword: "",
@@ -232,17 +206,10 @@ export default function StudentProfile() {
     } catch (error) {
       console.error("Failed to update password:", error);
       const code = error?.code || "";
-      if (
-        code === "auth/wrong-password" ||
-        code === "auth/invalid-credential"
-      ) {
+      if (code === "student-auth/wrong-password") {
         setPasswordError("Current password is incorrect.");
-      } else if (code === "auth/weak-password") {
-        setPasswordError("New password is too weak.");
-      } else if (code === "auth/too-many-requests") {
-        setPasswordError("Too many attempts. Please try again later.");
       } else {
-        setPasswordError("Failed to update password. Please try again.");
+        setPasswordError(error?.message || "Failed to update password.");
       }
     } finally {
       setPasswordLoading(false);

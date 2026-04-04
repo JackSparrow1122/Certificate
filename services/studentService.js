@@ -37,6 +37,52 @@ const STUDENTS_COLLECTION = "students";
 const DEFAULT_PROJECT_STUDENTS_LIMIT = 5000;
 const DEFAULT_ALL_STUDENTS_LIMIT = 10000;
 const DEFAULT_PROJECT_STUDENTS_PAGE_SIZE = 50;
+const PROJECT_COUNT_FALLBACK_SCAN_LIMIT = 2000;
+const DISABLE_AGGREGATION_COUNTS =
+  import.meta.env.DEV ||
+  String(import.meta.env.VITE_DISABLE_AGGREGATION_COUNTS || "").trim() ===
+    "true";
+const STUDENTS_COUNT_CACHE_TTL_MS = 60 * 1000;
+const STUDENTS_COUNT_QUOTA_BACKOFF_MS = 5 * 60 * 1000;
+const STUDENTS_COUNT_RETRY_AFTER_KEY = "students_count_retry_after_v1";
+const PROJECT_STUDENTS_COUNT_CACHE_TTL_MS = 60 * 1000;
+const PROJECT_STUDENTS_COUNT_QUOTA_BACKOFF_MS = 5 * 60 * 1000;
+let studentsCountCache = {
+  value: null,
+  fetchedAt: 0,
+};
+let studentsCountInFlight = null;
+let studentsCountQuotaRetryAfter = 0;
+let studentsCountLastBackoffLogAt = 0;
+const projectStudentsCountCache = new Map();
+const projectStudentsCountInFlight = new Map();
+const projectStudentsCountRetryAfter = new Map();
+
+const readStudentsCountRetryAfter = () => {
+  if (studentsCountQuotaRetryAfter > 0) {
+    return studentsCountQuotaRetryAfter;
+  }
+  try {
+    const raw = sessionStorage.getItem(STUDENTS_COUNT_RETRY_AFTER_KEY);
+    const parsed = Number(raw || 0);
+    studentsCountQuotaRetryAfter = Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    studentsCountQuotaRetryAfter = 0;
+  }
+  return studentsCountQuotaRetryAfter;
+};
+
+const writeStudentsCountRetryAfter = (valueMs) => {
+  studentsCountQuotaRetryAfter = Number(valueMs || 0);
+  try {
+    sessionStorage.setItem(
+      STUDENTS_COUNT_RETRY_AFTER_KEY,
+      String(studentsCountQuotaRetryAfter),
+    );
+  } catch {
+    // no-op
+  }
+};
 
 // Add a student to Firestore
 export const addStudent = async (studentData) => {
@@ -130,9 +176,11 @@ export const getAllStudents = async ({
     const querySnapshot = await getDocs(allStudentsQuery);
     const students = [];
     querySnapshot.forEach((studentDoc) => {
+      const data = studentDoc.data() || {};
+      if ((data?.isActive ?? true) === false) return;
       students.push({
         docId: studentDoc.id,
-        ...studentDoc.data(),
+        ...data,
       });
     });
 
@@ -168,9 +216,11 @@ export const getAllStudents = async ({
     const fallbackStudents = [];
     studentsByProjectSnapshots.forEach((projectStudentsSnapshot) => {
       projectStudentsSnapshot.forEach((studentDoc) => {
+        const data = studentDoc.data() || {};
+        if ((data?.isActive ?? true) === false) return;
         fallbackStudents.push({
           docId: studentDoc.id,
-          ...studentDoc.data(),
+          ...data,
         });
       });
     });
@@ -201,11 +251,13 @@ export const getStudentsByProject = async (
     const querySnapshot = await getDocs(query(studentsList, limit(maxDocs)));
     const students = [];
     querySnapshot.forEach((studentDoc) => {
+      const data = studentDoc.data() || {};
+      if ((data?.isActive ?? true) === false) return;
       students.push({
         id: studentDoc.id,
         docId: studentDoc.id,
         projectCode: projectId,
-        ...studentDoc.data(),
+        ...data,
       });
     });
     return students;
@@ -300,15 +352,76 @@ export const getAllStudentsCount = async () => {
     return Number(allRows?.length || 0);
   }
 
-  try {
-    const countSnapshot = await getCountFromServer(
-      collectionGroup(db, "students_list"),
-    );
-    return Number(countSnapshot?.data?.()?.count || 0);
-  } catch (error) {
-    console.error("Error getting all students count:", error);
-    throw error;
+  const now = Date.now();
+  const retryAfter = readStudentsCountRetryAfter();
+  if (retryAfter > now && Number.isFinite(studentsCountCache.value)) {
+    return Number(studentsCountCache.value || 0);
   }
+
+  if (retryAfter > now) {
+    const shouldLog = now - studentsCountLastBackoffLogAt > 30 * 1000;
+    if (shouldLog) {
+      studentsCountLastBackoffLogAt = now;
+    }
+    return 0;
+  }
+
+  if (
+    Number.isFinite(studentsCountCache.value) &&
+    now - Number(studentsCountCache.fetchedAt || 0) < STUDENTS_COUNT_CACHE_TTL_MS
+  ) {
+    return Number(studentsCountCache.value || 0);
+  }
+
+  if (studentsCountInFlight) {
+    return studentsCountInFlight;
+  }
+
+  studentsCountInFlight = (async () => {
+    try {
+      const countSnapshot = await getCountFromServer(
+        collectionGroup(db, "students_list"),
+      );
+      const count = Number(countSnapshot?.data?.()?.count || 0);
+      studentsCountCache = {
+        value: count,
+        fetchedAt: Date.now(),
+      };
+      return count;
+    } catch (error) {
+      const code = String(error?.code || "").toLowerCase();
+      const message = String(error?.message || "");
+      const isQuotaError =
+        code.includes("resource-exhausted") ||
+        code.includes("quota") ||
+        /quota exceeded|too many requests/i.test(message);
+
+      if (
+        isQuotaError &&
+        Number.isFinite(studentsCountCache.value) &&
+        studentsCountCache.value >= 0
+      ) {
+        writeStudentsCountRetryAfter(
+          Date.now() + STUDENTS_COUNT_QUOTA_BACKOFF_MS,
+        );
+        return Number(studentsCountCache.value || 0);
+      }
+
+      if (isQuotaError) {
+        writeStudentsCountRetryAfter(
+          Date.now() + STUDENTS_COUNT_QUOTA_BACKOFF_MS,
+        );
+        return 0;
+      }
+
+      console.error("Error getting all students count:", error);
+      throw error;
+    } finally {
+      studentsCountInFlight = null;
+    }
+  })();
+
+  return studentsCountInFlight;
 };
 
 export const getStudentsByProjectCount = async (projectId) => {
@@ -317,20 +430,85 @@ export const getStudentsByProjectCount = async (projectId) => {
     return Number(rows?.length || 0);
   }
 
-  try {
-    const projectDocId = codeToDocId(projectId);
-    const studentsListRef = collection(
-      db,
-      STUDENTS_COLLECTION,
-      projectDocId,
-      "students_list",
-    );
-    const countSnapshot = await getCountFromServer(studentsListRef);
-    return Number(countSnapshot?.data?.()?.count || 0);
-  } catch (error) {
-    console.error("Error getting students by project count:", error);
-    throw error;
+  const projectCode = String(projectId || "").trim();
+  const projectKey = codeToDocId(projectCode || "__unknown__");
+  const now = Date.now();
+
+  const cached = projectStudentsCountCache.get(projectKey);
+  if (
+    cached &&
+    Number.isFinite(cached.value) &&
+    now - Number(cached.fetchedAt || 0) < PROJECT_STUDENTS_COUNT_CACHE_TTL_MS
+  ) {
+    return Number(cached.value || 0);
   }
+
+  const retryAfter = Number(projectStudentsCountRetryAfter.get(projectKey) || 0);
+  if (retryAfter > now) {
+    if (cached && Number.isFinite(cached.value)) {
+      return Number(cached.value || 0);
+    }
+    return 0;
+  }
+
+  if (projectStudentsCountInFlight.has(projectKey)) {
+    return projectStudentsCountInFlight.get(projectKey);
+  }
+
+  const run = (async () => {
+    try {
+      const projectDocId = codeToDocId(projectCode);
+      const studentsListRef = collection(
+        db,
+        STUDENTS_COLLECTION,
+        projectDocId,
+        "students_list",
+      );
+      let count = 0;
+      if (DISABLE_AGGREGATION_COUNTS) {
+        const fallbackSnapshot = await getDocs(
+          query(studentsListRef, limit(PROJECT_COUNT_FALLBACK_SCAN_LIMIT)),
+        );
+        count = Number(fallbackSnapshot?.size || 0);
+      } else {
+        const countSnapshot = await getCountFromServer(studentsListRef);
+        count = Number(countSnapshot?.data?.()?.count || 0);
+      }
+
+      projectStudentsCountCache.set(projectKey, {
+        value: count,
+        fetchedAt: Date.now(),
+      });
+      projectStudentsCountRetryAfter.delete(projectKey);
+      return count;
+    } catch (error) {
+      const code = String(error?.code || "").toLowerCase();
+      const message = String(error?.message || "");
+      const isQuotaError =
+        code.includes("resource-exhausted") ||
+        code.includes("quota") ||
+        /quota exceeded|too many requests|resource-exhausted/i.test(message);
+
+      if (isQuotaError) {
+        projectStudentsCountRetryAfter.set(
+          projectKey,
+          Date.now() + PROJECT_STUDENTS_COUNT_QUOTA_BACKOFF_MS,
+        );
+        if (cached && Number.isFinite(cached.value)) {
+          return Number(cached.value || 0);
+        }
+        return 0;
+      }
+
+      console.error("Error getting students by project count:", error);
+      throw error;
+    } finally {
+      projectStudentsCountInFlight.delete(projectKey);
+    }
+  })();
+
+  projectStudentsCountInFlight.set(projectKey, run);
+  return run;
 };
 
 export const getStudentByDocId = async (studentDocId) => {

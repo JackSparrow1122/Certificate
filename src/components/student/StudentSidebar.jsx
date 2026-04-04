@@ -3,9 +3,8 @@ import { LayoutGrid, LogOut, X } from "lucide-react";
 import logo from "../../assets/image.png";
 import compactLogo from "../../assets/logo.png";
 import { useState } from "react";
-import { signOut } from "firebase/auth";
-import { auth } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
+import { performFullLogout } from "../../utils/authLogout";
 
 const STUDENT_SIDEBAR_STATE_KEY = "student_sidebar_expanded";
 
@@ -39,8 +38,7 @@ export default function StudentSidebar({ mobileMenuOpen, setMobileMenuOpen }) {
   const studentInitial = studentName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
-    await signOut(auth);
-    localStorage.clear();
+    await performFullLogout();
     setMobileMenuOpen(false);
     navigate("/login", { replace: true });
   };

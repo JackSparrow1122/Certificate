@@ -1,11 +1,10 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { LayoutGrid, Users, Award, CircleHelp, LogOut, X } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../../firebase/config";
 import logo from "../../assets/image.png";
 import profileImage from "../../assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
+import { performFullLogout } from "../../utils/authLogout";
 
 const COLLEGEADMIN_SIDEBAR_STATE_KEY = "collegeadmin_sidebar_expanded";
 
@@ -38,8 +37,7 @@ export default function CollegeAdminSidebar({ mobileMenuOpen, setMobileMenuOpen 
   ];
 
   const handleSignOut = async () => {
-    await signOut(auth);
-    localStorage.clear();
+    await performFullLogout();
     setMobileMenuOpen(false);
     navigate("/login", { replace: true });
   };

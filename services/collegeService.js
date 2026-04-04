@@ -10,6 +10,7 @@ import {
   where,
   writeBatch,
   setDoc,
+  limit,
 } from "firebase/firestore";
 import { isLocalDbMode } from "./dbModeService";
 import {
@@ -22,6 +23,7 @@ import {
   localSeedColleges,
   localUpdateCollege,
 } from "./localDbService";
+import { softDeleteProjectCode } from "./projectCodeService";
 
 const COLLEGES_COLLECTION = "college";
 
@@ -143,6 +145,73 @@ export const deleteCollege = async (collegeCode) => {
     return localDeleteCollege(collegeCode);
   }
   try {
+    const normalizedCollegeCode = String(collegeCode || "").trim();
+
+    const [byCollegeId, byCollegeCode] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, "projectCodes"),
+          where("collegeId", "==", normalizedCollegeCode),
+          limit(500),
+        ),
+      ),
+      getDocs(
+        query(
+          collection(db, "projectCodes"),
+          where("collegeCode", "==", normalizedCollegeCode),
+          limit(500),
+        ),
+      ),
+    ]);
+
+    const projectMap = new Map();
+    [byCollegeId, byCollegeCode].forEach((snapshot) => {
+      snapshot.forEach((projectDoc) => {
+        projectMap.set(projectDoc.id, {
+          id: projectDoc.id,
+          ...(projectDoc.data() || {}),
+        });
+      });
+    });
+
+    if (projectMap.size === 0) {
+      const allProjects = await getDocs(collection(db, "projectCodes"));
+      allProjects.forEach((projectDoc) => {
+        const data = projectDoc.data() || {};
+        const code = String(data?.code || "").trim().toUpperCase();
+        if (code.startsWith(`${normalizedCollegeCode.toUpperCase()}/`)) {
+          projectMap.set(projectDoc.id, {
+            id: projectDoc.id,
+            ...data,
+          });
+        }
+      });
+    }
+
+    const projectRows = Array.from(projectMap.values());
+    for (const projectRow of projectRows) {
+      const projectCodeValue = String(projectRow?.code || "").trim();
+      if (!projectCodeValue) continue;
+      await softDeleteProjectCode(projectRow.id, projectCodeValue);
+    }
+
+    const studentLoginUsers = await getDocs(
+      query(
+        collection(db, "student_login_users"),
+        where("collegeCode", "==", normalizedCollegeCode),
+        limit(1000),
+      ),
+    );
+    if (!studentLoginUsers.empty) {
+      const docs = studentLoginUsers.docs;
+      for (let index = 0; index < docs.length; index += 400) {
+        const chunk = docs.slice(index, index + 400);
+        const batch = writeBatch(db);
+        chunk.forEach((studentLoginDoc) => batch.delete(studentLoginDoc.ref));
+        await batch.commit();
+      }
+    }
+
     await deleteDoc(doc(db, COLLEGES_COLLECTION, collegeCode));
     console.log("College deleted:", collegeCode);
     return true;

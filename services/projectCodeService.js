@@ -5,6 +5,7 @@ import {
   getDoc,
   doc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   writeBatch,
@@ -74,7 +75,7 @@ const setStudentsProjectActiveStatus = async (projectCode, isActive) => {
 
   const studentUsersSnapshot = await getDocs(
     query(
-      collection(db, "student_users"),
+      collection(db, "student_login_users"),
       where("projectCode", "==", projectCode),
     ),
   );
@@ -97,6 +98,90 @@ const setStudentsProjectActiveStatus = async (projectCode, isActive) => {
       await usersBatch.commit();
     }
   }
+};
+
+const deleteStudentsProjectData = async (projectCode) => {
+  if (!projectCode) return;
+
+  const projectDocId = codeToDocId(projectCode);
+
+  const studentsSnapshot = await getDocs(
+    collection(db, STUDENTS_COLLECTION, projectDocId, "students_list"),
+  );
+
+  for (const studentDoc of studentsSnapshot.docs) {
+    const nestedEnrollmentsSnapshot = await getDocs(
+      collection(
+        db,
+        STUDENTS_COLLECTION,
+        projectDocId,
+        "students_list",
+        studentDoc.id,
+        "certificate_enrollments",
+      ),
+    );
+
+    if (!nestedEnrollmentsSnapshot.empty) {
+      for (
+        let index = 0;
+        index < nestedEnrollmentsSnapshot.docs.length;
+        index += BATCH_CHUNK_SIZE
+      ) {
+        const chunk = nestedEnrollmentsSnapshot.docs.slice(
+          index,
+          index + BATCH_CHUNK_SIZE,
+        );
+        const batch = writeBatch(db);
+        chunk.forEach((nestedDoc) => batch.delete(nestedDoc.ref));
+        await batch.commit();
+      }
+    }
+  }
+
+  if (!studentsSnapshot.empty) {
+    for (let index = 0; index < studentsSnapshot.docs.length; index += BATCH_CHUNK_SIZE) {
+      const chunk = studentsSnapshot.docs.slice(index, index + BATCH_CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((studentDoc) => batch.delete(studentDoc.ref));
+      await batch.commit();
+    }
+  }
+
+  const projectEnrollmentsSnapshot = await getDocs(
+    collection(db, STUDENTS_COLLECTION, projectDocId, "certificate_enrollments"),
+  );
+  if (!projectEnrollmentsSnapshot.empty) {
+    for (
+      let index = 0;
+      index < projectEnrollmentsSnapshot.docs.length;
+      index += BATCH_CHUNK_SIZE
+    ) {
+      const chunk = projectEnrollmentsSnapshot.docs.slice(
+        index,
+        index + BATCH_CHUNK_SIZE,
+      );
+      const batch = writeBatch(db);
+      chunk.forEach((docSnap) => batch.delete(docSnap.ref));
+      await batch.commit();
+    }
+  }
+
+  const studentUsersSnapshot = await getDocs(
+    query(
+      collection(db, "student_login_users"),
+      where("projectCode", "==", projectCode),
+    ),
+  );
+  if (!studentUsersSnapshot.empty) {
+    for (let index = 0; index < studentUsersSnapshot.docs.length; index += BATCH_CHUNK_SIZE) {
+      const chunk = studentUsersSnapshot.docs.slice(index, index + BATCH_CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((studentUserDoc) => batch.delete(studentUserDoc.ref));
+      await batch.commit();
+    }
+  }
+
+  await deleteDoc(doc(db, STUDENTS_COLLECTION, projectDocId)).catch(() => null);
 };
 
 // Add a project code to Firestore
@@ -365,7 +450,7 @@ export const softDeleteProjectCode = async (id, projectCode) => {
       deletedAt: new Date(),
       updatedAt: new Date(),
     });
-    await setStudentsProjectActiveStatus(projectCode, false);
+    await deleteStudentsProjectData(projectCode);
     console.log("Project code soft-deleted:", id);
     return true;
   } catch (error) {

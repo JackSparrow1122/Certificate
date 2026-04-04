@@ -8,12 +8,11 @@ import {
   CircleHelp,
   LogOut,
 } from "lucide-react";
-import { signOut } from "firebase/auth";
-import { auth } from "../../firebase/config";
 import logo from "../../assets/image.png";
 import profileImage from "../../assets/logo.png";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { performFullLogout } from "../../utils/authLogout";
 
 const SUPERADMIN_SIDEBAR_STATE_KEY = "superadmin_sidebar_expanded";
 
@@ -45,8 +44,7 @@ export default function Sidebar() {
   const adminInitial = adminName.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.clear();
+    await performFullLogout();
     navigate("/login", { replace: true });
   };
 

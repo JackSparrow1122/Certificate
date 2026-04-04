@@ -9,6 +9,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { auth } from "../firebase/config";
 import { getDashboardByRole } from "../utils/roleRedirect";
 import { getAuthUserProfile } from "../utils/authProfileLookup";
+import { authenticateStudentUser } from "../../services/userService";
+import { setStudentSession } from "../utils/studentSession";
 import logo from "../assets/image.png";
 
 export default function Login() {
@@ -58,33 +60,54 @@ export default function Login() {
     setError("");
 
     try {
-      // 🔐 Firebase Auth login
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
+      try {
+        // Try student login first (collection-based auth).
+        const studentProfile = await authenticateStudentUser({
+          email,
+          password,
+        });
+        setStudentSession({
+          loginId: studentProfile.id || "",
+          uid: studentProfile.id || studentProfile.uid || "",
+          email: studentProfile.email || String(email || "").trim(),
+          role: "student",
+          profile: studentProfile,
+        });
+        navigate("/student/dashboard", { replace: true });
+        return;
+      } catch {
+        // Admin/college login via Firebase Authentication.
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
+        const uid = userCredential.user.uid;
+        const profile = await getAuthUserProfile({
+          uid,
+          email: userCredential.user.email,
+        });
+        const role = profile?.role || null;
 
-      const uid = userCredential.user.uid;
+        if (!role) {
+          throw new Error("User role not found in users/student_login_users.");
+        }
 
-      const profile = await getAuthUserProfile({
-        uid,
-        email: userCredential.user.email,
-      });
-      const role = profile?.role || null;
-
-      if (!role) {
-        throw new Error("User role not found in users/student_users");
+        localStorage.setItem("role", role);
+        navigate(getDashboardByRole(role));
+        return;
       }
-      localStorage.setItem("role", role); // store role in localStorage for later use
-
-      // 🚀 Redirect based on role
-      const redirectPath = getDashboardByRole(role);
-      navigate(redirectPath);
     } catch (err) {
-      console.error(err);
-      setError(err.message);
-      console.error("LOGIN ERROR:", err);
+      const code = String(err?.code || "").toLowerCase();
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/user-not-found" ||
+        code === "auth/wrong-password"
+      ) {
+        setError("Invalid email or password.");
+      } else {
+        setError(err?.message || "Invalid credentials.");
+      }
     } finally {
       setLoading(false);
     }
@@ -291,3 +314,4 @@ export default function Login() {
     </div>
   );
 }
+

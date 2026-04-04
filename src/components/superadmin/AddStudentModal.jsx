@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { addStudent } from "../../../services/studentService";
-import { createStudentAuthUser } from "../../../services/userService";
+import { upsertStudentLoginUser } from "../../../services/userService";
 import {
   enrollStudentsIntoCertificate,
   getAllCertificates,
@@ -15,6 +15,27 @@ const normalizeExamCode = (value) =>
     .trim()
     .toUpperCase();
 
+const getYearNumberFromProjectCode = (projectCodeValue) => {
+  const parts = String(projectCodeValue || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 3) return null;
+  const match = parts[2].match(/\d+/);
+  if (!match) return null;
+  const yearNumber = Number(match[0]);
+  return Number.isFinite(yearNumber) && yearNumber > 0 ? yearNumber : null;
+};
+
+const getAllowedSemestersForYear = (projectCodeValue) => {
+  const yearNumber = getYearNumberFromProjectCode(projectCodeValue);
+  if (!yearNumber) return [];
+  const first = yearNumber * 2 - 1;
+  const second = yearNumber * 2;
+  return [first, second];
+};
+
 export default function AddStudentModal({
   projectCode,
   onClose,
@@ -22,6 +43,10 @@ export default function AddStudentModal({
 }) {
   const parsedProjectCode = useMemo(
     () => parseProjectCode(projectCode),
+    [projectCode],
+  );
+  const allowedSemesters = useMemo(
+    () => getAllowedSemestersForYear(projectCode),
     [projectCode],
   );
 
@@ -50,6 +75,7 @@ export default function AddStudentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [skippedEntries, setSkippedEntries] = useState([]);
+  const [selectedSemester, setSelectedSemester] = useState("");
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -85,6 +111,13 @@ export default function AddStudentModal({
     }
     if (!normalizeExamCode(form.examCode)) {
       setError("Exam code is required");
+      return false;
+    }
+    if (
+      !selectedSemester ||
+      !allowedSemesters.includes(Number(selectedSemester))
+    ) {
+      setError("Semester is required");
       return false;
     }
     setError(null);
@@ -166,6 +199,7 @@ export default function AddStudentModal({
         certificateName: matchedCertificate.name || "",
         examCode: matchedCertificate.examCode || normalizedExamCode,
         projectCode,
+        assignedSemesterNumber: Number(selectedSemester),
         studentEmails: [
           String(form.email || "")
             .trim()
@@ -177,7 +211,7 @@ export default function AddStudentModal({
       let authError = null;
       let authResult = null;
       try {
-        authResult = await createStudentAuthUser({
+        authResult = await upsertStudentLoginUser({
           studentId: form.id,
           name: form.name,
           email: form.email,
@@ -193,14 +227,14 @@ export default function AddStudentModal({
 
       if (authResult?.skippedExisting) {
         setError(
-          "Student added to DB. student_users already had this email, so duplicate auth entry was skipped and duplicates were cleaned.",
+          "Student added to DB. Existing student login was updated for this email.",
         );
         return;
       }
 
       if (authError) {
         setError(
-          `Student added to DB, but auth/student_users creation failed: ${authError.message || "Unknown error"}`,
+          `Student added to DB, but student login creation failed: ${authError.message || "Unknown error"}`,
         );
         return;
       }
@@ -404,6 +438,30 @@ export default function AddStudentModal({
                 className="w-full border-none bg-gray-300 px-3 py-2 text-sm outline-none"
                 required
               />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Semester <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={selectedSemester}
+                onChange={(event) => setSelectedSemester(event.target.value)}
+                className="w-full border-none bg-gray-300 px-3 py-2 text-sm outline-none"
+                required
+              >
+                {allowedSemesters.length === 0 ? (
+                  <option value="">No semester options</option>
+                ) : (
+                  <>
+                    <option value="">Select semester</option>
+                    {allowedSemesters.map((semester) => (
+                      <option key={semester} value={String(semester)}>
+                        Semester {semester}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">

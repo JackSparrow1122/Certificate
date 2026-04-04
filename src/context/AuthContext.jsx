@@ -2,6 +2,10 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase/config";
 import { getAuthUserProfile } from "../utils/authProfileLookup";
+import {
+  getStudentSession,
+  STUDENT_SESSION_CHANGED_EVENT,
+} from "../utils/studentSession";
 
 const AuthContext = createContext();
 
@@ -12,6 +16,22 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const applyStudentSession = () => {
+      const studentSession = getStudentSession();
+      if (studentSession?.role === "student") {
+        setUser({
+          uid: studentSession.uid || studentSession.loginId || "",
+          email: studentSession.email || "",
+        });
+        setRole("student");
+        setProfile(studentSession.profile || null);
+        return;
+      }
+      setUser(null);
+      setRole(null);
+      setProfile(null);
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -29,15 +49,30 @@ export function AuthProvider({ children }) {
           setProfile(null);
         }
       } else {
-        setUser(null);
-        setRole(null);
-        setProfile(null);
+        applyStudentSession();
       }
 
       setLoading(false);
     });
 
-    return unsubscribe;
+    const onStudentSessionChanged = () => {
+      if (auth.currentUser) return;
+      applyStudentSession();
+      setLoading(false);
+    };
+
+    window.addEventListener(
+      STUDENT_SESSION_CHANGED_EVENT,
+      onStudentSessionChanged,
+    );
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener(
+        STUDENT_SESSION_CHANGED_EVENT,
+        onStudentSessionChanged,
+      );
+    };
   }, []);
 
   return (

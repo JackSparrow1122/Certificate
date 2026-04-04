@@ -11,6 +11,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  limit,
   query,
   where,
   getDocs,
@@ -21,45 +22,28 @@ import {
 import { isLocalDbMode } from "./dbModeService";
 import {
   localCreateCollegeAdmin,
-  localCreateStudentAuthUser,
+  localAuthenticateStudentUser,
+  localChangeStudentLoginPassword,
   localCreateSuperAdmin,
   localDeleteCollegeAdmin,
   localGetAllAdmins,
+  localGetStudentLoginUserByEmail,
+  localUpsertStudentLoginUser,
   localGetUserByCollegeCode,
   localGetUserByEmail,
   localGetUserByUID,
   localUpdateAdmin,
 } from "./localDbService";
+import { codeToDocId } from "../src/utils/projectCodeUtils";
 
 const USERS_COLLECTION = "users";
-const STUDENT_USERS_COLLECTION = "student_users";
+const STUDENT_LOGIN_USERS_COLLECTION = "student_login_users";
 const SECONDARY_APP_NAME = "secondary-user-creation";
 const ACTIVE_FILTER = (data) => (data?.isActive ?? true) !== false;
-const AUTH_MAX_RETRIES = 7;
-const AUTH_RETRY_BASE_DELAY_MS = 1200;
 const normalizeEmail = (email) =>
   String(email || "")
     .trim()
     .toLowerCase();
-
-const wait = (ms) =>
-  new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
-
-const isRetryableAuthError = (error) => {
-  const code = String(error?.code || "").toLowerCase();
-  return (
-    code === "auth/too-many-requests" ||
-    code === "auth/network-request-failed" ||
-    code === "auth/internal-error"
-  );
-};
-
-const getRetryDelayMs = (attempt) => {
-  const exponent = Math.max(0, Number(attempt) || 0);
-  const backoff = AUTH_RETRY_BASE_DELAY_MS * 2 ** exponent;
-  const jitter = Math.floor(Math.random() * 500);
-  return Math.min(60000, backoff + jitter);
-};
 
 const getSecondaryAuth = () => {
   const existingApp = getApps().find((app) => app.name === SECONDARY_APP_NAME);
@@ -76,9 +60,9 @@ export const formatMobilePassword = (mobileValue) => {
   return digitsOnly;
 };
 
-export const createStudentAuthUser = async (studentData) => {
+export const upsertStudentLoginUser = async (studentData) => {
   if (isLocalDbMode()) {
-    return localCreateStudentAuthUser(studentData);
+    return localUpsertStudentLoginUser(studentData);
   }
   const email = normalizeEmail(studentData?.email);
   const name = String(studentData?.name || "").trim();
@@ -91,38 +75,34 @@ export const createStudentAuthUser = async (studentData) => {
   const studentId = String(studentData?.studentId || "").trim();
 
   if (!email) {
-    throw new Error("Student email is required for auth creation");
+    throw new Error("Student email is required for student login");
   }
 
   if (!mobilePassword) {
     throw new Error(
-      "Valid mobile number is required for auth password creation",
+      "Valid mobile number is required for student login password",
     );
   }
 
   if (mobilePassword.length < 6) {
     throw new Error(
-      "Mobile number must have at least 6 digits for auth password",
+      "Mobile number must have at least 6 digits for student login password",
     );
   }
 
-  const secondaryAuth = getSecondaryAuth();
-
   try {
-    const existingStudentUsersQuery = query(
-      collection(db, STUDENT_USERS_COLLECTION),
+    const existingStudentLoginsQuery = query(
+      collection(db, STUDENT_LOGIN_USERS_COLLECTION),
       where("email", "==", email),
     );
-    const existingStudentUsersSnapshot = await getDocs(
-      existingStudentUsersQuery,
+    const existingStudentLoginsSnapshot = await getDocs(
+      existingStudentLoginsQuery,
     );
 
-    if (!existingStudentUsersSnapshot.empty) {
+    if (!existingStudentLoginsSnapshot.empty) {
       // Keep one entry for the email and remove any duplicate docs.
-      const existingDocs = existingStudentUsersSnapshot.docs;
+      const existingDocs = existingStudentLoginsSnapshot.docs;
       const docToKeep = existingDocs[0];
-      const existingData = docToKeep.data() || {};
-      const resolvedUid = String(existingData.uid || docToKeep.id).trim();
 
       if (existingDocs.length > 1) {
         await Promise.all(
@@ -133,15 +113,17 @@ export const createStudentAuthUser = async (studentData) => {
       }
 
       await setDoc(
-        doc(db, STUDENT_USERS_COLLECTION, docToKeep.id),
+        doc(db, STUDENT_LOGIN_USERS_COLLECTION, docToKeep.id),
         {
-          uid: resolvedUid,
+          id: docToKeep.id,
           email,
+          emailLower: email,
           name,
           role: "student",
           projectCode,
           collegeCode,
           studentId,
+          password: mobilePassword,
           isActive: true,
           deletedAt: null,
           updatedAt: new Date(),
@@ -150,71 +132,211 @@ export const createStudentAuthUser = async (studentData) => {
       );
 
       return {
-        uid: resolvedUid,
+        loginId: docToKeep.id,
         email,
         skippedExisting: true,
       };
     }
 
-    let userCredential = null;
-    let lastAuthError = null;
-
-    for (let attempt = 0; attempt <= AUTH_MAX_RETRIES; attempt += 1) {
-      try {
-        userCredential = await createUserWithEmailAndPassword(
-          secondaryAuth,
-          email,
-          mobilePassword,
-        );
-        lastAuthError = null;
-        break;
-      } catch (authError) {
-        lastAuthError = authError;
-        if (
-          !isRetryableAuthError(authError) ||
-          attempt === AUTH_MAX_RETRIES
-        ) {
-          throw authError;
-        }
-
-        const delayMs = getRetryDelayMs(attempt);
-        console.warn(
-          `Retrying student auth create for ${email} (attempt ${attempt + 1}/${AUTH_MAX_RETRIES + 1}) in ${delayMs}ms due to ${authError?.code || "unknown-error"}`,
-        );
-        await wait(delayMs);
-      }
-    }
-
-    if (!userCredential && lastAuthError) {
-      throw lastAuthError;
-    }
-
-    const uid = userCredential.user.uid;
+    const loginDocId = `${codeToDocId(projectCode || collegeCode || "student")}__${studentId || email}`;
 
     await setDoc(
-      doc(db, STUDENT_USERS_COLLECTION, uid),
+      doc(db, STUDENT_LOGIN_USERS_COLLECTION, loginDocId),
       {
-        uid,
+        id: loginDocId,
         email,
+        emailLower: email,
         name,
         role: "student",
         projectCode,
         collegeCode,
         studentId,
+        password: mobilePassword,
         isActive: true,
         deletedAt: null,
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
       { merge: true },
     );
 
-    return { uid, email };
+    return { loginId: loginDocId, email };
   } catch (error) {
-    console.error("Error creating student auth user:", error);
+    console.error("Error creating student login user:", error);
     throw error;
-  } finally {
-    await signOut(secondaryAuth).catch(() => null);
   }
+};
+
+// Backward-compatible alias for older call sites.
+export const createStudentAuthUser = upsertStudentLoginUser;
+
+export const authenticateStudentUser = async ({ email, password } = {}) => {
+  if (isLocalDbMode()) {
+    return localAuthenticateStudentUser({ email, password });
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  const rawPassword = String(password || "").trim();
+  const mobilePassword = formatMobilePassword(password);
+
+  if (!normalizedEmail || !rawPassword) {
+    throw new Error("Email and password are required.");
+  }
+
+  const byLowerEmail = await getDocs(
+    query(
+      collection(db, STUDENT_LOGIN_USERS_COLLECTION),
+      where("emailLower", "==", normalizedEmail),
+      limit(1),
+    ),
+  );
+
+  const candidates = [];
+  byLowerEmail.forEach((item) => candidates.push(item));
+
+  if (candidates.length === 0) {
+    const byEmail = await getDocs(
+      query(
+        collection(db, STUDENT_LOGIN_USERS_COLLECTION),
+        where("email", "==", normalizedEmail),
+        limit(1),
+      ),
+    );
+    byEmail.forEach((item) => candidates.push(item));
+  }
+
+  if (candidates.length === 0) {
+    throw new Error("Invalid email or password.");
+  }
+
+  const docSnap = candidates[0];
+  const data = docSnap.data() || {};
+
+  if (!ACTIVE_FILTER(data)) {
+    throw new Error("Student account is inactive.");
+  }
+
+  const storedPassword = String(data.password || "").trim();
+  const passwordMatches =
+    Boolean(storedPassword) &&
+    (storedPassword === rawPassword ||
+      (mobilePassword && storedPassword === mobilePassword));
+  if (!passwordMatches) {
+    throw new Error("Invalid email or password.");
+  }
+
+  return {
+    id: docSnap.id,
+    uid: docSnap.id,
+    role: "student",
+    ...data,
+  };
+};
+
+export const getStudentLoginUserByEmail = async (email) => {
+  if (isLocalDbMode()) {
+    return localGetStudentLoginUserByEmail(email);
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const byLowerEmail = await getDocs(
+    query(
+      collection(db, STUDENT_LOGIN_USERS_COLLECTION),
+      where("emailLower", "==", normalizedEmail),
+      limit(1),
+    ),
+  );
+  if (!byLowerEmail.empty) {
+    const docSnap = byLowerEmail.docs[0];
+    return { id: docSnap.id, ...(docSnap.data() || {}) };
+  }
+
+  const byEmail = await getDocs(
+    query(
+      collection(db, STUDENT_LOGIN_USERS_COLLECTION),
+      where("email", "==", normalizedEmail),
+      limit(1),
+    ),
+  );
+  if (byEmail.empty) {
+    return null;
+  }
+  const docSnap = byEmail.docs[0];
+  return { id: docSnap.id, ...(docSnap.data() || {}) };
+};
+
+export const changeStudentLoginPassword = async ({
+  loginId,
+  email,
+  currentPassword,
+  newPassword,
+} = {}) => {
+  if (isLocalDbMode()) {
+    return localChangeStudentLoginPassword({
+      loginId,
+      email,
+      currentPassword,
+      newPassword,
+    });
+  }
+
+  const rawCurrent = String(currentPassword || "").trim();
+  const rawNew = String(newPassword || "").trim();
+
+  if (!rawCurrent || !rawNew) {
+    throw new Error("Current and new passwords are required.");
+  }
+
+  let targetDoc = null;
+  if (loginId) {
+    const byId = await getDoc(doc(db, STUDENT_LOGIN_USERS_COLLECTION, loginId));
+    if (byId.exists()) targetDoc = byId;
+  }
+
+  if (!targetDoc) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new Error("Student login record not found.");
+    }
+    const byEmail = await getDocs(
+      query(
+        collection(db, STUDENT_LOGIN_USERS_COLLECTION),
+        where("emailLower", "==", normalizedEmail),
+        limit(1),
+      ),
+    );
+    if (!byEmail.empty) {
+      targetDoc = byEmail.docs[0];
+    }
+  }
+
+  if (!targetDoc) {
+    throw new Error("Student login record not found.");
+  }
+
+  const data = targetDoc.data() || {};
+  if (String(data.password || "").trim() !== rawCurrent) {
+    const wrongPasswordError = new Error("Current password is incorrect.");
+    wrongPasswordError.code = "student-auth/wrong-password";
+    throw wrongPasswordError;
+  }
+
+  await setDoc(
+    targetDoc.ref,
+    {
+      password: rawNew,
+      passwordLastUpdatedAt: new Date(),
+      passwordUpdatedBy: "student",
+      updatedAt: new Date(),
+    },
+    { merge: true },
+  );
+
+  return true;
 };
 
 const findUsersByEmail = async (email) => {

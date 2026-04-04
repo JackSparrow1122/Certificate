@@ -20,6 +20,7 @@ const defaultStore = () => ({
   helpTicketRemarks: {},
   users: {},
   student_users: {},
+  student_login_users: {},
 });
 
 const nowIso = () => new Date().toISOString();
@@ -52,6 +53,7 @@ const readStore = () => {
       helpTicketRemarks: parsed?.helpTicketRemarks || {},
       users: parsed?.users || {},
       student_users: parsed?.student_users || {},
+      student_login_users: parsed?.student_login_users || {},
     };
   } catch {
     return defaultStore();
@@ -183,7 +185,45 @@ export const localUpdateCollege = async (collegeCode, updateData) =>
 
 export const localDeleteCollege = async (collegeCode) =>
   withStore((store) => {
-    delete store.colleges[String(collegeCode || "").trim()];
+    const normalizedCollegeCode = String(collegeCode || "").trim();
+    if (!normalizedCollegeCode) return true;
+
+    const projectEntries = Object.entries(store.projectCodes || {}).filter(
+      ([, row]) =>
+        String(row?.collegeId || "").trim() === normalizedCollegeCode ||
+        String(row?.collegeCode || "").trim() === normalizedCollegeCode ||
+        String(row?.college || "").trim() === normalizedCollegeCode,
+    );
+
+    projectEntries.forEach(([projectId, row]) => {
+      const code = String(row?.code || "").trim();
+      if (code) {
+        const projectDocId = codeToDocId(code);
+        delete store.students[projectDocId];
+      }
+      store.projectCodes[projectId] = {
+        ...store.projectCodes[projectId],
+        isActive: false,
+        deletedAt: nowIso(),
+        updatedAt: nowIso(),
+      };
+    });
+
+    Object.keys(store.student_login_users || {}).forEach((loginId) => {
+      const student = store.student_login_users[loginId] || {};
+      if (String(student?.collegeCode || "").trim() === normalizedCollegeCode) {
+        delete store.student_login_users[loginId];
+      }
+    });
+
+    Object.keys(store.student_users || {}).forEach((legacyId) => {
+      const student = store.student_users[legacyId] || {};
+      if (String(student?.collegeCode || "").trim() === normalizedCollegeCode) {
+        delete store.student_users[legacyId];
+      }
+    });
+
+    delete store.colleges[normalizedCollegeCode];
     return true;
   });
 
@@ -328,21 +368,19 @@ export const localSoftDeleteProjectCode = async (id, projectCode) =>
 
     if (code) {
       const projectDocId = codeToDocId(code);
-      const projectNode = store.students[projectDocId];
-      if (projectNode) {
-        projectNode.isActive = false;
-        projectNode.updatedAt = nowIso();
-        Object.values(projectNode.students_list || {}).forEach((student) => {
-          student.isActive = false;
-          student.updatedAt = nowIso();
-        });
-      }
+      delete store.students[projectDocId];
 
-      Object.values(store.student_users).forEach((studentUser) => {
+      Object.keys(store.student_users || {}).forEach((studentUserId) => {
+        const studentUser = store.student_users[studentUserId] || {};
         if (String(studentUser.projectCode || "") === code) {
-          studentUser.isActive = false;
-          studentUser.deletedAt = nowIso();
-          studentUser.updatedAt = nowIso();
+          delete store.student_users[studentUserId];
+        }
+      });
+
+      Object.keys(store.student_login_users || {}).forEach((studentUserId) => {
+        const studentUser = store.student_login_users[studentUserId] || {};
+        if (String(studentUser.projectCode || "") === code) {
+          delete store.student_login_users[studentUserId];
         }
       });
     }
@@ -442,8 +480,10 @@ export const localGetAllStudents = async () => {
   const store = readStore();
   const rows = [];
   Object.entries(store.students).forEach(([projectDocId, projectNode]) => {
+    if ((projectNode?.isActive ?? true) === false) return;
     Object.entries(projectNode.students_list || {}).forEach(
       ([studentDocId, student]) => {
+        if ((student?.isActive ?? true) === false) return;
         rows.push({
           docId: studentDocId,
           id: studentDocId,
@@ -461,15 +501,16 @@ export const localGetStudentsByProject = async (projectId) => {
   const projectDocId = codeToDocId(projectId);
   const projectNode = store.students[projectDocId];
   if (!projectNode) return [];
+  if ((projectNode?.isActive ?? true) === false) return [];
 
-  return Object.entries(projectNode.students_list || {}).map(
-    ([studentDocId, student]) => ({
+  return Object.entries(projectNode.students_list || {})
+    .filter(([, student]) => (student?.isActive ?? true) !== false)
+    .map(([studentDocId, student]) => ({
       id: studentDocId,
       docId: studentDocId,
       projectCode: projectId,
       ...student,
-    }),
-  );
+    }));
 };
 
 export const localGetStudentByDocId = async (studentDocId) => {
@@ -1184,7 +1225,7 @@ export const localUnassignProjectCodeFromCertificate = async ({
   });
 
 // Users/Admins
-export const localCreateStudentAuthUser = async (studentData) =>
+export const localUpsertStudentLoginUser = async (studentData) =>
   withStore((store) => {
     const email = normalizeEmail(studentData?.email);
     const name = String(studentData?.name || "").trim();
@@ -1194,44 +1235,162 @@ export const localCreateStudentAuthUser = async (studentData) =>
       String(projectCode || "").split("/")[0] ||
       "";
     const studentId = String(studentData?.studentId || "").trim();
+    const password = String(studentData?.mobile || "")
+      .replace(/\D/g, "")
+      .trim();
 
-    const existingEntry = Object.entries(store.student_users).find(
+    if (!email) {
+      throw new Error("Student email is required for student login.");
+    }
+    if (!password || password.length < 6) {
+      throw new Error(
+        "Mobile number must have at least 6 digits for student login password.",
+      );
+    }
+
+    const existingEntry = Object.entries(store.student_login_users || {}).find(
       ([, user]) => normalizeEmail(user.email) === email,
     );
 
     if (existingEntry) {
-      const uid = existingEntry[0];
-      store.student_users[uid] = {
-        ...store.student_users[uid],
-        uid,
+      const loginId = existingEntry[0];
+      store.student_login_users[loginId] = {
+        ...store.student_login_users[loginId],
+        id: loginId,
+        uid: loginId,
         email,
+        emailLower: email,
         name,
         role: "student",
         projectCode,
         collegeCode,
         studentId,
+        password,
         isActive: true,
         deletedAt: null,
         updatedAt: nowIso(),
       };
-      return { uid, email, skippedExisting: true };
+      return { loginId, email, skippedExisting: true };
     }
 
-    const uid = generateId(store, "user", "stu");
-    store.student_users[uid] = {
-      uid,
+    const loginId = `${codeToDocId(projectCode || collegeCode || "student")}__${studentId || email}`;
+    store.student_login_users[loginId] = {
+      id: loginId,
+      uid: loginId,
       email,
+      emailLower: email,
       name,
       role: "student",
       projectCode,
       collegeCode,
       studentId,
+      password,
       isActive: true,
       deletedAt: null,
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
-    return { uid, email };
+    return { loginId, email };
+  });
+
+// Backward-compatible alias for older call sites.
+export const localCreateStudentAuthUser = localUpsertStudentLoginUser;
+
+export const localAuthenticateStudentUser = async ({ email, password } = {}) => {
+  const normalizedEmail = normalizeEmail(email);
+  const rawPassword = String(password || "").trim();
+  const mobilePassword = String(password || "")
+    .replace(/\D/g, "")
+    .trim();
+  if (!normalizedEmail || !rawPassword) {
+    throw new Error("Email and password are required.");
+  }
+
+  const store = readStore();
+  const entry = Object.entries(store.student_login_users || {}).find(
+    ([, user]) =>
+      normalizeEmail(user?.email || user?.emailLower || "") === normalizedEmail,
+  );
+
+  if (!entry) {
+    throw new Error("Invalid email or password.");
+  }
+
+  const [id, user] = entry;
+  if (!ACTIVE_FILTER(user)) {
+    throw new Error("Student account is inactive.");
+  }
+
+  const storedPassword = String(user?.password || "").trim();
+  const passwordMatches =
+    Boolean(storedPassword) &&
+    (storedPassword === rawPassword ||
+      (mobilePassword && storedPassword === mobilePassword));
+  if (!passwordMatches) {
+    throw new Error("Invalid email or password.");
+  }
+
+  return { id, uid: id, role: "student", ...user };
+};
+
+export const localGetStudentLoginUserByEmail = async (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+  const store = readStore();
+  const entry = Object.entries(store.student_login_users || {}).find(
+    ([, user]) =>
+      normalizeEmail(user?.email || user?.emailLower || "") === normalizedEmail,
+  );
+  if (!entry) return null;
+  return { id: entry[0], ...(entry[1] || {}) };
+};
+
+export const localChangeStudentLoginPassword = async ({
+  loginId,
+  email,
+  currentPassword,
+  newPassword,
+} = {}) =>
+  withStore((store) => {
+    const rawCurrent = String(currentPassword || "").trim();
+    const rawNew = String(newPassword || "").trim();
+    if (!rawCurrent || !rawNew) {
+      throw new Error("Current and new passwords are required.");
+    }
+
+    let entry =
+      loginId && store.student_login_users?.[String(loginId).trim()]
+        ? [String(loginId).trim(), store.student_login_users[String(loginId).trim()]]
+        : null;
+
+    if (!entry) {
+      const normalizedEmail = normalizeEmail(email);
+      entry = Object.entries(store.student_login_users || {}).find(
+        ([, user]) =>
+          normalizeEmail(user?.email || user?.emailLower || "") ===
+          normalizedEmail,
+      );
+    }
+
+    if (!entry) {
+      throw new Error("Student login record not found.");
+    }
+
+    const [id, user] = entry;
+    if (String(user?.password || "").trim() !== rawCurrent) {
+      const wrongPasswordError = new Error("Current password is incorrect.");
+      wrongPasswordError.code = "student-auth/wrong-password";
+      throw wrongPasswordError;
+    }
+
+    store.student_login_users[id] = {
+      ...user,
+      password: rawNew,
+      passwordLastUpdatedAt: nowIso(),
+      passwordUpdatedBy: "student",
+      updatedAt: nowIso(),
+    };
+    return true;
   });
 
 export const localCreateCollegeAdmin = async (adminData, collegeCode) =>

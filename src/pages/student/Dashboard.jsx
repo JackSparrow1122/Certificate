@@ -15,7 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { useAuth } from "../../context/AuthContext";
 import { getStudentForAuthUser } from "../../../services/studentService";
 import {
@@ -1098,26 +1098,24 @@ function SummaryCard({ enrolled, passed, failed }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "20px", alignItems: "center" }}>
         {/* Donut */}
-        <div style={{ position: "relative", height: "200px" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={hasData ? chartData : [{ name: "empty", value: 1, color: "#E2E8F0" }]}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={hasData ? 3 : 0}
-                startAngle={90}
-                endAngle={-270}
-              >
-                {(hasData ? chartData : [{ name: "empty", value: 1, color: "#E2E8F0" }]).map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
-              {hasData && <Tooltip formatter={(value) => [value, "Count"]} />}
-            </PieChart>
-          </ResponsiveContainer>
+        <div style={{ position: "relative", width: "200px", height: "200px", margin: "0 auto" }}>
+          <PieChart width={200} height={200}>
+            <Pie
+              data={hasData ? chartData : [{ name: "empty", value: 1, color: "#E2E8F0" }]}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={60}
+              outerRadius={90}
+              paddingAngle={hasData ? 3 : 0}
+              startAngle={90}
+              endAngle={-270}
+            >
+              {(hasData ? chartData : [{ name: "empty", value: 1, color: "#E2E8F0" }]).map((entry) => (
+                <Cell key={entry.name} fill={entry.color} />
+              ))}
+            </Pie>
+            {hasData && <Tooltip formatter={(value) => [value, "Count"]} />}
+          </PieChart>
           {/* Center label */}
           <div style={{
             position: "absolute", inset: 0,

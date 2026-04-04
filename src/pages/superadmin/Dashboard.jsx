@@ -185,8 +185,19 @@ export default function Dashboard() {
         /insufficient permissions|permission denied/i.test(
           String(error?.message || ""),
         );
+      const isQuotaIssue =
+        errorCode === "resource-exhausted" ||
+        /quota exceeded|too many requests|resource-exhausted/i.test(
+          String(error?.message || ""),
+        );
 
-      console.error(`Dashboard data load failed for ${request.label}:`, error);
+      if (!isQuotaIssue) {
+        console.error(`Dashboard data load failed for ${request.label}:`, error);
+      } else {
+        console.warn(
+          `Dashboard data load throttled for ${request.label}; using fallback values where possible.`,
+        );
+      }
       if (isPermissionIssue) {
         console.warn(
           `Firestore access blocked for ${request.label}. Check rules and verify the logged-in user has a users/{uid} document with role superAdmin.`,
@@ -201,6 +212,9 @@ export default function Dashboard() {
     if ("students" in freshData) setStudents(freshData.students);
     if ("totalStudentsCount" in freshData)
       setTotalStudentsCount(Number(freshData.totalStudentsCount || 0));
+    else if ("students" in freshData) {
+      setTotalStudentsCount(Number((freshData.students || []).length || 0));
+    }
     if ("admins" in freshData) setAdmins(freshData.admins);
     if ("certifications" in freshData)
       setCertifications(freshData.certifications);

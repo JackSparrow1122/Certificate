@@ -4,11 +4,10 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { codeToDocId } from "../../utils/projectCodeUtils";
 import { getStudentsByProject } from "../../../services/studentService";
-import { createStudentAuthUser } from "../../../services/userService";
+import { upsertStudentLoginUser } from "../../../services/userService";
 import {
   enrollStudentsIntoCertificate,
   getAllCertificates,
@@ -820,14 +819,14 @@ async function processRows(
   try {
     let successCount = 0;
     let failedCount = 0;
-    let authCreatedCount = 0;
-    let authSkippedExistingCount = 0;
-    const authFailures = [];
+    let loginCreatedCount = 0;
+    let loginUpdatedCount = 0;
+    const loginFailures = [];
 
     // Convert project code to document ID (replace "/" with "-")
     const projectDocId = codeToDocId(projectCode);
     const collegeCode = String(projectCode || "").split("/")[0] || "";
-    const authCandidates = [];
+    const loginCandidates = [];
 
     await processInChunks(
       rows,
@@ -938,7 +937,7 @@ async function processRows(
             );
             batch.set(studentDocRef, docBody, { merge: true });
 
-            authCandidates.push({
+            loginCandidates.push({
               studentId: idVal,
               name:
                 official && official["FULL NAME OF STUDENT"]
@@ -965,46 +964,29 @@ async function processRows(
     );
 
     await processInChunks(
-      authCandidates,
+      loginCandidates,
       AUTH_CONCURRENCY,
-      async (authChunk) => {
+      async (loginChunk) => {
         const results = await Promise.allSettled(
-          authChunk.map((student) => createStudentAuthUser(student)),
+          loginChunk.map((student) => upsertStudentLoginUser(student)),
         );
 
         results.forEach((result, index) => {
-          const student = authChunk[index];
+          const student = loginChunk[index];
           if (result.status === "fulfilled") {
             if (result.value?.skippedExisting) {
-              authSkippedExistingCount++;
+              loginUpdatedCount++;
             } else {
-              authCreatedCount++;
-            }
-            // Write UID back to student doc in students_list
-            const uid = result.value?.uid;
-            if (uid && student.studentId) {
-              const studentDocRef = doc(
-                db,
-                "students",
-                projectDocId,
-                "students_list",
-                student.studentId,
-              );
-              updateDoc(studentDocRef, { uid }).catch((err) =>
-                console.warn(
-                  `Failed to write UID for student ${student.studentId}:`,
-                  err,
-                ),
-              );
+              loginCreatedCount++;
             }
             return;
           }
 
-          const authError = result.reason;
-          authFailures.push({
+          const loginError = result.reason;
+          loginFailures.push({
             studentId: student?.studentId || "-",
             email: student?.email || "-",
-            reason: authError?.message || "Auth creation failed",
+            reason: loginError?.message || "Student login creation failed",
           });
         });
       },
@@ -1014,19 +996,15 @@ async function processRows(
     setSuccess(
       `✅ Imported ${successCount} students${
         failedCount ? `, ${failedCount} failed` : ""
-      }. Auth created for ${authCreatedCount}${
-        authSkippedExistingCount
-          ? `, ${authSkippedExistingCount} skipped (email already in student_users)`
-          : ""
-      }${authFailures.length ? `, ${authFailures.length} auth failed` : ""}`,
+      }. Student login created for ${loginCreatedCount}${ loginUpdatedCount ? `, ${loginUpdatedCount} updated (email already existed)` : "" }${loginFailures.length ? `, ${loginFailures.length} login failed` : ""}`,
     );
 
-    if (authFailures.length > 0) {
+    if (loginFailures.length > 0) {
       setError(
-        `Auth creation failed for: ${authFailures
+        `Student login creation failed for: ${loginFailures
           .slice(0, 10)
           .map((item) => `${item.studentId} (${item.email})`)
-          .join(", ")}${authFailures.length > 10 ? " ..." : ""}`,
+          .join(", ")}${loginFailures.length > 10 ? " ..." : ""}`,
       );
     }
 
@@ -1105,3 +1083,5 @@ async function assignCertificatesFromRows({
     unmatchedExamCodes: Array.from(unmatchedExamCodes),
   };
 }
+
+
