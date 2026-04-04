@@ -47,6 +47,64 @@ const STUDENTS_COUNT_QUOTA_BACKOFF_MS = 5 * 60 * 1000;
 const STUDENTS_COUNT_RETRY_AFTER_KEY = "students_count_retry_after_v1";
 const PROJECT_STUDENTS_COUNT_CACHE_TTL_MS = 60 * 1000;
 const PROJECT_STUDENTS_COUNT_QUOTA_BACKOFF_MS = 5 * 60 * 1000;
+
+const normalizeStudentEmail = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const normalizeStudentPhone = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .trim();
+
+const generateStudentDocId = (baseId = "student") => {
+  const normalizedBase = String(baseId || "student")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 100);
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${normalizedBase || "student"}__${suffix}`;
+};
+
+const contactsMatchByEmailOrPhone = (existingData, studentData) => {
+  const existingEmail = normalizeStudentEmail(
+    existingData?.email || existingData?.OFFICIAL_DETAILS?.["EMAIL_ID"],
+  );
+  const existingPhone = normalizeStudentPhone(
+    existingData?.phone || existingData?.OFFICIAL_DETAILS?.["MOBILE NO."],
+  );
+  const newEmail = normalizeStudentEmail(studentData?.email);
+  const newPhone = normalizeStudentPhone(studentData?.phone);
+
+  if (newEmail && existingEmail && newEmail === existingEmail) return true;
+  if (newPhone && existingPhone && newPhone === existingPhone) return true;
+  return false;
+};
+
+const findExistingStudentByContact = async (projectId, email, phone) => {
+  if (!projectId || (!email && !phone)) return null;
+  const students = await getStudentsByProject(projectId, { maxDocs: 5000 });
+  const normalizedEmail = normalizeStudentEmail(email);
+  const normalizedPhone = normalizeStudentPhone(phone);
+
+  return students.find((student) => {
+    const studentEmail = normalizeStudentEmail(
+      student?.email || student?.OFFICIAL_DETAILS?.["EMAIL_ID"],
+    );
+    const studentPhone = normalizeStudentPhone(
+      student?.phone || student?.OFFICIAL_DETAILS?.["MOBILE NO."],
+    );
+
+    if (normalizedEmail && studentEmail && normalizedEmail === studentEmail)
+      return true;
+    if (normalizedPhone && studentPhone && normalizedPhone === studentPhone)
+      return true;
+    return false;
+  });
+};
+
 let studentsCountCache = {
   value: null,
   fetchedAt: 0,
@@ -103,16 +161,63 @@ export const addStudent = async (studentData) => {
       { merge: true },
     );
 
-    const studentRef = doc(
+    const normalizedEmail = normalizeStudentEmail(studentData.email);
+    const normalizedPhone = normalizeStudentPhone(studentData.phone);
+    const requestedId = String(studentData.id || "").trim();
+
+    let studentId = requestedId || "";
+    let studentRef = doc(
       db,
       STUDENTS_COLLECTION,
       projectDocId,
       "students_list",
-      String(studentData.id),
+      studentId || generateStudentDocId(),
     );
 
+    const requestedStudentSnapshot =
+      studentId && (await getDoc(studentRef));
+    const requestedStudentExists = requestedStudentSnapshot?.exists();
+    if (requestedStudentExists) {
+      const existingData = requestedStudentSnapshot.data() || {};
+      if (!contactsMatchByEmailOrPhone(existingData, studentData)) {
+        studentId = generateStudentDocId(requestedId || normalizedEmail || normalizedPhone);
+        studentRef = doc(
+          db,
+          STUDENTS_COLLECTION,
+          projectDocId,
+          "students_list",
+          studentId,
+        );
+      }
+    } else if (!studentId) {
+      studentId = generateStudentDocId(normalizedEmail || normalizedPhone);
+      studentRef = doc(
+        db,
+        STUDENTS_COLLECTION,
+        projectDocId,
+        "students_list",
+        studentId,
+      );
+    } else if (normalizedEmail || normalizedPhone) {
+      const existingStudent = await findExistingStudentByContact(
+        studentData.projectId,
+        normalizedEmail,
+        normalizedPhone,
+      );
+      if (existingStudent) {
+        studentId = existingStudent.id;
+        studentRef = doc(
+          db,
+          STUDENTS_COLLECTION,
+          projectDocId,
+          "students_list",
+          studentId,
+        );
+      }
+    }
+
     await setDoc(studentRef, {
-      id: studentData.id,
+      id: studentId,
       name: studentData.name,
       gender: studentData.gender,
       dob: studentData.dob,
@@ -138,7 +243,7 @@ export const addStudent = async (studentData) => {
       createdAt: new Date(),
       updatedAt: new Date(),
       OFFICIAL_DETAILS: {
-        SN: String(studentData.id || ""),
+        SN: String(studentData.id || studentId || ""),
         "FULL NAME OF STUDENT": studentData.name || "",
         "EMAIL_ID": studentData.email || "",
         "MOBILE NO.": studentData.phone || "",
@@ -153,8 +258,8 @@ export const addStudent = async (studentData) => {
       },
     });
 
-    console.log("Student added with ID:", studentData.id);
-    return String(studentData.id);
+    console.log("Student added with ID:", studentId);
+    return String(studentId);
   } catch (error) {
     console.error("Error adding student:", error);
     throw error;

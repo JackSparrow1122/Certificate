@@ -3,6 +3,7 @@ import { db } from "../../firebase/config";
 import {
   writeBatch,
   doc,
+  getDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { codeToDocId } from "../../utils/projectCodeUtils";
@@ -60,6 +61,62 @@ function parseExamCodes(value) {
     .split(",")
     .map((code) => normalizeExamCode(code))
     .filter(Boolean);
+}
+
+function normalizeStudentEmail(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeStudentPhone(value) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .trim();
+}
+
+function generateStudentDocId(baseId = "student") {
+  const normalizedBase = String(baseId || "student")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 100);
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${normalizedBase || "student"}__${suffix}`;
+}
+
+function contactsMatchByEmailOrPhone(existingData, studentData) {
+  const existingEmail = normalizeStudentEmail(
+    existingData?.email || existingData?.OFFICIAL_DETAILS?.["EMAIL_ID"],
+  );
+  const existingPhone = normalizeStudentPhone(
+    existingData?.phone || existingData?.OFFICIAL_DETAILS?.["MOBILE NO."],
+  );
+  const newEmail = normalizeStudentEmail(studentData?.email);
+  const newPhone = normalizeStudentPhone(studentData?.phone);
+
+  if (newEmail && existingEmail && newEmail === existingEmail) return true;
+  if (newPhone && existingPhone && newPhone === existingPhone) return true;
+  return false;
+}
+
+async function resolveStudentDocId(projectDocId, sn, email, phone) {
+  const desiredId = String(sn || "").trim();
+  const studentId = desiredId || generateStudentDocId();
+  const studentRef = doc(db, "students", projectDocId, "students_list", studentId);
+  const studentSnapshot = await getDoc(studentRef);
+
+  if (!studentSnapshot.exists()) {
+    return studentId;
+  }
+
+  const existingData = studentSnapshot.data() || {};
+  const candidateId = studentId;
+  if (contactsMatchByEmailOrPhone(existingData, { email, phone })) {
+    return candidateId;
+  }
+
+  return generateStudentDocId(candidateId || email || phone);
 }
 
 function getYearNumberFromProjectCode(projectCodeValue) {
@@ -918,12 +975,24 @@ async function processRows(
             docBody.collegeCode = collegeCode;
             docBody.isActive = true;
 
-            const idVal =
-              official && official.SN ? String(official.SN) : undefined;
-            if (!idVal) {
+            const rawSn = official && official.SN ? String(official.SN) : undefined;
+            if (!rawSn) {
               failedCount++;
               continue;
             }
+
+            const email =
+              official && official["EMAIL_ID"]
+                ? String(official["EMAIL_ID"]).trim().toLowerCase()
+                : "";
+            const phone = official ? official["MOBILE NO."] : "";
+            const resolvedStudentId = await resolveStudentDocId(
+              projectDocId,
+              rawSn,
+              email,
+              phone,
+            );
+
             docBody.createdAt = serverTimestamp();
             docBody.updatedAt = serverTimestamp();
 
@@ -932,21 +1001,18 @@ async function processRows(
               "students",
               projectDocId,
               "students_list",
-              idVal,
+              resolvedStudentId,
             );
             batch.set(studentDocRef, docBody, { merge: true });
 
             loginCandidates.push({
-              studentId: idVal,
+              studentId: resolvedStudentId,
               name:
                 official && official["FULL NAME OF STUDENT"]
                   ? String(official["FULL NAME OF STUDENT"])
                   : "",
-              email:
-                official && official["EMAIL_ID"]
-                  ? String(official["EMAIL_ID"]).trim().toLowerCase()
-                  : "",
-              mobile: official ? official["MOBILE NO."] : "",
+              email,
+              mobile: phone,
               projectCode,
               collegeCode,
             });

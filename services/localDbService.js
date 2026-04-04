@@ -28,6 +28,19 @@ const normalizeEmail = (email) =>
   String(email || "")
     .trim()
     .toLowerCase();
+const normalizePhone = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .trim();
+const generateStudentDocId = (baseId = "student") => {
+  const normalizedBase = String(baseId || "student")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 100);
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${normalizedBase || "student"}__${suffix}`;
+};
 const ACTIVE_FILTER = (data) => (data?.isActive ?? true) !== false;
 
 const readStore = () => {
@@ -393,8 +406,50 @@ export const localAddStudent = async (studentData) =>
   withStore((store) => {
     const projectCode = String(studentData.projectId || "").trim();
     const projectDocId = codeToDocId(projectCode);
-    const studentId = String(studentData.id || "").trim();
+    let studentId = String(studentData.id || "").trim();
     const collegeCode = String(studentData.collegeCode || "").trim();
+    const normalizedEmail = normalizeEmail(studentData.email);
+    const normalizedPhone = normalizePhone(studentData.phone);
+
+    const { node } = ensureProjectNode(store, projectCode, collegeCode);
+    const existingByContact = Object.entries(node.students_list || {}).find(
+      ([, student]) => {
+        const studentEmail = normalizeEmail(
+          student?.email || student?.OFFICIAL_DETAILS?.["EMAIL_ID"],
+        );
+        const studentPhone = normalizePhone(
+          student?.phone || student?.OFFICIAL_DETAILS?.["MOBILE NO."],
+        );
+
+        if (
+          normalizedEmail &&
+          studentEmail &&
+          normalizedEmail === studentEmail
+        ) {
+          return true;
+        }
+        if (
+          normalizedPhone &&
+          studentPhone &&
+          normalizedPhone === studentPhone
+        ) {
+          return true;
+        }
+        return false;
+      },
+    );
+
+    if (existingByContact) {
+      studentId = existingByContact[0];
+    } else if (studentId && node.students_list[studentId]) {
+      let candidateId = studentId;
+      while (node.students_list[candidateId]) {
+        candidateId = generateStudentDocId(candidateId);
+      }
+      studentId = candidateId;
+    } else if (!studentId) {
+      studentId = generateStudentDocId(normalizedEmail || normalizedPhone);
+    }
 
     const certificateIds = getCertificateIdsByProjectCode(store, projectCode);
     const certificateNames = certificateIds
@@ -413,7 +468,6 @@ export const localAddStudent = async (studentData) =>
       return acc;
     }, {});
 
-    const { node } = ensureProjectNode(store, projectCode, collegeCode);
     node.projectCode = projectCode;
     node.collegeCode = collegeCode;
     node.isActive = true;

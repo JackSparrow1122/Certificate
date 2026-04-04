@@ -206,9 +206,25 @@ export default function StudentDashboard() {
             "",
         ).trim();
 
+        const normalizedProjectCode = String(projectCode || "").trim();
+        const filterByCurrentProject = (entry) => {
+          if (!normalizedProjectCode) return true;
+          return (
+            String(entry?.projectCode || "").trim() === normalizedProjectCode
+          );
+        };
+
         const [byEmail, byId] = await Promise.all([
-          email ? getEnrollmentsByStudentEmail(email) : [],
-          studentId ? getEnrollmentsByStudentId(studentId) : [],
+          email
+            ? getEnrollmentsByStudentEmail(email).then((rows) =>
+                rows.filter(filterByCurrentProject),
+              )
+            : [],
+          studentId
+            ? getEnrollmentsByStudentId(studentId).then((rows) =>
+                rows.filter(filterByCurrentProject),
+              )
+            : [],
         ]);
 
         const mergedMap = new Map();

@@ -54,6 +54,22 @@ const buildStudentEnrollmentMirror = ({
   updatedAt: new Date(),
 });
 
+const hasExistingExamCodeEnrollment = (studentData, examCode) => {
+  const normalizedExamCode = String(examCode || "").trim().toUpperCase();
+  if (!normalizedExamCode) return false;
+
+  const enrollments = studentData?.certificateEnrollments;
+  if (!enrollments || typeof enrollments !== "object") return false;
+
+  return Object.values(enrollments).some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const status = String(entry.status || "").trim().toLowerCase();
+    if (status === "unenrolled") return false;
+    const existingExamCode = String(entry.examCode || "").trim().toUpperCase();
+    return existingExamCode === normalizedExamCode;
+  });
+};
+
 const getSemesterParity = (semesterNumber) => {
   if (!Number.isFinite(semesterNumber) || semesterNumber <= 0) return "";
   return semesterNumber % 2 === 0 ? "even" : "odd";
@@ -399,7 +415,22 @@ export const enrollStudentsIntoCertificate = async ({
         studentDoc.id,
       );
 
-      // Check if already enrolled on the primary nested path.
+      const normalizedExamCode = String(examCode || "").trim().toUpperCase();
+      const hasDuplicateExamCode = hasExistingExamCodeEnrollment(
+        studentData,
+        normalizedExamCode,
+      );
+      const existingMirrorEntry =
+        studentData?.certificateEnrollments?.[String(certificateId || "").trim()];
+      const hasExistingCertificateEnrollment = existingMirrorEntry
+        ? String(existingMirrorEntry.status || "").trim().toLowerCase() !== "unenrolled"
+        : false;
+
+      if (hasDuplicateExamCode || hasExistingCertificateEnrollment) {
+        alreadyEnrolledCount += 1;
+        continue;
+      }
+
       const enrollmentRef = doc(
         db,
         STUDENTS_COLLECTION,
@@ -409,13 +440,16 @@ export const enrollStudentsIntoCertificate = async ({
         CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
         String(certificateId || "").trim(),
       );
-      const existingEnrollment = await getDoc(enrollmentRef);
-      if (
-        existingEnrollment.exists() &&
-        existingEnrollment.data()?.status !== "unenrolled"
-      ) {
-        alreadyEnrolledCount += 1;
-        continue;
+
+      if (!existingMirrorEntry) {
+        const existingEnrollment = await getDoc(enrollmentRef);
+        if (
+          existingEnrollment.exists() &&
+          existingEnrollment.data()?.status !== "unenrolled"
+        ) {
+          alreadyEnrolledCount += 1;
+          continue;
+        }
       }
 
       ops.push({

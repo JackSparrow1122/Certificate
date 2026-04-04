@@ -16,6 +16,7 @@ import {
   getAllStudents,
   getAllStudentsCount,
   getStudentsByProject,
+  getStudentsByProjectCount,
 } from "../../../services/studentService";
 import { getAllAdmins } from "../../../services/userService";
 import {
@@ -141,7 +142,8 @@ export default function Dashboard() {
   const [colleges, setColleges] = useState([]);
   const [projectCodes, setProjectCodes] = useState([]);
   const [certStatsByProject, setCertStatsByProject] = useState({});
-  const [, setTotalStudentsCount] = useState(0);
+  const [totalStudentsCount, setTotalStudentsCount] = useState(0);
+  const [selectedCollegeTotalStudentsCount, setSelectedCollegeTotalStudentsCount] = useState(0);
   const [selectedCollegeCode, setSelectedCollegeCode] = useState("ALL");
   const [dbMode, setDbModeState] = useState(getDbMode());
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
@@ -247,6 +249,47 @@ export default function Dashboard() {
     const nextProjectCodes = freshData.projectCodes ?? [];
     const nextStudents = freshData.students ?? [];
     let nextCertStatsByProject = certStatsByProject;
+
+    let nextTotalStudentsCount = Number(freshData.totalStudentsCount || 0);
+    const nextSampleStudentsCount = Number((nextStudents || []).length || 0);
+    if (!Number.isFinite(nextTotalStudentsCount) || nextTotalStudentsCount <= 0) {
+      nextTotalStudentsCount = nextSampleStudentsCount;
+    }
+
+    if (
+      nextProjectCodes.length > 1 &&
+      nextTotalStudentsCount <= nextSampleStudentsCount
+    ) {
+      try {
+        const projectCountResults = await Promise.allSettled(
+          nextProjectCodes.map(async (projectCodeRow) => {
+            const projectCode = getProjectCodeValue(projectCodeRow);
+            if (!projectCode) return 0;
+            return getStudentsByProjectCount(projectCode);
+          }),
+        );
+
+        const projectCountSum = projectCountResults.reduce(
+          (sum, result) =>
+            sum +
+            (result.status === "fulfilled"
+              ? Number(result.value || 0)
+              : 0),
+          0,
+        );
+
+        if (projectCountSum > nextTotalStudentsCount) {
+          nextTotalStudentsCount = projectCountSum;
+        }
+      } catch (error) {
+        console.warn(
+          "Could not compute fallback total student count from project counts:",
+          error,
+        );
+      }
+    }
+
+    setTotalStudentsCount(nextTotalStudentsCount);
 
     const projectRowsForStats = (nextProjectCodes.length > 0
       ? nextProjectCodes
@@ -442,6 +485,51 @@ export default function Dashboard() {
     [selectedProjects],
   );
 
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchSelectedCollegeCounts = async () => {
+      if (selectedCollegeCode === "ALL") {
+        if (mounted) setSelectedCollegeTotalStudentsCount(0);
+        return;
+      }
+
+      if (selectedProjectCodeSet.size === 0) {
+        if (mounted) setSelectedCollegeTotalStudentsCount(0);
+        return;
+      }
+
+      try {
+        const projectCounts = await Promise.allSettled(
+          Array.from(selectedProjectCodeSet).map((projectCode) =>
+            getStudentsByProjectCount(projectCode),
+          ),
+        );
+
+        const total = projectCounts.reduce(
+          (sum, result) =>
+            sum + (result.status === "fulfilled" ? Number(result.value || 0) : 0),
+          0,
+        );
+
+        if (mounted) {
+          setSelectedCollegeTotalStudentsCount(total);
+        }
+      } catch (error) {
+        console.warn(
+          "Unable to load selected college student counts:",
+          error,
+        );
+        if (mounted) setSelectedCollegeTotalStudentsCount(0);
+      }
+    };
+
+    fetchSelectedCollegeCounts();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedCollegeCode, selectedProjectCodeSet, dbMode]);
+
   const chartStudents = useMemo(() => {
     if (selectedCollegeCode === "ALL") return students;
     if (selectedProjectCodeSet.size > 0) {
@@ -465,6 +553,11 @@ export default function Dashboard() {
     );
     return unique.size;
   }, [chartStudents]);
+
+  const selectedCollegeDisplayedStudentCount =
+    selectedCollegeCode === "ALL"
+      ? totalStudentsCount || selectedCollegeStudentCount
+      : selectedCollegeTotalStudentsCount || selectedCollegeStudentCount;
 
   const selectedCollegeActiveColleges = useMemo(() => {
     if (selectedCollegeCode === "ALL") return activeColleges;
@@ -746,7 +839,7 @@ export default function Dashboard() {
         <MetricCard
           icon={<Users size={18} />}
           label="Total Students"
-          value={selectedCollegeStudentCount}
+          value={selectedCollegeDisplayedStudentCount}
           helper={
             selectedCollegeCode === "ALL"
               ? "Across all project groups"
