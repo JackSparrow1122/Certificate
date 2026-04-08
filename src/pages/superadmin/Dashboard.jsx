@@ -4,6 +4,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -42,6 +44,20 @@ const SIDEBAR_BLUE = "#0B2A4A";
 const ACCENT_BLUE = "#1D5FA8";
 const MINT = "#6BC7A7";
 const ROSE = "#CA5D7C";
+const PRIMARY_GRADIENT = "from-blue-600 to-blue-400";
+const SUCCESS_GRADIENT = "from-emerald-500 to-emerald-400";
+const WARNING_GRADIENT = "from-amber-500 to-amber-400";
+const DANGER_GRADIENT = "from-rose-500 to-rose-400";
+const PIE_COLORS = [
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#EC4899",
+  "#06B6D4",
+  "#F97316",
+];
 
 const isCollegeAdminRole = (roleValue) => {
   const normalized = String(roleValue || "")
@@ -241,8 +257,10 @@ export default function Dashboard() {
       setTotalStudentsCount(Number((freshData.students || []).length || 0));
     }
     if ("admins" in freshData) setAdmins(freshData.admins);
-    if ("certifications" in freshData)
+    if ("certifications" in freshData) {
+      console.log("Setting certifications from freshData:", freshData.certifications);
       setCertifications(freshData.certifications);
+    }
     if ("colleges" in freshData) setColleges(freshData.colleges);
     if ("projectCodes" in freshData) setProjectCodes(freshData.projectCodes);
 
@@ -595,9 +613,15 @@ export default function Dashboard() {
   const certificateToOrganization = new Map(
     certifications.map((certificate) => [
       String(certificate?.id || "").trim(),
-      String(certificate?.domain || "").trim() || "Other",
+      String(certificate?.domain || certificate?.platform || "").trim() || "Other",
     ]),
   );
+
+  console.log("=== Organization Mix Debug ===");
+  console.log("Total certifications:", certifications.length);
+  console.log("Certifications:", certifications);
+  console.log("Certificate to Organization map:", certificateToOrganization);
+  console.log("Chart students count:", chartStudents.length);
 
   const organizationEnrollmentMap = new Map();
   chartStudents.forEach((student) => {
@@ -623,6 +647,10 @@ export default function Dashboard() {
           .filter(Boolean),
       ),
     ];
+
+    if (uniqueCertificateIds.length > 0) {
+      console.log(`Student ${studentKey} has ${uniqueCertificateIds.length} certificates:`, uniqueCertificateIds);
+    }
 
     const organizationsForStudent = new Set(
       uniqueCertificateIds
@@ -650,6 +678,29 @@ export default function Dashboard() {
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
+
+  console.log("Final organizationEnrollmentMix:", organizationEnrollmentMix);
+
+  // Fallback: if no organization mix data, show organizations directly from certifications
+  const organizationsFallback = useMemo(() => {
+    if (organizationEnrollmentMix.length > 0) {
+      return organizationEnrollmentMix;
+    }
+
+    // Show all organizations from certificates with their enrollment counts
+    const orgStats = new Map();
+    certifications.forEach((cert) => {
+      const org = String(cert?.domain || cert?.platform || "Other").trim();
+      if (!org) return;
+      const current = orgStats.get(org) || { organization: org, count: 0 };
+      current.count += Number(cert?.enrolledCount || 0);
+      orgStats.set(org, current);
+    });
+
+    return Array.from(orgStats.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [organizationEnrollmentMix, certifications]);
 
   const certificationResultsData = useMemo(() => {
     const statsByCertificate = new Map();
@@ -799,43 +850,31 @@ export default function Dashboard() {
 
   return (
     <SuperAdminLayout>
-      <section className="mb-4 flex flex-wrap items-center justify-end gap-2">
+      <section className="mb-6 flex flex-row items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-slate-50 via-blue-50 to-slate-50 p-6 shadow-md border border-slate-200">
         {cacheInfo.cachedAt > 0 && (
-          <span className="mr-auto text-lg text-[#012920]">
+          <span className="text-lg text-[#012920]">
             {cacheInfo.isStale ? "⚠\uFE0F " : ""}Last updated:{" "}
             {cacheAgeLabel(cacheInfo.cachedAt)}
           </span>
         )}
-        <label className="text-sm font-semibold text-[#012920]">College</label>
-        <select
-          value={selectedCollegeCode}
-          onChange={(event) => setSelectedCollegeCode(event.target.value)}
-          className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-2 text-sm font-semibold text-[#012920]"
-        >
-          <option value="ALL">All Colleges</option>
-          {collegeOptions.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={handleResetLocalDb}
-          className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-4 py-2 text-sm font-semibold text-white shadow-sm"
-        >
-          Reset Local DB
-        </button>
-        <button
-          type="button"
-          onClick={handleToggleDbMode}
-          className="rounded-lg border border-[#D7E2F1] bg-[#012920] px-4 py-2 text-sm font-semibold text-white shadow-sm"
-        >
-          DB Mode: {dbMode === DB_MODES.LOCAL ? "Local" : "Production"}
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-semibold text-[#012920]">College</label>
+          <select
+            value={selectedCollegeCode}
+            onChange={(event) => setSelectedCollegeCode(event.target.value)}
+            className="rounded-lg border-2 border-blue-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm transition hover:border-blue-500 hover:shadow-md focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
+            <option value="ALL">All Colleges</option>
+            {collegeOptions.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<Users size={18} />}
           label="Total Students"
@@ -878,20 +917,20 @@ export default function Dashboard() {
         />
       </section>
 
-      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.6fr_1fr]">
+      <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.6fr_1fr]">
         <ChartCard title="Result Status Mix">
-          <ResponsiveContainer width="100%" height={240} debounce={75}>
+          <ResponsiveContainer width="100%" height={260} debounce={75}>
             <BarChart data={resultStatusMix}>
-              <Tooltip cursor={false} />
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="status" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} />
+              <Tooltip cursor={{ fill: "rgba(59, 130, 246, 0.1)" }} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+              <XAxis dataKey="status" tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
               <Bar
                 dataKey="count"
-                radius={[8, 8, 0, 0]}
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               >
                 {resultStatusMix.map((entry, index) => (
                   <Cell key={`${entry.status}-${index}`} fill={entry.fill} />
@@ -902,119 +941,128 @@ export default function Dashboard() {
         </ChartCard>
 
         <ChartCard title="Students by Project Code">
-          <ResponsiveContainer width="100%" height={240} debounce={75}>
+          <ResponsiveContainer width="100%" height={260} debounce={75}>
             <BarChart data={studentsByProject}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="projectId" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} />
-              <Tooltip cursor={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+              <XAxis dataKey="projectId" tick={{ fontSize: 11, fill: "#6b7280" }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <Tooltip cursor={{ fill: "rgba(29, 95, 168, 0.1)" }} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
               <Bar
                 dataKey="count"
                 fill={ACCENT_BLUE}
-                radius={[8, 8, 0, 0]}
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Organisation Enrollment Mix">
-          <ResponsiveContainer width="100%" height={240} debounce={75}>
-            <BarChart data={organizationEnrollmentMix}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="organization" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} />
-              <Tooltip cursor={false} />
-              <Bar
+          <ResponsiveContainer width="100%" height={300} debounce={75}>
+            <PieChart>
+              <Pie
+                data={organizationsFallback}
                 dataKey="count"
-                fill={SIDEBAR_BLUE}
-                radius={[8, 8, 0, 0]}
+                nameKey="organization"
+                cx="50%"
+                cy="50%"
+                outerRadius={95}
+                label={{ fontSize: 12, fill: "#374151" }}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
-              />
-            </BarChart>
+                animationDuration={500}
+                animationEasing="ease-in-out"
+              >
+                {organizationsFallback.map((entry, index) => (
+                  <Cell key={`org-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`${value} students`, "Enrolled"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+              <Legend verticalAlign="bottom" height={36} />
+            </PieChart>
           </ResponsiveContainer>
         </ChartCard>
       </section>
 
-      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <ChartCard title="Certification Results">
           <ResponsiveContainer width="100%" height={280} debounce={75}>
             <BarChart
               data={certificationResultsData}
               margin={{ top: 16, right: 12, left: 0, bottom: 52 }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" vertical={false} />
               <XAxis
                 dataKey="label"
                 interval={0}
                 height={54}
                 angle={-24}
                 textAnchor="end"
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 11, fill: "#6b7280" }}
               />
-              <YAxis allowDecimals={false} />
-              <Tooltip cursor={false} />
-              <Legend />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <Tooltip cursor={{ fill: "rgba(59, 130, 246, 0.1)" }} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px" }} />
+              <Legend wrapperStyle={{ paddingTop: "12px" }} />
               <Bar
                 dataKey="Failed"
                 stackId="certResult"
                 fill="#E15B64"
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
               <Bar
                 dataKey="Ongoing"
                 stackId="certResult"
                 fill={ACCENT_BLUE}
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
               <Bar
                 dataKey="Passed"
                 stackId="certResult"
                 fill={MINT}
-                radius={[6, 6, 0, 0]}
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Certificate Enrollment Counts">
-          <ResponsiveContainer width="100%" height={240} debounce={75}>
+          <ResponsiveContainer width="100%" height={280} debounce={75}>
             <BarChart
               data={certificateEnrollmentCountData}
               margin={{ top: 12, right: 12, left: 0, bottom: 52 }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" vertical={false} />
               <XAxis
                 dataKey="label"
                 interval={0}
                 height={54}
                 angle={-24}
                 textAnchor="end"
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 11, fill: "#6b7280" }}
               />
-              <YAxis allowDecimals={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
               <Tooltip
-                cursor={false}
+                cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
                 formatter={(value) => [`${Number(value || 0)} students`, "Enrolled"]}
+                contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px" }}
               />
               <Bar
                 dataKey="count"
                 fill={ACCENT_BLUE}
-                radius={[8, 8, 0, 0]}
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={220}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
             </BarChart>
           </ResponsiveContainer>
@@ -1025,25 +1073,39 @@ export default function Dashboard() {
 }
 
 function MetricCard({ icon, label, value, helper }) {
+  const getColorClass = (label) => {
+    if (label.includes("Student")) return "from-blue-500 to-blue-600";
+    if (label.includes("College")) return "from-emerald-500 to-emerald-600";
+    if (label.includes("Project")) return "from-amber-500 to-amber-600";
+    if (label.includes("Certificate")) return "from-rose-500 to-rose-600";
+    return "from-slate-500 to-slate-600";
+  };
+
   return (
-    <div className="rounded-2xl border border-[#012920] bg-white p-4 shadow-sm">
+    <div className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-md transition hover:shadow-xl hover:border-slate-200">
       <div className="flex items-center justify-between">
-        <p className="text-lg font-medium text-[#012920]">{label}</p>
-        <span className="rounded-lg  bg-[#F5F4EB] p-2 text-[#012920]">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wider text-slate-600">{label}</p>
+          <p className="mt-3 text-4xl font-bold text-slate-900">{value}</p>
+          <p className="mt-2 text-xs text-slate-500">{helper}</p>
+        </div>
+        <div className={`rounded-2xl bg-gradient-to-br ${getColorClass(label)} p-4 text-white shadow-lg transition group-hover:scale-110 group-hover:shadow-xl`}>
           {icon}
-        </span>
+        </div>
       </div>
-      <p className="mt-2 text-3xl font-semibold text-[#012920]">{value}</p>
-      <p className="mt-1 text-xs text-gray-500">{helper}</p>
     </div>
   );
 }
 
 function ChartCard({ title, children }) {
   return (
-    <div className="rounded-2xl border border-[#012920] bg-white p-4 shadow-sm">
-      <h2 className="mb-2 text-base font-semibold text-[#012920]">{title}</h2>
-      {children}
+    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-md transition hover:shadow-lg">
+      <h2 className="mb-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-lg font-bold text-transparent">
+        {title}
+      </h2>
+      <div className="rounded-xl bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+        {children}
+      </div>
     </div>
   );
 }

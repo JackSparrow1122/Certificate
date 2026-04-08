@@ -231,7 +231,16 @@ export default function AdminDashboard() {
 
     const load = async () => {
       try {
-        if (!collegeCode) {
+        const collegeCodeValue = String(
+          profile?.collegeCode || profile?.college_code || "",
+        ).trim().toUpperCase();
+        
+        console.log("=== Dashboard Load Started ===");
+        console.log("College Code:", collegeCodeValue);
+        console.log("Profile:", profile);
+        
+        if (!collegeCodeValue) {
+          console.warn("No collegeCode available");
           if (!mounted) return;
           setStudents([]);
           setProjects([]);
@@ -385,6 +394,13 @@ export default function AdminDashboard() {
               "",
           ),
         };
+        
+        console.log("=== College Info Debug ===");
+        console.log("College object:", college);
+        console.log("College logo field value:", college?.college_logo || college?.collegeLogo || college?.logo);
+        console.log("Final normalized logo URL:", newCollegeInfo.logo);
+        console.log("College name:", newCollegeInfo.name);
+        
         setCollegeInfo(newCollegeInfo);
         setLogoLoadFailed(false);
 
@@ -737,7 +753,7 @@ export default function AdminDashboard() {
     const certsWithStats = new Set();
 
     // 1. Merge in aggregated enrollment stats (per filtered project)
-    filteredCertStats.forEach((statsMap) => {
+    filteredCertStats.forEach((statsMap, idx) => {
       statsMap.forEach((stat, certId) => {
         const label = String(stat.name || certId).trim();
         certsWithStats.add(label);
@@ -750,9 +766,15 @@ export default function AdminDashboard() {
             Failed: 0,
           };
         }
-        statsByCertificate[label].Enrolled += stat.enrolledCount || 0;
-        statsByCertificate[label].Passed += stat.passedCount || 0;
-        statsByCertificate[label].Failed += stat.failedCount || 0;
+        // Calculate ongoing students: total enrolled - passed - failed
+        const totalEnrolled = stat.enrolledCount || 0;
+        const passed = stat.passedCount || 0;
+        const failed = stat.failedCount || 0;
+        const ongoingCount = Math.max(0, totalEnrolled - passed - failed);
+
+        statsByCertificate[label].Enrolled += ongoingCount;
+        statsByCertificate[label].Passed += passed;
+        statsByCertificate[label].Failed += failed;
       });
     });
 
@@ -907,29 +929,28 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-md">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#012920]">
-              Dashboard{" "}
+    <div className="space-y-8">
+      <section className="rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 px-8 py-6 shadow-lg">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex-1">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+              Dashboard
             </h1>
-            <p className="mt-1 text-base font-semibold text-[#012920]">
-              Welcome, {adminName}
+            <p className="mt-2 text-base font-medium text-slate-600">
+              Welcome back, <span className="text-blue-600 font-semibold">{adminName}</span>
             </p>
-            <p className="mt-2 text-base text-[#012920]"></p>
           </div>
-          <div className="hidden md:flex md:items-center md:justify-center">
+          <div className="flex flex-col items-end gap-2">
             {collegeInfo.logo && !logoLoadFailed ? (
               <img
                 src={collegeInfo.logo}
                 alt={collegeInfo.name || "College"}
-                className="max-h-20 w-auto max-w-48 object-contain"
+                className="h-20 w-auto max-w-60 object-contain rounded-lg"
                 referrerPolicy="no-referrer"
                 onError={() => setLogoLoadFailed(true)}
               />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-xl font-bold text-white">
+              <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-400 text-xl font-bold text-white shadow-md">
                 {String(collegeCode || "CLG").slice(0, 2)}
               </div>
             )}
@@ -937,83 +958,85 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section className="grid w-full grid-cols-1 gap-4 rounded-2xl border border-[#012920] bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
-        <label className="flex w-full items-center gap-3">
-          <span className="text-sm font-semibold text-gray-700">Year</span>
-          <select
-            className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-          >
-            {academicYears.map((year) => (
-              <option key={year} value={year}>
-                {year === "All" ? "All Years" : year}
-              </option>
-            ))}
-          </select>
-        </label>
+      <section className="rounded-2xl border border-slate-100 bg-white px-8 py-6 shadow-md">
+        <div className="flex flex-wrap items-center gap-8">
+          <label className="flex items-center gap-3 group">
+            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">Year</span>
+            <select
+              className="rounded-lg border-2 border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+            >
+              {academicYears.map((year) => (
+                <option key={year} value={year}>
+                  {year === "All" ? "All Years" : year}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="flex w-full items-center gap-3">
-          <span className="text-sm font-semibold text-gray-700">Course</span>
-          <select
-            className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            value={selectedCourse}
-            onChange={(e) => setSelectedCourse(e.target.value)}
-          >
-            {courseOptions.map((course) => (
-              <option key={course} value={course}>
-                {course === "All" ? "All Courses" : course}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="flex items-center gap-3 group">
+            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">Course</span>
+            <select
+              className="rounded-lg border-2 border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={selectedCourse}
+              onChange={(e) => setSelectedCourse(e.target.value)}
+            >
+              {courseOptions.map((course) => (
+                <option key={course} value={course}>
+                  {course === "All" ? "All Courses" : course}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="flex w-full items-center gap-3">
-          <span className="text-sm font-semibold text-gray-700">Pass Year</span>
-          <select
-            className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            value={selectedPassYear}
-            onChange={(e) => setSelectedPassYear(e.target.value)}
-          >
-            {passYearOptions.map((year) => (
-              <option key={year} value={year}>
-                {year === "All" ? "All Years" : year}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="flex items-center gap-3 group">
+            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">Pass Year</span>
+            <select
+              className="rounded-lg border-2 border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={selectedPassYear}
+              onChange={(e) => setSelectedPassYear(e.target.value)}
+            >
+              {passYearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year === "All" ? "All Years" : year}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Enrollments"
           value={data.totalEnrollments}
-          icon={<Users size={20} />}
+          icon={<Users size={24} />}
           color="blue"
         />
         <StatCard
           title="Avg Completion"
           value={data.completionRate}
-          icon={<BookOpenCheck size={20} />}
+          icon={<BookOpenCheck size={24} />}
           color="emerald"
         />
         <StatCard
           title="Certificates"
           value={data.certificatesIssued}
-          icon={<Award size={20} />}
+          icon={<Award size={24} />}
           color="amber"
         />
         <StatCard
           title="Project Codes"
           value={data.activeProjectCodes}
-          icon={<Layers3 size={20} />}
+          icon={<Layers3 size={24} />}
           color="rose"
         />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        <Panel title="Certification Results">
-          <ResponsiveContainer width="100%" height={340} debounce={75}>
+      <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-2">
+        <PanelCard title="Certification Results">
+          <ResponsiveContainer width="100%" height={360} debounce={75}>
             <BarChart
               data={certificationData}
               barCategoryGap="18%"
@@ -1021,9 +1044,9 @@ export default function AdminDashboard() {
               margin={{ top: 24, right: 24, left: 0, bottom: 60 }}
             >
               <CartesianGrid
-                strokeDasharray="4 4"
+                strokeDasharray="0"
+                stroke="#e5e7eb"
                 vertical={false}
-                stroke="#E5E7EB"
               />
               <XAxis
                 dataKey="label"
@@ -1036,97 +1059,106 @@ export default function AdminDashboard() {
                 type="number"
                 domain={[0, maxCertTotal]}
                 range={[340 - 60, 20]}
-                tick={{ fontSize: 13, fill: "#6B7280" }}
+                tick={{ fontSize: 13, fill: "#4b5563" }}
                 allowDecimals={false}
                 width={40}
               />
               <Tooltip
-                cursor={{ fill: "#F3F4F6" }}
+                cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "8px",
+                  backgroundColor: "#fff",
+                  border: "2px solid #e5e7eb",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
                 }}
               />
-              <Legend verticalAlign="top" align="right" />
+              <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: "16px" }} />
               <Bar
                 dataKey="Enrolled"
                 name="Ongoing"
                 stackId="a"
-                fill="#3B82F6"
+                fill="#3b82f6"
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={400}
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
               <Bar
                 dataKey="Passed"
                 stackId="a"
-                fill="#10B981"
+                fill="#10b981"
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={400}
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
               <Bar
                 dataKey="Failed"
                 stackId="a"
-                fill="#EF4444"
-                radius={[4, 4, 0, 0]}
+                fill="#ef4444"
+                radius={[12, 12, 0, 0]}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={400}
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
             </BarChart>
           </ResponsiveContainer>
-        </Panel>
-        <Panel title="Enrollment by Course">
-          <ResponsiveContainer width="100%" height={340} debounce={75}>
+        </PanelCard>
+        <PanelCard title="Enrollment by Course">
+          <ResponsiveContainer width="100%" height={360} debounce={75}>
             <BarChart data={data.barData} barSize={48}>
               <CartesianGrid
-                strokeDasharray="4 4"
+                strokeDasharray="0"
+                stroke="#e5e7eb"
                 vertical={false}
-                stroke="#E5E7EB"
               />
               <XAxis
                 dataKey="course"
-                tick={{ fontSize: 13, fill: "#6B7280" }}
+                tick={{ fontSize: 13, fill: "#4b5563" }}
               />
               <YAxis
-                tick={{ fontSize: 13, fill: "#6B7280" }}
+                tick={{ fontSize: 13, fill: "#4b5563" }}
                 allowDecimals={false}
               />
               <Tooltip
-                cursor={{ fill: "#F3F4F6" }}
+                cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "8px",
+                  backgroundColor: "#fff",
+                  border: "2px solid #e5e7eb",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
                 }}
               />
               <Bar
                 dataKey="count"
-                fill="#3B82F6"
+                fill="#3b82f6"
                 radius={[12, 12, 0, 0]}
                 rootTabIndex={-1}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={400}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               />
             </BarChart>
           </ResponsiveContainer>
-        </Panel>
+        </PanelCard>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        <Panel title="Course Distribution">
-          <ResponsiveContainer width="100%" height={320} debounce={75}>
+      <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-2">
+        <PanelCard title="Course Distribution">
+          <ResponsiveContainer width="100%" height={340} debounce={75}>
             <PieChart>
               <Pie
                 data={data.pieData}
                 dataKey="value"
                 nameKey="name"
+                cx="50%"
+                cy="50%"
                 outerRadius={110}
                 rootTabIndex={-1}
-                label
+                label={{ fontSize: 12, fill: "#374151" }}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={400}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               >
                 {data.pieData.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
@@ -1134,28 +1166,32 @@ export default function AdminDashboard() {
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "8px",
+                  backgroundColor: "#fff",
+                  border: "2px solid #e5e7eb",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
                 }}
               />
               <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
-        </Panel>
-        <Panel title="Student Progress Distribution">
-          <ResponsiveContainer width="100%" height={320} debounce={75}>
+        </PanelCard>
+        <PanelCard title="Student Progress Distribution">
+          <ResponsiveContainer width="100%" height={340} debounce={75}>
             <PieChart>
               <Pie
                 data={data.progressBands}
                 dataKey="value"
                 nameKey="name"
+                cx="50%"
+                cy="50%"
                 innerRadius={70}
                 outerRadius={110}
                 rootTabIndex={-1}
+                label={{ fontSize: 12, fill: "#374151" }}
                 isAnimationActive={!isLayoutResizing}
-                animationDuration={400}
-                animationEasing="ease-out"
+                animationDuration={500}
+                animationEasing="ease-in-out"
               >
                 {data.progressBands.map((entry, index) => (
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
@@ -1163,15 +1199,16 @@ export default function AdminDashboard() {
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: "8px",
+                  backgroundColor: "#fff",
+                  border: "2px solid #e5e7eb",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
                 }}
               />
               <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
-        </Panel>
+        </PanelCard>
       </div>
     
     </div>
@@ -1179,29 +1216,68 @@ export default function AdminDashboard() {
 }
 /* Helper Components */
 function StatCard({ title, value, icon, color = "blue" }) {
-  const colorClasses = {
-    blue: "from-blue-50 to-blue-100 text-blue-600 bg-blue-100",
-    emerald: "from-emerald-50 to-emerald-100 text-emerald-600 bg-emerald-100",
-    amber: "from-amber-50 to-amber-100 text-amber-600 bg-amber-100",
-    rose: "from-rose-50 to-rose-100 text-rose-600 bg-rose-100",
+  const colorConfig = {
+    blue: {
+      bg: "from-blue-50 to-blue-100",
+      iconBg: "from-blue-600 to-blue-500",
+      text: "text-blue-600",
+    },
+    emerald: {
+      bg: "from-emerald-50 to-emerald-100",
+      iconBg: "from-emerald-600 to-emerald-500",
+      text: "text-emerald-600",
+    },
+    amber: {
+      bg: "from-amber-50 to-amber-100",
+      iconBg: "from-amber-600 to-amber-500",
+      text: "text-amber-600",
+    },
+    rose: {
+      bg: "from-rose-50 to-rose-100",
+      iconBg: "from-rose-600 to-rose-500",
+      text: "text-rose-600",
+    },
   };
-  const iconBg = colorClasses[color] || colorClasses.blue;
+
+  const config = colorConfig[color] || colorConfig.blue;
+
   return (
-    <div className="rounded-sm border border-[#012920] bg-white p-6 shadow-sm transition hover:shadow-md">
+    <div className="group rounded-2xl border border-slate-100 bg-white p-8 shadow-lg hover:shadow-2xl transition duration-300 hover:-translate-y-1">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-          {title}
-        </p>
-        <span className={`rounded-lg ${iconBg} p-2.5`}>{icon}</span>
+        <div className="flex-1">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+            {title}
+          </p>
+          <h3 className="mt-4 text-4xl font-bold text-slate-900">
+            {value}
+          </h3>
+        </div>
+        <div className={`rounded-2xl bg-gradient-to-br ${config.iconBg} p-4 text-white shadow-lg group-hover:scale-110 transition duration-300`}>
+          {icon}
+        </div>
       </div>
-      <h2 className="mt-4 text-3xl font-bold text-gray-900">{value}</h2>
+      <div className={`mt-4 h-1 w-12 rounded-full bg-gradient-to-r ${config.iconBg}`}></div>
     </div>
   );
 }
+
+function PanelCard({ title, children }) {
+  return (
+    <div className="group rounded-2xl border border-slate-100 bg-white p-8 shadow-lg hover:shadow-xl transition duration-300">
+      <h2 className="mb-6 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-2xl font-bold text-transparent">
+        {title}
+      </h2>
+      <div className="rounded-xl bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Panel({ title, children }) {
   return (
-    <div className="rounded-sm border border-[#012920] bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-semibold text-gray-900">{title}</h3>
+    <div className="rounded-2xl border border-slate-100 bg-white p-8 shadow-lg">
+      <h3 className="mb-6 text-xl font-bold text-slate-900">{title}</h3>
       {children}
     </div>
   );

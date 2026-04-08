@@ -1122,45 +1122,104 @@ export const getCertificateEnrollmentStatsByProject = async (projectCode) => {
     const normalizedProjectCode = String(projectCode || "").trim();
     if (!normalizedProjectCode) return new Map();
 
-    // Read from nested students/*/certificate_enrollments via collectionGroup.
-    const enrollmentsQuery = query(
-      collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
-      where("projectCode", "==", normalizedProjectCode),
-    );
-    const snapshot = await getDocs(enrollmentsQuery);
-    const statsMap = new Map();
-
-    snapshot.forEach((enrollDoc) => {
-      const d = enrollDoc.data();
-      if (d.isDeleted === true) return;
-
-      const certId = String(d.certificateId || "").trim();
-      if (!certId) return;
-
-      const current = statsMap.get(certId) || {
-        id: certId,
-        name: String(d.certificateName || "").trim(),
-        examCode: String(d.examCode || "").trim(),
-        enrolledCount: 0,
-        passedCount: 0,
-        failedCount: 0,
-      };
-
-      current.enrolledCount += 1;
-      const status = String(d.status || "").toLowerCase();
-      const isPass = ["passed", "completed", "certified", "pass"].includes(
-        status,
+    // Try collection group query first (requires index)
+    try {
+      const enrollmentsQuery = query(
+        collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
+        where("projectCode", "==", normalizedProjectCode),
       );
-      const isFail = ["failed", "fail"].includes(status);
-      if (isPass) current.passedCount += 1;
-      if (isFail) current.failedCount += 1;
+      const snapshot = await getDocs(enrollmentsQuery);
+      const statsMap = new Map();
 
-      statsMap.set(certId, current);
-    });
+      snapshot.forEach((enrollDoc) => {
+        const d = enrollDoc.data();
+        if (d.isDeleted === true) return;
 
-    return statsMap;
+        const certId = String(d.certificateId || "").trim();
+        if (!certId) return;
+
+        const current = statsMap.get(certId) || {
+          id: certId,
+          name: String(d.certificateName || "").trim(),
+          examCode: String(d.examCode || "").trim(),
+          enrolledCount: 0,
+          passedCount: 0,
+          failedCount: 0,
+        };
+
+        current.enrolledCount += 1;
+        const status = String(d.status || "").toLowerCase();
+        const isPass = ["passed", "completed", "certified", "pass"].includes(
+          status,
+        );
+        const isFail = ["failed", "fail"].includes(status);
+        if (isPass) current.passedCount += 1;
+        if (isFail) current.failedCount += 1;
+
+        statsMap.set(certId, current);
+      });
+
+      return statsMap;
+    } catch (indexError) {
+      // Fallback: query students directly and aggregate enrollment data
+      console.log("Collection group query unavailable, using fallback method for project:", normalizedProjectCode);
+      const projectDocId = codeToDocId(normalizedProjectCode);
+      const studentsRef = collection(
+        db,
+        STUDENTS_COLLECTION,
+        projectDocId,
+        "students_list",
+      );
+      
+      const studentsSnapshot = await getDocs(studentsRef);
+      const statsMap = new Map();
+
+      for (const studentDoc of studentsSnapshot.docs) {
+        // Query certificate enrollments for this student
+        const enrollmentsRef = collection(
+          db,
+          STUDENTS_COLLECTION,
+          projectDocId,
+          "students_list",
+          studentDoc.id,
+          CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
+        );
+        const enrollmentsSnapshot = await getDocs(enrollmentsRef);
+
+        enrollmentsSnapshot.forEach((enrollDoc) => {
+          const d = enrollDoc.data();
+          if (d.isDeleted === true) return;
+
+          const certId = String(d.certificateId || "").trim();
+          if (!certId) return;
+
+          const current = statsMap.get(certId) || {
+            id: certId,
+            name: String(d.certificateName || "").trim(),
+            examCode: String(d.examCode || "").trim(),
+            enrolledCount: 0,
+            passedCount: 0,
+            failedCount: 0,
+          };
+
+          current.enrolledCount += 1;
+          const status = String(d.status || "").toLowerCase();
+          const isPass = ["passed", "completed", "certified", "pass"].includes(
+            status,
+          );
+          const isFail = ["failed", "fail"].includes(status);
+          if (isPass) current.passedCount += 1;
+          if (isFail) current.failedCount += 1;
+
+          statsMap.set(certId, current);
+        });
+      }
+
+      return statsMap;
+    }
   } catch (error) {
     console.error("Error getting certificate enrollment stats:", error);
-    throw error;
+    // Return empty map on error to allow dashboard to continue
+    return new Map();
   }
 };
