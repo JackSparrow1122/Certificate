@@ -6,6 +6,13 @@ import {
   getCertificateEnrollmentStatsByProject,
 } from "../../../services/certificateService";
 import { getAllOrganizations } from "../../../services/organizationService";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 const EMPTY_BREAKDOWN = { enrolledCount: 0, passedCount: 0, failedCount: 0 };
 
@@ -19,7 +26,7 @@ const normalizeStream = (rawCourse, projectCode) => {
   const normalized = rawValue.toLowerCase();
 
   if (normalized.includes("mba")) return "MBA";
- 
+
   if (
     normalized.includes("engineering") ||
     normalized.includes("engineer") ||
@@ -57,6 +64,21 @@ export default function Certificates() {
 
   useEffect(() => {
     let mounted = true;
+    const cacheKey = `${CACHE_KEYS.CA_CERTIFICATES}_${collegeCode}`;
+
+    const cached = getCached(cacheKey);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setCertStatsMap(new Map(cached.data.certStatsEntries || []));
+      setCertifications(cached.data.certifications || []);
+      setOrganizations(cached.data.organizations || []);
+      if (!cached.isStale && !shouldRevalidate) {
+        return () => {
+          mounted = false;
+        };
+      }
+    }
+
     const load = async () => {
       try {
         if (!collegeCode) {
@@ -137,6 +159,15 @@ export default function Certificates() {
         setCertStatsMap(merged);
         setCertifications(allCerts || []);
         setOrganizations(orgRows || []);
+        setCached(
+          cacheKey,
+          {
+            certStatsEntries: Array.from(merged.entries()),
+            certifications: allCerts || [],
+            organizations: orgRows || [],
+          },
+          CACHE_TTL.MEDIUM,
+        );
       } catch (error) {
         console.error("Failed to load certificate data:", error);
       }
@@ -174,11 +205,17 @@ export default function Certificates() {
           orgLookupKey && orgLookupKey !== "-"
             ? organizationByName.get(orgLookupKey)
             : null;
-        
-        const engineeringBreakdown = stat.streamBreakdown?.Engineering || { ...EMPTY_BREAKDOWN };
-        const mbaBreakdown = stat.streamBreakdown?.MBA || { ...EMPTY_BREAKDOWN };
-        const otherBreakdown = stat.streamBreakdown?.Other || { ...EMPTY_BREAKDOWN };
-        
+
+        const engineeringBreakdown = stat.streamBreakdown?.Engineering || {
+          ...EMPTY_BREAKDOWN,
+        };
+        const mbaBreakdown = stat.streamBreakdown?.MBA || {
+          ...EMPTY_BREAKDOWN,
+        };
+        const otherBreakdown = stat.streamBreakdown?.Other || {
+          ...EMPTY_BREAKDOWN,
+        };
+
         return {
           id: stat.id,
           name: String(meta?.name || stat.name || "").trim() || stat.id,
@@ -200,7 +237,9 @@ export default function Certificates() {
   }, [certStatsMap, certifications, organizations]);
 
   const filterOptions = useMemo(() => {
-    const domains = [...new Set(certificateRows.map((row) => row.domain))].sort();
+    const domains = [
+      ...new Set(certificateRows.map((row) => row.domain)),
+    ].sort();
     const organizationsList = [
       ...new Set(certificateRows.map((row) => row.organization)),
     ].sort();
@@ -447,10 +486,7 @@ export default function Certificates() {
             <tbody>
               {filteredCertificateRows.length === 0 ? (
                 <tr>
-                  <td
-                    className="py-6 text-center text-gray-500"
-                    colSpan={10}
-                  >
+                  <td className="py-6 text-center text-gray-500" colSpan={10}>
                     No certificates match the selected filters.
                   </td>
                 </tr>
@@ -561,5 +597,5 @@ function StatusPills({ enrolledCount, passedCount, failedCount }) {
         </span>
       )}
     </div>
-  ); 
+  );
 }

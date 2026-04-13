@@ -9,6 +9,14 @@ import {
   rerunProjectCodeMatching,
 } from "../../../services/projectCodeService";
 import { getAllColleges } from "../../../services/collegeService";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 const REQUIRED_JSON_KEYS = [
   "S.No",
@@ -103,6 +111,14 @@ export default function ProjectCodes() {
       ]);
       setProjectCodes(projectCodesData || []);
       setColleges(collegesData || []);
+      setCached(
+        CACHE_KEYS.SA_PROJECT_CODES,
+        {
+          projectCodes: projectCodesData || [],
+          colleges: collegesData || [],
+        },
+        CACHE_TTL.MEDIUM,
+      );
     } catch (error) {
       console.error("Failed to load project codes:", error);
       setProjectCodes([]);
@@ -113,6 +129,14 @@ export default function ProjectCodes() {
   };
 
   useEffect(() => {
+    const cached = getCached(CACHE_KEYS.SA_PROJECT_CODES);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setProjectCodes(cached.data.projectCodes || []);
+      setColleges(cached.data.colleges || []);
+      setLoading(false);
+      if (!cached.isStale && !shouldRevalidate) return;
+    }
     fetchProjectCodes();
   }, []);
 
@@ -144,6 +168,7 @@ export default function ProjectCodes() {
   }, [filtered, colleges]);
 
   const handleProjectCodeAdded = async () => {
+    clearSuperAdminCache();
     setShowAddModal(false);
     await fetchProjectCodes();
   };
@@ -225,6 +250,7 @@ export default function ProjectCodes() {
         });
       }
 
+      clearSuperAdminCache();
       await fetchProjectCodes();
       alert(`Successfully imported ${parsed.length} project codes.`);
     } catch (error) {
@@ -242,6 +268,7 @@ export default function ProjectCodes() {
     try {
       setRerunningMatch(true);
       const result = await rerunProjectCodeMatching();
+      clearSuperAdminCache();
       await fetchProjectCodes();
       alert(
         `Matching completed. Total: ${result.total}, Matched: ${result.matched}, Unmatched: ${result.unmatched}, Updated: ${result.updated}.`,
@@ -260,14 +287,20 @@ export default function ProjectCodes() {
         <section className="rounded-2xl border border-[#012920] bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold text-[#012920]">Project Codes</h1>
-              <p className="mt-1 text-sm text-gray-600">Manage, search, and import project codes</p>
+              <h1 className="text-2xl font-semibold text-[#012920]">
+                Project Codes
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Manage, search, and import project codes
+              </p>
             </div>
             <div className="inline-flex items-center gap-2 rounded-xl border border-[#012920] bg-[#F7FAFF] px-3 py-2">
               <span className="text-xs font-medium uppercase tracking-wide text-[#012920]/70">
                 Total
               </span>
-              <span className="text-lg font-semibold text-[#012920]">{filtered.length}</span>
+              <span className="text-lg font-semibold text-[#012920]">
+                {filtered.length}
+              </span>
             </div>
           </div>
         </section>

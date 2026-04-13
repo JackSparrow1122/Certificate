@@ -12,6 +12,14 @@ import {
   getUserByCollegeCode,
   deleteCollegeAdmin,
 } from "../../../services/userService";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 export default function Colleges() {
   const [colleges, setColleges] = useState([]);
@@ -28,6 +36,13 @@ export default function Colleges() {
 
   // Fetch colleges from Firestore on component mount
   useEffect(() => {
+    const cached = getCached(CACHE_KEYS.SA_COLLEGES);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setColleges(cached.data);
+      setLoading(false);
+      if (!cached.isStale && !shouldRevalidate) return;
+    }
     fetchCollegesData();
   }, []);
 
@@ -36,6 +51,7 @@ export default function Colleges() {
       setLoading(true);
       const data = await getAllColleges();
       setColleges(data);
+      setCached(CACHE_KEYS.SA_COLLEGES, data, CACHE_TTL.LONG);
       setError(null);
     } catch (err) {
       console.error("Error fetching colleges:", err);
@@ -79,6 +95,7 @@ export default function Colleges() {
 
       // 2. Delete the college
       await deleteCollege(deleteConfirm.college.collegeCode);
+      clearSuperAdminCache();
       alert("College and admin deleted successfully!");
       setDeleteConfirm({ isOpen: false, college: null, loading: false });
       fetchCollegesData();
@@ -147,7 +164,10 @@ export default function Colleges() {
         <AddEditCollegeModal
           college={selectedCollege}
           onClose={() => setOpen(false)}
-          onCollageAdded={fetchCollegesData}
+          onCollageAdded={async () => {
+            clearSuperAdminCache();
+            await fetchCollegesData();
+          }}
         />
       )}
       <ConfirmDialog

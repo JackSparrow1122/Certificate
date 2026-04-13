@@ -9,6 +9,13 @@ import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddProjectCodeModal from "../../components/superadmin/AddProjectCodeModal";
 import { RotateCcw, Trash2 } from "lucide-react";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import {
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 export default function CollegeProjectCodes() {
   const navigate = useNavigate();
@@ -29,6 +36,9 @@ export default function CollegeProjectCodes() {
     year: "",
     type: "",
   });
+  const cacheKey = `sa_college_project_codes_${String(collegeId || "")
+    .trim()
+    .toUpperCase()}`;
 
   const getProjectCodePrefix = (projectCode) =>
     String(projectCode || "")
@@ -83,6 +93,14 @@ export default function CollegeProjectCodes() {
 
       setProjectCodes(strictCollegeProjectCodes);
       setCollege(collegeData);
+      setCached(
+        cacheKey,
+        {
+          projectCodes: strictCollegeProjectCodes,
+          college: collegeData,
+        },
+        CACHE_TTL.MEDIUM,
+      );
     } catch (error) {
       setError("Failed to load data");
       console.error(error);
@@ -92,8 +110,16 @@ export default function CollegeProjectCodes() {
   }, [collegeId]);
 
   useEffect(() => {
+    const cached = getCached(cacheKey);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setProjectCodes(cached.data.projectCodes || []);
+      setCollege(cached.data.college || null);
+      setLoading(false);
+      if (!cached.isStale && !shouldRevalidate) return;
+    }
     fetchData();
-  }, [fetchData]);
+  }, [cacheKey, fetchData]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -130,6 +156,7 @@ export default function CollegeProjectCodes() {
     try {
       setDeletingProjectId(confirmTarget.id);
       await softDeleteProjectCode(confirmTarget.id, confirmTarget.code);
+      clearSuperAdminCache();
       setConfirmOpen(false);
       setConfirmTarget(null);
       await fetchData();
@@ -334,7 +361,10 @@ export default function CollegeProjectCodes() {
           )}
           collegeName={String(college?.college_name || "")}
           onClose={() => setShowAddProjectModal(false)}
-          onProjectCodeAdded={fetchData}
+          onProjectCodeAdded={async () => {
+            clearSuperAdminCache();
+            await fetchData();
+          }}
         />
       )}
 

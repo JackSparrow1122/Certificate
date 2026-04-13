@@ -18,6 +18,28 @@
 
 const CACHE_PREFIX = "erp_dash_";
 const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+let initialRevalidationPending = true;
+
+export const CACHE_TTL = {
+  SHORT: 2 * 60 * 1000,
+  MEDIUM: 10 * 60 * 1000,
+  LONG: 30 * 60 * 1000,
+};
+
+export const CACHE_KEYS = {
+  SA_COLLEGES: "sa_colleges",
+  SA_ADMINS: "sa_admins",
+  SA_PROJECT_CODES: "sa_project_codes",
+  SA_CERT_CONFIG: "sa_certificate_config",
+  SA_PROJECT_STUDENTS: "sa_project_students",
+  CA_CERTIFICATES: "ca_certificates",
+  CA_PROJECT_OPTIONS: "ca_project_options",
+};
+
+const normalizeCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
 
 /**
  * Read a cached entry.
@@ -79,6 +101,40 @@ export function clearAllDashboardCache() {
     );
     keys.forEach((k) => localStorage.removeItem(k));
   } catch {}
+}
+
+export function clearCachedByPrefix(prefix) {
+  try {
+    const keyPrefix = CACHE_PREFIX + String(prefix || "");
+    const keys = Object.keys(localStorage).filter((k) =>
+      k.startsWith(keyPrefix),
+    );
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
+export function clearSuperAdminCache() {
+  clearCached("superadmin_dashboard");
+  clearCachedByPrefix("sa_");
+}
+
+export function clearCollegeAdminCache(collegeCode = "") {
+  const normalizedCollegeCode = normalizeCode(collegeCode);
+  if (normalizedCollegeCode) {
+    clearCachedByPrefix(`ca_${normalizedCollegeCode}_`);
+    clearCached(`college_admin_dashboard_${normalizedCollegeCode}`);
+  } else {
+    clearCachedByPrefix("ca_");
+    clearCachedByPrefix("college_admin_dashboard_");
+  }
+}
+
+export function consumeInitialRevalidationToken() {
+  if (initialRevalidationPending) {
+    initialRevalidationPending = false;
+    return true;
+  }
+  return false;
 }
 
 /**

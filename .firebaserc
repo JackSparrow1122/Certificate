@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "erp-certification"
-  }
+    "default": "erp-certification",
+    "ayush": "trial-99fc4"
+  },
+  "targets": {},
+  "etags": {}
 }

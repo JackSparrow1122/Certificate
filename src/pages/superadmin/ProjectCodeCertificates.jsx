@@ -6,6 +6,13 @@ import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { RotateCcw } from "lucide-react";
+import {
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 export default function ProjectCodeCertificates() {
   const navigate = useNavigate();
@@ -17,6 +24,7 @@ export default function ProjectCodeCertificates() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState("all");
+  const cacheKey = `sa_project_certificates_${projectId}`;
 
   const semesterOptions = useMemo(() => {
     const set = new Set();
@@ -44,8 +52,17 @@ export default function ProjectCodeCertificates() {
   }, [certificates, selectedSemester]);
 
   useEffect(() => {
+    const cached = getCached(cacheKey);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setProjectCode(cached.data.projectCode || null);
+      setCertificates(cached.data.certificates || []);
+      setSelectedSemester(cached.data.selectedSemester || "all");
+      setLoading(false);
+      if (!cached.isStale && !shouldRevalidate) return;
+    }
     fetchData();
-  }, [projectId]);
+  }, [cacheKey, projectId]);
 
   const fetchData = async () => {
     try {
@@ -65,6 +82,15 @@ export default function ProjectCodeCertificates() {
         );
         setCertificates(enrolledCerts);
         setSelectedSemester("all");
+        setCached(
+          cacheKey,
+          {
+            projectCode: projectData,
+            certificates: enrolledCerts,
+            selectedSemester: "all",
+          },
+          CACHE_TTL.MEDIUM,
+        );
       } catch (certErr) {
         console.error("Certificate fetch error:", certErr);
         // Gracefully handle — page still loads, user can assign certificates
@@ -177,7 +203,10 @@ export default function ProjectCodeCertificates() {
               </div>
               <ExcelStudentImport
                 projectCode={projectCode?.code || ""}
-                onStudentAdded={() => fetchData()}
+                onStudentAdded={() => {
+                  clearSuperAdminCache();
+                  fetchData();
+                }}
               />
             </section>
           )}
@@ -259,7 +288,10 @@ export default function ProjectCodeCertificates() {
         <AddStudentModal
           projectCode={projectCode?.code || projectId}
           onClose={() => setShowAddStudentModal(false)}
-          onStudentAdded={fetchData}
+          onStudentAdded={async () => {
+            clearSuperAdminCache();
+            await fetchData();
+          }}
         />
       )}
     </SuperAdminLayout>

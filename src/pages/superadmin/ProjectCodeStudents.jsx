@@ -1,5 +1,5 @@
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getProjectCodeById } from "../../../services/projectCodeService";
 import {
   getStudentsByProject,
@@ -14,6 +14,16 @@ import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AddStudentModal from "../../components/superadmin/AddStudentModal";
 import { ExcelStudentImport } from "../../components/superadmin/ExcelStudentImport";
 import { deriveHighestSemesterFromEnrollments } from "../../utils/semesterUtils";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
+
+const PAGE_SIZE = 50;
 
 // Extract current year from the 3rd segment of a project code like "COLLEGE/BATCH/YEAR"
 function getCurrentYearFromProjectCode(projectCode) {
@@ -73,12 +83,26 @@ export default function ProjectCodeStudents() {
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     rollNo: "",
     name: "",
   });
 
+  const cacheKey = `${CACHE_KEYS.SA_PROJECT_STUDENTS}_${projectId}_${certificateId || "all"}`;
+
   useEffect(() => {
+    const cached = getCached(cacheKey);
+    if (!cached?.data) return;
+    setProjectCode(cached.data.projectCode || null);
+    setStudents(cached.data.students || []);
+    setLoading(false);
+  }, [cacheKey]);
+
+  useEffect(() => {
+    const cached = getCached(cacheKey);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data && !cached.isStale && !shouldRevalidate) return;
     fetchData();
   }, [projectId, certificateId]);
 
@@ -111,6 +135,14 @@ export default function ProjectCodeStudents() {
         });
       }
       setStudents(studentsData);
+      setCached(
+        cacheKey,
+        {
+          projectCode: projectData,
+          students: studentsData,
+        },
+        CACHE_TTL.MEDIUM,
+      );
     } catch (err) {
       setError("Failed to load data");
       console.error(err);
@@ -119,31 +151,13 @@ export default function ProjectCodeStudents() {
     }
   };
 
-  if (loading) {
-    return (
-      <SuperAdminLayout>
-        <div className="flex items-center justify-center p-8">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      </SuperAdminLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <SuperAdminLayout>
-        <div className="flex items-center justify-center p-8">
-          <div className="text-red-500">{error}</div>
-        </div>
-      </SuperAdminLayout>
-    );
-  }
-
   const handleFilterChange = (key, value) => {
+    setCurrentPage(1);
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleResetFilters = () => {
+    setCurrentPage(1);
     setFilters({
       rollNo: "",
       name: "",
@@ -228,6 +242,7 @@ export default function ProjectCodeStudents() {
         },
       };
       await updateStudent(projectCode.code, editingStudent.id, updateData);
+      clearSuperAdminCache();
       setEditingStudent(null);
       await fetchData();
     } catch (err) {
@@ -238,16 +253,61 @@ export default function ProjectCodeStudents() {
     }
   };
 
-  const filteredStudents = students
-    .map((s) => extractStudentDisplayData(s, projectCode?.code))
-    .filter((student) => {
-      const rollNo = String(student.id || "");
-      const name = String(student.name || "");
-      return (
-        rollNo.toLowerCase().includes(filters.rollNo.toLowerCase()) &&
-        name.toLowerCase().includes(filters.name.toLowerCase())
-      );
-    });
+  const filteredStudents = useMemo(
+    () =>
+      students
+        .map((s) => extractStudentDisplayData(s, projectCode?.code))
+        .filter((student) => {
+          const rollNo = String(student.id || "");
+          const name = String(student.name || "");
+          return (
+            rollNo.toLowerCase().includes(filters.rollNo.toLowerCase()) &&
+            name.toLowerCase().includes(filters.name.toLowerCase())
+          );
+        }),
+    [students, filters, projectCode?.code],
+  );
+
+  const sortedStudents = useMemo(() => {
+    return [...filteredStudents].sort((a, b) =>
+      String(a.id || "").localeCompare(String(b.id || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+  }, [filteredStudents]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedStudents.length / PAGE_SIZE));
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return sortedStudents.slice(start, start + PAGE_SIZE);
+  }, [sortedStudents, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  if (loading) {
+    return (
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center p-8">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      </SuperAdminLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center p-8">
+          <div className="text-red-500">{error}</div>
+        </div>
+      </SuperAdminLayout>
+    );
+  }
 
   return (
     <SuperAdminLayout>
@@ -343,7 +403,7 @@ export default function ProjectCodeStudents() {
             </div>
 
             <div className="space-y-2.5">
-              {filteredStudents.map((student) => (
+              {paginatedStudents.map((student) => (
                 <div
                   key={student.docId || student.id}
                   role="button"
@@ -443,6 +503,39 @@ export default function ProjectCodeStudents() {
                 No students found
               </div>
             )}
+
+            {filteredStudents.length > PAGE_SIZE && (
+              <div className="mt-3 flex items-center justify-between px-1">
+                <p className="text-xs text-[#415a77]">
+                  {`Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, sortedStudents.length)} of ${sortedStudents.length}`}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((page) => Math.max(1, page - 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-medium text-[#0B2A4A]">
+                    {`Page ${currentPage} of ${totalPages}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(totalPages, page + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-[#D7E2F1] bg-white px-3 py-1.5 text-xs font-medium text-[#0B2A4A] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </div>
@@ -451,7 +544,10 @@ export default function ProjectCodeStudents() {
         <AddStudentModal
           projectCode={projectCode?.code || projectId}
           onClose={() => setShowAddStudentModal(false)}
-          onStudentAdded={fetchData}
+          onStudentAdded={async () => {
+            clearSuperAdminCache();
+            await fetchData();
+          }}
         />
       )}
 
@@ -824,6 +920,7 @@ export default function ProjectCodeStudents() {
               onStudentAdded={(success) => {
                 // Only close modal and refresh when import succeeded.
                 if (success) {
+                  clearSuperAdminCache();
                   setShowImportModal(false);
                   setTimeout(() => fetchData(), 700);
                 } else {

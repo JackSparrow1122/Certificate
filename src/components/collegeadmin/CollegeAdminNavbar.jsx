@@ -4,6 +4,13 @@ import { useAuth } from "../../context/AuthContext";
 import { getCollegeByCode } from "../../../services/collegeService";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "../../firebase/config";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 const normalizeCode = (value) =>
   String(value || "")
@@ -34,6 +41,18 @@ export default function CollegeAdminNavbar({ onMenuClick }) {
 
   useEffect(() => {
     let mounted = true;
+    const cacheKey = `${CACHE_KEYS.CA_PROJECT_OPTIONS}_${collegeCode}_logo`;
+
+    const cached = getCached(cacheKey);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data?.collegeLogo && mounted) {
+      setCollegeLogo(cached.data.collegeLogo);
+      if (!cached.isStale && !shouldRevalidate) {
+        return () => {
+          mounted = false;
+        };
+      }
+    }
 
     const loadCollegeLogo = async () => {
       if (!collegeCode) {
@@ -75,6 +94,10 @@ export default function CollegeAdminNavbar({ onMenuClick }) {
           college?.college_logo || college?.collegeLogo || college?.logo || "",
         ),
       );
+      const normalizedLogo = normalizeCollegeLogoUrl(
+        college?.college_logo || college?.collegeLogo || college?.logo || "",
+      );
+      setCached(cacheKey, { collegeLogo: normalizedLogo }, CACHE_TTL.LONG);
       setLogoLoadFailed(false);
     };
 

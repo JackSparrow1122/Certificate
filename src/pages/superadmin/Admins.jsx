@@ -2,9 +2,20 @@ import { useState, useEffect } from "react";
 import SuperAdminLayout from "../../components/layout/SuperAdminLayout";
 import AdminCard from "../../components/superadmin/AdminCard";
 import AddAdminModal from "../../components/superadmin/AddAdminModal";
-import { getAllAdmins, deleteCollegeAdmin as deleteAdmin } from "../../../services/userService";
-import { getCollegeByCode } from "../../../services/collegeService";
+import {
+  getAllAdmins,
+  deleteCollegeAdmin as deleteAdmin,
+} from "../../../services/userService";
+import { getAllColleges } from "../../../services/collegeService";
 import { useAuth } from "../../context/AuthContext";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 export default function Admins() {
   const { user } = useAuth();
@@ -21,27 +32,41 @@ export default function Admins() {
     try {
       setLoading(true);
       setError(null);
-      const adminsList = await getAllAdmins();
+      const [adminsList, colleges] = await Promise.all([
+        getAllAdmins(),
+        getAllColleges(),
+      ]);
 
-      // For each college admin, fetch the college name
-      const enrichedAdmins = await Promise.all(
-        adminsList.map(async (admin) => {
-          let collegeName = null;
-          if (admin.role === "collegeAdmin" && admin.collegeCode) {
-            const college = await getCollegeByCode(admin.collegeCode);
-            collegeName = college?.college_name || "Unknown College";
-          } else if (admin.role === "superAdmin") {
-            collegeName = "Gryphon Academy";
-          }
-
-          return {
-            ...admin,
-            college: collegeName,
-          };
-        }),
+      const collegeNameByCode = new Map(
+        (colleges || []).map((college) => [
+          String(college.collegeCode || college.college_code || "")
+            .trim()
+            .toUpperCase(),
+          college?.college_name || "Unknown College",
+        ]),
       );
 
+      const enrichedAdmins = (adminsList || []).map((admin) => {
+        let collegeName = null;
+        if (admin.role === "collegeAdmin") {
+          collegeName =
+            collegeNameByCode.get(
+              String(admin.collegeCode || "")
+                .trim()
+                .toUpperCase(),
+            ) || "Unknown College";
+        } else if (admin.role === "superAdmin") {
+          collegeName = "Gryphon Academy";
+        }
+
+        return {
+          ...admin,
+          college: collegeName,
+        };
+      });
+
       setAdmins(enrichedAdmins);
+      setCached(CACHE_KEYS.SA_ADMINS, enrichedAdmins, CACHE_TTL.MEDIUM);
     } catch (err) {
       console.error("Error fetching admins:", err);
       setError("Failed to load admins. Please try again.");
@@ -52,6 +77,13 @@ export default function Admins() {
 
   // Fetch admins on component mount
   useEffect(() => {
+    const cached = getCached(CACHE_KEYS.SA_ADMINS);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setAdmins(cached.data);
+      setLoading(false);
+      if (!cached.isStale && !shouldRevalidate) return;
+    }
     fetchAdmins();
   }, []);
 
@@ -60,10 +92,15 @@ export default function Admins() {
   };
 
   const handleDelete = async (admin) => {
-    if (window.confirm(`Are you sure you want to remove access for admin ${admin.name}?`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to remove access for admin ${admin.name}?`,
+      )
+    ) {
       try {
         setLoading(true);
         await deleteAdmin(admin.uid);
+        clearSuperAdminCache();
         await fetchAdmins();
       } catch (err) {
         console.error("Error deleting admin:", err);
@@ -212,7 +249,12 @@ export default function Admins() {
         {!loading && admins.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedAdmins.map((admin) => (
-              <AdminCard key={admin.uid} admin={admin} onEdit={handleEdit} onDelete={handleDelete} />
+              <AdminCard
+                key={admin.uid}
+                admin={admin}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
@@ -227,7 +269,10 @@ export default function Admins() {
             setShowAddModal(false);
             setEditingAdmin(null);
           }}
-          onAdminAdded={fetchAdmins}
+          onAdminAdded={async () => {
+            clearSuperAdminCache();
+            await fetchAdmins();
+          }}
         />
       )}
     </SuperAdminLayout>

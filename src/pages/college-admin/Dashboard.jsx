@@ -12,6 +12,7 @@ import {
 import { getCertificateEnrollmentStatsByProject } from "../../../services/certificateService";
 import {
   cacheAgeLabel,
+  consumeInitialRevalidationToken,
   getCached,
   setCached,
 } from "../../utils/dashboardCache";
@@ -218,27 +219,35 @@ export default function AdminDashboard() {
     const CA_CACHE_KEY = `college_admin_dashboard_${collegeCode}`;
 
     // Hydrate from cache immediately — prevents blank graphs on reconnect
-    // const cached = getCached(CA_CACHE_KEY);
-    // if (cached?.data && collegeCode) {
-    //   const d = cached.data;
-    //   setStudents(d.students || []);
-    //   setProjects(d.projects || []);
-    //   setProjectStudentCounts(d.projectStudentCounts || {});
-    //   setCertifications(d.certifications || []);
-    //   setCollegeInfo(d.collegeInfo || { name: "", logo: "" });
-    //   setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
-    // }
+    const cached = getCached(CA_CACHE_KEY);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data && collegeCode) {
+      const d = cached.data;
+      setStudents(d.students || []);
+      setProjects(d.projects || []);
+      setProjectStudentCounts(d.projectStudentCounts || {});
+      setCertifications(d.certifications || []);
+      setCollegeInfo(d.collegeInfo || { name: "", logo: "" });
+      setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
+      if (!cached.isStale && !shouldRevalidate) {
+        return () => {
+          mounted = false;
+        };
+      }
+    }
 
     const load = async () => {
       try {
         const collegeCodeValue = String(
           profile?.collegeCode || profile?.college_code || "",
-        ).trim().toUpperCase();
-        
+        )
+          .trim()
+          .toUpperCase();
+
         console.log("=== Dashboard Load Started ===");
         console.log("College Code:", collegeCodeValue);
         console.log("Profile:", profile);
-        
+
         if (!collegeCodeValue) {
           console.warn("No collegeCode available");
           if (!mounted) return;
@@ -332,7 +341,9 @@ export default function AdminDashboard() {
 
         const countsByProject = {};
         countEntries.forEach((entry, index) => {
-          const projectCode = String(normalizedProjects[index]?.code || "").trim();
+          const projectCode = String(
+            normalizedProjects[index]?.code || "",
+          ).trim();
           if (!projectCode) return;
           if (entry.status === "fulfilled" && Array.isArray(entry.value)) {
             countsByProject[projectCode] = Number(entry.value[1] || 0);
@@ -344,7 +355,9 @@ export default function AdminDashboard() {
           const isQuotaError =
             code.includes("resource-exhausted") ||
             code.includes("quota") ||
-            /quota exceeded|too many requests|resource-exhausted/i.test(message);
+            /quota exceeded|too many requests|resource-exhausted/i.test(
+              message,
+            );
           if (!isQuotaError) {
             console.warn(`Student count failed for ${projectCode}:`, error);
           }
@@ -394,13 +407,16 @@ export default function AdminDashboard() {
               "",
           ),
         };
-        
+
         console.log("=== College Info Debug ===");
         console.log("College object:", college);
-        console.log("College logo field value:", college?.college_logo || college?.collegeLogo || college?.logo);
+        console.log(
+          "College logo field value:",
+          college?.college_logo || college?.collegeLogo || college?.logo,
+        );
         console.log("Final normalized logo URL:", newCollegeInfo.logo);
         console.log("College name:", newCollegeInfo.name);
-        
+
         setCollegeInfo(newCollegeInfo);
         setLogoLoadFailed(false);
 
@@ -440,8 +456,12 @@ export default function AdminDashboard() {
     const courses = new Set(
       projects
         .map((p) =>
-          String(p.course || p.courseCode || deriveCourseFromProjectCode(p.code) || "")
-            .trim(),
+          String(
+            p.course ||
+              p.courseCode ||
+              deriveCourseFromProjectCode(p.code) ||
+              "",
+          ).trim(),
         )
         .filter(Boolean),
     );
@@ -937,7 +957,8 @@ export default function AdminDashboard() {
               Dashboard
             </h1>
             <p className="mt-2 text-base font-medium text-slate-600">
-              Welcome back, <span className="text-blue-600 font-semibold">{adminName}</span>
+              Welcome back,{" "}
+              <span className="text-blue-600 font-semibold">{adminName}</span>
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -961,7 +982,9 @@ export default function AdminDashboard() {
       <section className="rounded-2xl border border-slate-100 bg-white px-8 py-6 shadow-md">
         <div className="flex flex-wrap items-center gap-8">
           <label className="flex items-center gap-3 group">
-            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">Year</span>
+            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">
+              Year
+            </span>
             <select
               className="rounded-lg border-2 border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               value={selectedYear}
@@ -976,7 +999,9 @@ export default function AdminDashboard() {
           </label>
 
           <label className="flex items-center gap-3 group">
-            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">Course</span>
+            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">
+              Course
+            </span>
             <select
               className="rounded-lg border-2 border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               value={selectedCourse}
@@ -991,7 +1016,9 @@ export default function AdminDashboard() {
           </label>
 
           <label className="flex items-center gap-3 group">
-            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">Pass Year</span>
+            <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition">
+              Pass Year
+            </span>
             <select
               className="rounded-lg border-2 border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:shadow-md focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               value={selectedPassYear}
@@ -1069,10 +1096,14 @@ export default function AdminDashboard() {
                   backgroundColor: "#fff",
                   border: "2px solid #e5e7eb",
                   borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                 }}
               />
-              <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: "16px" }} />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                wrapperStyle={{ paddingBottom: "16px" }}
+              />
               <Bar
                 dataKey="Enrolled"
                 name="Ongoing"
@@ -1126,7 +1157,7 @@ export default function AdminDashboard() {
                   backgroundColor: "#fff",
                   border: "2px solid #e5e7eb",
                   borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                 }}
               />
               <Bar
@@ -1169,7 +1200,7 @@ export default function AdminDashboard() {
                   backgroundColor: "#fff",
                   border: "2px solid #e5e7eb",
                   borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                 }}
               />
               <Legend verticalAlign="bottom" height={36} />
@@ -1202,7 +1233,7 @@ export default function AdminDashboard() {
                   backgroundColor: "#fff",
                   border: "2px solid #e5e7eb",
                   borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)"
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                 }}
               />
               <Legend verticalAlign="bottom" height={36} />
@@ -1210,7 +1241,6 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </PanelCard>
       </div>
-    
     </div>
   );
 }
@@ -1248,15 +1278,17 @@ function StatCard({ title, value, icon, color = "blue" }) {
           <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
             {title}
           </p>
-          <h3 className="mt-4 text-4xl font-bold text-slate-900">
-            {value}
-          </h3>
+          <h3 className="mt-4 text-4xl font-bold text-slate-900">{value}</h3>
         </div>
-        <div className={`rounded-2xl bg-gradient-to-br ${config.iconBg} p-4 text-white shadow-lg group-hover:scale-110 transition duration-300`}>
+        <div
+          className={`rounded-2xl bg-gradient-to-br ${config.iconBg} p-4 text-white shadow-lg group-hover:scale-110 transition duration-300`}
+        >
           {icon}
         </div>
       </div>
-      <div className={`mt-4 h-1 w-12 rounded-full bg-gradient-to-r ${config.iconBg}`}></div>
+      <div
+        className={`mt-4 h-1 w-12 rounded-full bg-gradient-to-r ${config.iconBg}`}
+      ></div>
     </div>
   );
 }

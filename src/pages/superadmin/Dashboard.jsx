@@ -36,6 +36,7 @@ import {
 import {
   cacheAgeLabel,
   clearAllDashboardCache,
+  consumeInitialRevalidationToken,
   getCached,
   setCached,
 } from "../../utils/dashboardCache";
@@ -96,7 +97,9 @@ const resolveCollegeCodeForStudent = (student) => {
     student?.collegeCode || student?.college_code || "",
   );
   if (explicitCode) return explicitCode;
-  return deriveCollegeCodeFromProject(student?.projectId || student?.projectCode);
+  return deriveCollegeCodeFromProject(
+    student?.projectId || student?.projectCode,
+  );
 };
 
 const resolveCollegeCodeForAdmin = (admin) => {
@@ -159,7 +162,10 @@ export default function Dashboard() {
   const [projectCodes, setProjectCodes] = useState([]);
   const [certStatsByProject, setCertStatsByProject] = useState({});
   const [totalStudentsCount, setTotalStudentsCount] = useState(0);
-  const [selectedCollegeTotalStudentsCount, setSelectedCollegeTotalStudentsCount] = useState(0);
+  const [
+    selectedCollegeTotalStudentsCount,
+    setSelectedCollegeTotalStudentsCount,
+  ] = useState(0);
   const [selectedCollegeCode, setSelectedCollegeCode] = useState("ALL");
   const [dbMode, setDbModeState] = useState(getDbMode());
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
@@ -233,7 +239,10 @@ export default function Dashboard() {
         );
 
       if (!isQuotaIssue) {
-        console.error(`Dashboard data load failed for ${request.label}:`, error);
+        console.error(
+          `Dashboard data load failed for ${request.label}:`,
+          error,
+        );
       } else {
         console.warn(
           `Dashboard data load throttled for ${request.label}; using fallback values where possible.`,
@@ -258,7 +267,10 @@ export default function Dashboard() {
     }
     if ("admins" in freshData) setAdmins(freshData.admins);
     if ("certifications" in freshData) {
-      console.log("Setting certifications from freshData:", freshData.certifications);
+      console.log(
+        "Setting certifications from freshData:",
+        freshData.certifications,
+      );
       setCertifications(freshData.certifications);
     }
     if ("colleges" in freshData) setColleges(freshData.colleges);
@@ -270,7 +282,10 @@ export default function Dashboard() {
 
     let nextTotalStudentsCount = Number(freshData.totalStudentsCount || 0);
     const nextSampleStudentsCount = Number((nextStudents || []).length || 0);
-    if (!Number.isFinite(nextTotalStudentsCount) || nextTotalStudentsCount <= 0) {
+    if (
+      !Number.isFinite(nextTotalStudentsCount) ||
+      nextTotalStudentsCount <= 0
+    ) {
       nextTotalStudentsCount = nextSampleStudentsCount;
     }
 
@@ -290,9 +305,7 @@ export default function Dashboard() {
         const projectCountSum = projectCountResults.reduce(
           (sum, result) =>
             sum +
-            (result.status === "fulfilled"
-              ? Number(result.value || 0)
-              : 0),
+            (result.status === "fulfilled" ? Number(result.value || 0) : 0),
           0,
         );
 
@@ -309,18 +322,16 @@ export default function Dashboard() {
 
     setTotalStudentsCount(nextTotalStudentsCount);
 
-    const projectRowsForStats = (nextProjectCodes.length > 0
-      ? nextProjectCodes
-      : projectCodes
+    const projectRowsForStats = (
+      nextProjectCodes.length > 0 ? nextProjectCodes : projectCodes
     ).filter((projectCodeRow) => getProjectCodeValue(projectCodeRow));
 
     if (projectRowsForStats.length > 0) {
       const statsSettled = await Promise.allSettled(
         projectRowsForStats.map(async (projectCodeRow) => {
           const projectCode = getProjectCodeValue(projectCodeRow);
-          const statsMap = await getCertificateEnrollmentStatsByProject(
-            projectCode,
-          );
+          const statsMap =
+            await getCertificateEnrollmentStatsByProject(projectCode);
           return [projectCode, Array.from(statsMap.values())];
         }),
       );
@@ -398,6 +409,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     let mounted = true;
+    const shouldRevalidate = consumeInitialRevalidationToken();
 
     // Hydrate from cache immediately so graphs are never blank on reconnect
     const cached = getCached(SA_CACHE_KEY);
@@ -411,6 +423,11 @@ export default function Dashboard() {
       setProjectCodes(d.projectCodes || []);
       setCertStatsByProject(d.certStatsByProject || {});
       setCacheInfo({ cachedAt: cached.cachedAt, isStale: cached.isStale });
+      if (!cached.isStale && !shouldRevalidate) {
+        return () => {
+          mounted = false;
+        };
+      }
     }
 
     const handleDbModeChange = (event) => {
@@ -526,7 +543,8 @@ export default function Dashboard() {
 
         const total = projectCounts.reduce(
           (sum, result) =>
-            sum + (result.status === "fulfilled" ? Number(result.value || 0) : 0),
+            sum +
+            (result.status === "fulfilled" ? Number(result.value || 0) : 0),
           0,
         );
 
@@ -534,10 +552,7 @@ export default function Dashboard() {
           setSelectedCollegeTotalStudentsCount(total);
         }
       } catch (error) {
-        console.warn(
-          "Unable to load selected college student counts:",
-          error,
-        );
+        console.warn("Unable to load selected college student counts:", error);
         if (mounted) setSelectedCollegeTotalStudentsCount(0);
       }
     };
@@ -559,7 +574,8 @@ export default function Dashboard() {
       });
     }
     return students.filter(
-      (student) => resolveCollegeCodeForStudent(student) === selectedCollegeCode,
+      (student) =>
+        resolveCollegeCodeForStudent(student) === selectedCollegeCode,
     );
   }, [students, selectedCollegeCode, selectedProjectCodeSet]);
 
@@ -589,10 +605,14 @@ export default function Dashboard() {
   }, [selectedCollegeCode, colleges, activeColleges]);
 
   const selectedCollegeProjectCodeCount =
-    selectedCollegeCode === "ALL" ? projectCodes.length : selectedProjects.length;
+    selectedCollegeCode === "ALL"
+      ? projectCodes.length
+      : selectedProjects.length;
 
   const selectedCollegeAdminCount = useMemo(() => {
-    const collegeAdmins = admins.filter((admin) => isCollegeAdminRole(admin?.role));
+    const collegeAdmins = admins.filter((admin) =>
+      isCollegeAdminRole(admin?.role),
+    );
     if (selectedCollegeCode === "ALL") return collegeAdmins.length;
     return collegeAdmins.filter(
       (admin) => resolveCollegeCodeForAdmin(admin) === selectedCollegeCode,
@@ -613,7 +633,8 @@ export default function Dashboard() {
   const certificateToOrganization = new Map(
     certifications.map((certificate) => [
       String(certificate?.id || "").trim(),
-      String(certificate?.domain || certificate?.platform || "").trim() || "Other",
+      String(certificate?.domain || certificate?.platform || "").trim() ||
+        "Other",
     ]),
   );
 
@@ -649,7 +670,10 @@ export default function Dashboard() {
     ];
 
     if (uniqueCertificateIds.length > 0) {
-      console.log(`Student ${studentKey} has ${uniqueCertificateIds.length} certificates:`, uniqueCertificateIds);
+      console.log(
+        `Student ${studentKey} has ${uniqueCertificateIds.length} certificates:`,
+        uniqueCertificateIds,
+      );
     }
 
     const organizationsForStudent = new Set(
@@ -712,7 +736,9 @@ export default function Dashboard() {
       const statsRows = certStatsByProject[projectCode] || [];
       statsRows.forEach((stat) => {
         const certificateId = String(stat?.id || "").trim();
-        const label = String(stat?.name || stat?.examCode || certificateId).trim();
+        const label = String(
+          stat?.name || stat?.examCode || certificateId,
+        ).trim();
         if (!label) return;
 
         const current = statsByCertificate.get(label) || {
@@ -754,7 +780,9 @@ export default function Dashboard() {
             ).trim();
             if (!label) return;
 
-            const status = getStudentResultStatus(result?.status || result?.result);
+            const status = getStudentResultStatus(
+              result?.status || result?.result,
+            );
             const current = statsByCertificate.get(label) || {
               label,
               Passed: 0,
@@ -787,7 +815,9 @@ export default function Dashboard() {
 
       statsRows.forEach((stat) => {
         const certificateId = String(stat?.id || "").trim();
-        const label = String(stat?.name || stat?.examCode || certificateId).trim();
+        const label = String(
+          stat?.name || stat?.examCode || certificateId,
+        ).trim();
         if (!label) return;
         const current = byCertificate.get(label) || { label, count: 0 };
         current.count += Number(stat?.enrolledCount || 0);
@@ -858,7 +888,9 @@ export default function Dashboard() {
           </span>
         )}
         <div className="flex items-center gap-3">
-          <label className="text-sm font-semibold text-[#012920]">College</label>
+          <label className="text-sm font-semibold text-[#012920]">
+            College
+          </label>
           <select
             value={selectedCollegeCode}
             onChange={(event) => setSelectedCollegeCode(event.target.value)}
@@ -921,10 +953,27 @@ export default function Dashboard() {
         <ChartCard title="Result Status Mix">
           <ResponsiveContainer width="100%" height={260} debounce={75}>
             <BarChart data={resultStatusMix}>
-              <Tooltip cursor={{ fill: "rgba(59, 130, 246, 0.1)" }} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis dataKey="status" tick={{ fontSize: 12, fill: "#6b7280" }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <Tooltip
+                cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="status"
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
               <Bar
                 dataKey="count"
                 radius={[12, 12, 0, 0]}
@@ -943,10 +992,27 @@ export default function Dashboard() {
         <ChartCard title="Students by Project Code">
           <ResponsiveContainer width="100%" height={260} debounce={75}>
             <BarChart data={studentsByProject}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis dataKey="projectId" tick={{ fontSize: 11, fill: "#6b7280" }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
-              <Tooltip cursor={{ fill: "rgba(29, 95, 168, 0.1)" }} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="projectId"
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(29, 95, 168, 0.1)" }}
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              />
               <Bar
                 dataKey="count"
                 fill={ACCENT_BLUE}
@@ -975,10 +1041,20 @@ export default function Dashboard() {
                 animationEasing="ease-in-out"
               >
                 {organizationsFallback.map((entry, index) => (
-                  <Cell key={`org-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  <Cell
+                    key={`org-${index}`}
+                    fill={PIE_COLORS[index % PIE_COLORS.length]}
+                  />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [`${value} students`, "Enrolled"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+              <Tooltip
+                formatter={(value) => [`${value} students`, "Enrolled"]}
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              />
               <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
@@ -992,7 +1068,11 @@ export default function Dashboard() {
               data={certificationResultsData}
               margin={{ top: 16, right: 12, left: 0, bottom: 52 }}
             >
-              <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" vertical={false} />
+              <CartesianGrid
+                strokeDasharray="0"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
               <XAxis
                 dataKey="label"
                 interval={0}
@@ -1001,8 +1081,19 @@ export default function Dashboard() {
                 textAnchor="end"
                 tick={{ fontSize: 11, fill: "#6b7280" }}
               />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
-              <Tooltip cursor={{ fill: "rgba(59, 130, 246, 0.1)" }} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px" }} />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  padding: "8px",
+                }}
+              />
               <Legend wrapperStyle={{ paddingTop: "12px" }} />
               <Bar
                 dataKey="Failed"
@@ -1041,7 +1132,11 @@ export default function Dashboard() {
               data={certificateEnrollmentCountData}
               margin={{ top: 12, right: 12, left: 0, bottom: 52 }}
             >
-              <CartesianGrid strokeDasharray="0" stroke="#e5e7eb" vertical={false} />
+              <CartesianGrid
+                strokeDasharray="0"
+                stroke="#e5e7eb"
+                vertical={false}
+              />
               <XAxis
                 dataKey="label"
                 interval={0}
@@ -1050,11 +1145,22 @@ export default function Dashboard() {
                 textAnchor="end"
                 tick={{ fontSize: 11, fill: "#6b7280" }}
               />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
               <Tooltip
                 cursor={{ fill: "rgba(59, 130, 246, 0.1)" }}
-                formatter={(value) => [`${Number(value || 0)} students`, "Enrolled"]}
-                contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px" }}
+                formatter={(value) => [
+                  `${Number(value || 0)} students`,
+                  "Enrolled",
+                ]}
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  padding: "8px",
+                }}
               />
               <Bar
                 dataKey="count"
@@ -1085,11 +1191,15 @@ function MetricCard({ icon, label, value, helper }) {
     <div className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-md transition hover:shadow-xl hover:border-slate-200">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-slate-600">{label}</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-slate-600">
+            {label}
+          </p>
           <p className="mt-3 text-4xl font-bold text-slate-900">{value}</p>
           <p className="mt-2 text-xs text-slate-500">{helper}</p>
         </div>
-        <div className={`rounded-2xl bg-gradient-to-br ${getColorClass(label)} p-4 text-white shadow-lg transition group-hover:scale-110 group-hover:shadow-xl`}>
+        <div
+          className={`rounded-2xl bg-gradient-to-br ${getColorClass(label)} p-4 text-white shadow-lg transition group-hover:scale-110 group-hover:shadow-xl`}
+        >
           {icon}
         </div>
       </div>

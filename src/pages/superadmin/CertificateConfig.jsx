@@ -11,6 +11,14 @@ import {
 } from "../../../services/certificateService";
 import { getAllProjectCodesFromStudents } from "../../../services/studentService";
 import { getAllOrganizations } from "../../../services/organizationService";
+import {
+  CACHE_KEYS,
+  CACHE_TTL,
+  consumeInitialRevalidationToken,
+  clearSuperAdminCache,
+  getCached,
+  setCached,
+} from "../../utils/dashboardCache";
 
 export default function CertificateConfig() {
   const [certifications, setCertifications] = useState([]);
@@ -32,6 +40,7 @@ export default function CertificateConfig() {
   const [deletingCertificateId, setDeletingCertificateId] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const menuRef = useRef(null);
+  const lastSilentRefreshRef = useRef(0);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -50,18 +59,35 @@ export default function CertificateConfig() {
   });
 
   useEffect(() => {
+    const cached = getCached(CACHE_KEYS.SA_CERT_CONFIG);
+    const shouldRevalidate = consumeInitialRevalidationToken();
+    if (cached?.data) {
+      setCertifications(cached.data.certifications || []);
+      setProjectCodes(cached.data.projectCodes || []);
+      setOrganizations(cached.data.organizations || []);
+      setLoading(false);
+      if (!cached.isStale && !shouldRevalidate) return;
+    }
     fetchData();
   }, []);
 
   useEffect(() => {
+    const triggerSilentRefresh = () => {
+      if (loading || refreshingCounts || certifications.length === 0) return;
+      const now = Date.now();
+      if (now - lastSilentRefreshRef.current < CACHE_TTL.SHORT) return;
+      lastSilentRefreshRef.current = now;
+      handleRefreshEnrolledCounts({ silent: true });
+    };
+
     const handlePageVisible = () => {
       if (document.visibilityState === "visible") {
-        handleRefreshEnrolledCounts({ silent: true });
+        triggerSilentRefresh();
       }
     };
 
     const handleWindowFocus = () => {
-      handleRefreshEnrolledCounts({ silent: true });
+      triggerSilentRefresh();
     };
 
     document.addEventListener("visibilitychange", handlePageVisible);
@@ -71,7 +97,7 @@ export default function CertificateConfig() {
       document.removeEventListener("visibilitychange", handlePageVisible);
       window.removeEventListener("focus", handleWindowFocus);
     };
-  }, [certifications]);
+  }, [certifications.length, loading, refreshingCounts]);
 
   const fetchData = async () => {
     try {
@@ -119,6 +145,15 @@ export default function CertificateConfig() {
       console.log("Project codes loaded:", projectCodeData);
       setProjectCodes(projectCodeData || []);
       setOrganizations(organizationData || []);
+      setCached(
+        CACHE_KEYS.SA_CERT_CONFIG,
+        {
+          certifications: mergedCertificates,
+          projectCodes: projectCodeData || [],
+          organizations: organizationData || [],
+        },
+        CACHE_TTL.MEDIUM,
+      );
     } catch (fetchError) {
       setError("Failed to load certificate data");
       console.error("Fetch error:", fetchError);
@@ -171,6 +206,7 @@ export default function CertificateConfig() {
     setFilters({ platform: "All", level: "All", domain: "All" });
 
   const handleCertificateAdded = async () => {
+    clearSuperAdminCache();
     await fetchData();
     setSuccessMessage(
       "Certificate created. Click the certificate row to assign project codes.",
@@ -179,18 +215,21 @@ export default function CertificateConfig() {
   };
 
   const handleOrganizationAdded = async () => {
+    clearSuperAdminCache();
     await fetchData();
     setSuccessMessage("Organisation created successfully.");
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
   const handleOrganizationUpdated = async () => {
+    clearSuperAdminCache();
     await fetchData();
     setSuccessMessage("Organisation updated successfully.");
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
   const handleCertificateUpdated = async () => {
+    clearSuperAdminCache();
     await fetchData();
     setSuccessMessage("Certificate updated successfully.");
     setTimeout(() => setSuccessMessage(""), 3000);
@@ -210,6 +249,7 @@ export default function CertificateConfig() {
         certificateId: certificate.id,
       });
 
+      clearSuperAdminCache();
       await fetchData();
 
       const affectedCount = Number(result?.affectedStudents || 0);
@@ -238,12 +278,14 @@ export default function CertificateConfig() {
         return;
       }
 
-      const liveEnrollmentCounts =
-        await getCertificateEnrollmentCounts(certificateIds, {
+      const liveEnrollmentCounts = await getCertificateEnrollmentCounts(
+        certificateIds,
+        {
           projectCodes: (projectCodes || [])
             .map((row) => String(row?.code || "").trim())
             .filter(Boolean),
-        });
+        },
+      );
 
       setCertifications((prev) =>
         prev.map((certificate) => ({
@@ -255,6 +297,7 @@ export default function CertificateConfig() {
             : Number(certificate?.enrolledCount || 0),
         })),
       );
+      clearSuperAdminCache();
 
       if (!silent) {
         setSuccessMessage("Enrolled counts refreshed from live student data.");
@@ -582,6 +625,7 @@ export default function CertificateConfig() {
           onResultDeclared={() => {
             setShowDeclareResultModal(false);
             setSelectedCertificate(null);
+            clearSuperAdminCache();
             fetchData();
           }}
         />
