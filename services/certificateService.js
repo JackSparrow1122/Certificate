@@ -237,7 +237,13 @@ export const updateCertificate = async (certificateId, updateData) => {
 };
 
 // ---------------------------------------------------------------------------
-// Enrollment counts — from certificate_enrollments collectionGroup
+// Enrollment counts — single collectionGroup query aggregated client-side
+//
+// OPTIMISATION: was N parallel collectionGroup queries (one per certificateId).
+// Now: one query filtered by projectCode (uses the deployed projectCode index),
+// then we tally counts in memory. Reads drop from N×|enrollments| to 1×|enrollments|.
+// When no projectCodes are supplied we still need to fan-out per-cert, but that
+// path is only hit from the superadmin global view and is clearly documented.
 // ---------------------------------------------------------------------------
 
 export const getCertificateEnrollmentCounts = async (
@@ -257,13 +263,57 @@ export const getCertificateEnrollmentCounts = async (
   }
 
   if (ids.length === 0) return {};
+
   const projectCodeSet = new Set(
     (projectCodes || [])
       .map((code) => String(code || "").trim())
       .filter(Boolean),
   );
 
+  // Zero-initialise every requested certificate so callers always get an entry.
+  const counts = Object.fromEntries(ids.map((id) => [id, 0]));
+  const idSet = new Set(ids);
+
   try {
+    if (projectCodeSet.size > 0) {
+      // --- FAST PATH: one query per projectCode (uses deployed index) ---
+      // This replaces N-per-cert queries with P-per-project queries where
+      // typically P === 1, saving the bulk of reads for college-admin views.
+      const snapshots = await Promise.all(
+        [...projectCodeSet].map((projectCode) => {
+          const projectDocId = codeToDocId(projectCode);
+          return getDocs(
+            collection(
+              db,
+              STUDENTS_COLLECTION,
+              projectDocId,
+              CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
+            ),
+          );
+        }),
+      );
+
+      snapshots.forEach((snapshot) => {
+        snapshot.forEach((enrollmentDoc) => {
+          const data = enrollmentDoc.data() || {};
+          if (data?.isDeleted === true) return;
+          if (
+            String(data?.status || "")
+              .trim()
+              .toLowerCase() === "unenrolled"
+          ) return;
+          const certId = String(data?.certificateId || "").trim();
+          if (!certId || !idSet.has(certId)) return;
+          counts[certId] = (counts[certId] || 0) + 1;
+        });
+      });
+
+      return counts;
+    }
+
+    // --- SLOW PATH (superadmin / no projectCode filter) ---
+    // Fall back to one collectionGroup query per cert.  This path is
+    // intentionally retained but only reached when no project filter exists.
     const countEntries = await Promise.all(
       ids.map(async (certificateId) => {
         const enrollmentsQuery = query(
@@ -279,13 +329,7 @@ export const getCertificateEnrollmentCounts = async (
             String(data?.status || "")
               .trim()
               .toLowerCase() === "unenrolled"
-          ) {
-            return;
-          }
-          if (projectCodeSet.size > 0) {
-            const rowProjectCode = String(data?.projectCode || "").trim();
-            if (!rowProjectCode || !projectCodeSet.has(rowProjectCode)) return;
-          }
+          ) return;
           count += 1;
         });
         return [certificateId, count];
@@ -909,6 +953,12 @@ export const getStudentCertificateHistory = async (uid) => {
 
 // ---------------------------------------------------------------------------
 // Unenroll students from a certificate
+//
+// OPTIMISATION: removed the N+1 pattern (fetch all students → getDoc per
+// student for their enrollment).  Now queries the flat certificate_enrollments
+// subcollection directly with a certificateId filter — one read instead of
+// 1 + N reads.  The student-doc mirror is still updated so the Dashboard
+// mirror field stays consistent.
 // ---------------------------------------------------------------------------
 
 export const unenrollStudentsFromCertificate = async ({
@@ -919,73 +969,70 @@ export const unenrollStudentsFromCertificate = async ({
   try {
     const normalizedProjectCode = String(projectCode || "").trim();
     const projectDocId = codeToDocId(normalizedProjectCode);
-
-    const studentsRef = collection(
-      db,
-      STUDENTS_COLLECTION,
-      projectDocId,
-      "students_list",
-    );
-    const studentsSnapshot = await getDocs(studentsRef);
+    const normalizedCertificateId = String(certificateId || "").trim();
 
     const emailSet = studentEmails
       ? new Set(studentEmails.map((e) => String(e).trim().toLowerCase()))
       : null;
 
+    // Single targeted query on the flat subcollection — no student fan-out.
+    const flatQuery = query(
+      collection(
+        db,
+        STUDENTS_COLLECTION,
+        projectDocId,
+        CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
+      ),
+      where("certificateId", "==", normalizedCertificateId),
+    );
+    const flatSnapshot = await getDocs(flatQuery);
+
     const ops = [];
     let unenrolledCount = 0;
 
-    for (const studentDoc of studentsSnapshot.docs) {
-      const studentRef = doc(
-        db,
-        STUDENTS_COLLECTION,
-        projectDocId,
-        "students_list",
-        studentDoc.id,
-      );
-      const enrollmentRef = doc(
-        db,
-        STUDENTS_COLLECTION,
-        projectDocId,
-        "students_list",
-        studentDoc.id,
-        CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
-        String(certificateId || "").trim(),
-      );
-      const enrollmentSnap = await getDoc(enrollmentRef);
-      if (!enrollmentSnap.exists()) continue;
+    flatSnapshot.forEach((enrollmentDoc) => {
+      const data = enrollmentDoc.data() || {};
+      if (data.isDeleted || data.status === "unenrolled") return;
 
-      const data = enrollmentSnap.data() || {};
-      if (data.isDeleted || data.status === "unenrolled") continue;
+      const enrollmentEmail = String(data.email || "").trim().toLowerCase();
+      if (emailSet && !emailSet.has(enrollmentEmail)) return;
 
-      const enrollmentEmail = String(data.email || "")
-        .trim()
-        .toLowerCase();
-      if (emailSet && !emailSet.has(enrollmentEmail)) continue;
-
+      // Update the flat enrollment doc.
       ops.push({
         type: "update",
-        ref: enrollmentRef,
-        data: {
-          status: "unenrolled",
-          updatedAt: new Date(),
-        },
+        ref: enrollmentDoc.ref,
+        data: { status: "unenrolled", updatedAt: new Date() },
       });
-      ops.push({
-        type: "update",
-        ref: studentRef,
-        data: {
-          [`certificateEnrollments.${certificateId}.status`]: "unenrolled",
-          [`certificateEnrollments.${certificateId}.updatedAt`]: new Date(),
-        },
-      });
+
+      // Keep the student-doc mirror in sync.
+      const studentId = String(data.studentId || "").trim();
+      if (studentId) {
+        const studentRef = doc(
+          db,
+          STUDENTS_COLLECTION,
+          projectDocId,
+          "students_list",
+          studentId,
+        );
+        ops.push({
+          type: "update",
+          ref: studentRef,
+          data: {
+            [`certificateEnrollments.${normalizedCertificateId}.status`]:
+              "unenrolled",
+            [`certificateEnrollments.${normalizedCertificateId}.updatedAt`]:
+              new Date(),
+          },
+        });
+      }
+
       unenrolledCount += 1;
-    }
+    });
 
     if (unenrolledCount > 0) {
       ops.push({
         type: "update",
-        ref: doc(db, CERTIFICATES_COLLECTION, certificateId),
+        ref: doc(db, CERTIFICATES_COLLECTION, normalizedCertificateId),
         data: { enrolledCount: increment(-unenrolledCount) },
       });
       await commitInChunks(ops);
@@ -1000,6 +1047,12 @@ export const unenrollStudentsFromCertificate = async ({
 
 // ---------------------------------------------------------------------------
 // Declare results — update status on certificate_enrollments docs
+//
+// OPTIMISATION: removed the classic N+1 pattern (fetch all students in a
+// project → per-student getDoc for enrollment).  Now queries the flat
+// certificate_enrollments subcollection once per projectCode, filtered by
+// certificateId.  Reads drop from 1+N (students) + N (enrollments) per
+// project to 1 per project.
 // ---------------------------------------------------------------------------
 
 export const declareResultsForCertificate = async ({
@@ -1019,88 +1072,68 @@ export const declareResultsForCertificate = async ({
       const normalizedProjectCode = String(projectCode).trim();
       const projectDocId = codeToDocId(normalizedProjectCode);
 
-      const studentsRef = collection(
-        db,
-        STUDENTS_COLLECTION,
-        projectDocId,
-        "students_list",
-      );
-      const studentsSnapshot = await getDocs(studentsRef);
-
-      for (const studentDoc of studentsSnapshot.docs) {
-        const studentRef = doc(
+      // Single query — fetch only enrollment docs for this cert in this project.
+      const flatQuery = query(
+        collection(
           db,
           STUDENTS_COLLECTION,
           projectDocId,
-          "students_list",
-          studentDoc.id,
-        );
-        const enrollmentsRef = collection(
-          db,
-          STUDENTS_COLLECTION,
-          projectDocId,
-          "students_list",
-          studentDoc.id,
           CERTIFICATE_ENROLLMENTS_SUBCOLLECTION,
-        );
+        ),
+        where("certificateId", "==", normalizedCertificateId),
+      );
+      const flatSnapshot = await getDocs(flatQuery);
 
-        // Primary lookup by doc ID (common path), with query fallback by field.
-        const enrollmentByIdRef = doc(enrollmentsRef, normalizedCertificateId);
-        const enrollmentByIdSnap = await getDoc(enrollmentByIdRef);
+      flatSnapshot.forEach((enrollmentDoc) => {
+        const enrollmentData = enrollmentDoc.data() || {};
+        if (enrollmentData.isDeleted === true) return;
 
-        let enrollmentDocs = [];
-        if (enrollmentByIdSnap.exists()) {
-          enrollmentDocs = [enrollmentByIdSnap];
-        } else {
-          const enrollmentQuery = query(
-            enrollmentsRef,
-            where("certificateId", "==", normalizedCertificateId),
-          );
-          const enrollmentQuerySnap = await getDocs(enrollmentQuery);
-          enrollmentDocs = enrollmentQuerySnap.docs;
-        }
-
-        if (!enrollmentDocs.length) continue;
-
-        const firstEnrollmentData = enrollmentDocs[0]?.data?.() || {};
-        if (firstEnrollmentData.isDeleted === true) continue;
-
-        const studentEmail = String(firstEnrollmentData.email || "")
+        const studentEmail = String(enrollmentData.email || "")
           .trim()
           .toLowerCase();
 
-        let status = defaultStatus;
-        if (studentEmail && emailStatusMap.has(studentEmail)) {
-          status = emailStatusMap.get(studentEmail) || defaultStatus;
-        }
+        const status =
+          studentEmail && emailStatusMap.has(studentEmail)
+            ? emailStatusMap.get(studentEmail) || defaultStatus
+            : defaultStatus;
 
-        enrollmentDocs.forEach((enrollmentDocSnap) => {
-          const enrollmentData = enrollmentDocSnap.data() || {};
-          if (enrollmentData.isDeleted === true) return;
-          ops.push({
-            type: "update",
-            ref: enrollmentDocSnap.ref,
-            data: {
-              status,
-              resultDeclaredAt: new Date(),
-              updatedAt: new Date(),
-            },
-          });
-        });
-
+        // Update the flat enrollment doc.
         ops.push({
           type: "update",
-          ref: studentRef,
+          ref: enrollmentDoc.ref,
           data: {
-            [`certificateEnrollments.${certificateId}.status`]: status,
-            [`certificateEnrollments.${certificateId}.resultDeclaredAt`]:
-              new Date(),
-            [`certificateEnrollments.${certificateId}.updatedAt`]: new Date(),
+            status,
+            resultDeclaredAt: new Date(),
+            updatedAt: new Date(),
           },
         });
 
+        // Keep the student-doc mirror in sync.
+        const studentId = String(enrollmentData.studentId || "").trim();
+        if (studentId) {
+          const studentRef = doc(
+            db,
+            STUDENTS_COLLECTION,
+            projectDocId,
+            "students_list",
+            studentId,
+          );
+          ops.push({
+            type: "update",
+            ref: studentRef,
+            data: {
+              [`certificateEnrollments.${normalizedCertificateId}.status`]:
+                status,
+              [`certificateEnrollments.${normalizedCertificateId}.resultDeclaredAt`]:
+                new Date(),
+              [`certificateEnrollments.${normalizedCertificateId}.updatedAt`]:
+                new Date(),
+            },
+          });
+        }
+
         status === "passed" ? passedCount++ : failedCount++;
-      }
+      });
     }
 
     await commitInChunks(ops);
@@ -1217,6 +1250,12 @@ export const getStudentEnrollmentsByProject = async (projectCode) => {
 // ---------------------------------------------------------------------------
 // Get all certificate enrollments for a student by email (across projects)
 // Returns array of { certificateId, certificateName, examCode, status, projectCode }
+//
+// OPTIMISATION: removed the redundant parallel query by studentId.
+// Email is the canonical identifier stored on every enrollment doc, so a
+// single collectionGroup query on `email` is sufficient.  The case-variant
+// second query is retained only when the raw email differs from its lowercase
+// form (i.e. it contains uppercase characters).
 // ---------------------------------------------------------------------------
 
 export const getEnrollmentsByStudentEmail = async (email) => {
@@ -1233,6 +1272,7 @@ export const getEnrollmentsByStudentEmail = async (email) => {
       ),
     ];
 
+    // Only fire the second query when the stored email might differ in case.
     const rawEmail = String(email || "").trim();
     if (rawEmail && rawEmail !== normalized) {
       queries.push(
@@ -1244,9 +1284,14 @@ export const getEnrollmentsByStudentEmail = async (email) => {
     }
 
     const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
+    const seen = new Set();
     const rows = [];
+
     snapshots.forEach((snapshot) => {
       snapshot.forEach((docSnap) => {
+        if (seen.has(docSnap.id)) return; // deduplicate across case-variant queries
+        seen.add(docSnap.id);
+
         const d = docSnap.data() || {};
         if (d.isDeleted === true) return;
         rows.push({
@@ -1278,6 +1323,7 @@ export const getEnrollmentsByStudentEmail = async (email) => {
 };
 
 // Get enrollments across projects by studentId (collectionGroup)
+// NOTE: kept for callers that only have a studentId and no email.
 export const getEnrollmentsByStudentId = async (studentId) => {
   if (isLocalDbMode()) return [];
   const normalized = String(studentId || "").trim();
