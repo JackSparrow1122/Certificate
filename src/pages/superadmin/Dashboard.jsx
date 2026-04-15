@@ -24,6 +24,7 @@ import { getAllAdmins } from "../../../services/userService";
 import {
   getAllCertificates,
   getCertificateEnrollmentStatsByProject,
+  getOrganizationEnrollmentMixByProjects,
 } from "../../../services/certificateService";
 import { getAllColleges } from "../../../services/collegeService";
 import { getAllProjectCodes } from "../../../services/projectCodeService";
@@ -164,6 +165,8 @@ export default function Dashboard() {
   const [dbMode, setDbModeState] = useState(getDbMode());
   const [isLayoutResizing, setIsLayoutResizing] = useState(false);
   const [cacheInfo, setCacheInfo] = useState({ cachedAt: 0, isStale: false });
+  const [orgMixData, setOrgMixData] = useState([]);
+  const [orgMixLoading, setOrgMixLoading] = useState(false);
 
   useEffect(() => {
     let resizeTimer;
@@ -548,6 +551,44 @@ export default function Dashboard() {
     };
   }, [selectedCollegeCode, selectedProjectCodeSet, dbMode]);
 
+  // ─── Backend-driven Organisation Enrollment Mix ───────────────────────────
+  // Re-fetches from Firestore every time the college filter (or db mode) changes.
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchOrgMix = async () => {
+      if (!mounted) return;
+      setOrgMixLoading(true);
+
+      try {
+        const projectCodeList =
+          selectedCollegeCode === "ALL"
+            ? [] // empty = use certifications enrolledCount totals (all colleges)
+            : Array.from(selectedProjectCodeSet);
+
+        const result = await getOrganizationEnrollmentMixByProjects(
+          projectCodeList,
+          certifications,
+        );
+
+        if (mounted) {
+          setOrgMixData(result || []);
+        }
+      } catch (error) {
+        console.error("Failed to load org enrollment mix:", error);
+        if (mounted) setOrgMixData([]);
+      } finally {
+        if (mounted) setOrgMixLoading(false);
+      }
+    };
+
+    fetchOrgMix();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedCollegeCode, selectedProjectCodeSet, certifications, dbMode]);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const chartStudents = useMemo(() => {
     if (selectedCollegeCode === "ALL") return students;
     if (selectedProjectCodeSet.size > 0) {
@@ -610,97 +651,8 @@ export default function Dashboard() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
-  const certificateToOrganization = new Map(
-    certifications.map((certificate) => [
-      String(certificate?.id || "").trim(),
-      String(certificate?.domain || certificate?.platform || "").trim() || "Other",
-    ]),
-  );
-
-  console.log("=== Organization Mix Debug ===");
-  console.log("Total certifications:", certifications.length);
-  console.log("Certifications:", certifications);
-  console.log("Certificate to Organization map:", certificateToOrganization);
-  console.log("Chart students count:", chartStudents.length);
-
-  const organizationEnrollmentMap = new Map();
-  chartStudents.forEach((student) => {
-    const studentKey = String(student?.docId || student?.id || "").trim();
-    if (!studentKey) return;
-
-    const idsFromArray = Array.isArray(student?.certificateIds)
-      ? student.certificateIds
-      : [];
-    const idsFromResults =
-      student?.certificateResults &&
-      typeof student.certificateResults === "object"
-        ? Object.values(student.certificateResults)
-            .filter((entry) => !entry?.isDeleted)
-            .map((entry) => entry?.certificateId)
-            .filter(Boolean)
-        : [];
-
-    const uniqueCertificateIds = [
-      ...new Set(
-        [...idsFromArray, ...idsFromResults]
-          .map((id) => String(id || "").trim())
-          .filter(Boolean),
-      ),
-    ];
-
-    if (uniqueCertificateIds.length > 0) {
-      console.log(`Student ${studentKey} has ${uniqueCertificateIds.length} certificates:`, uniqueCertificateIds);
-    }
-
-    const organizationsForStudent = new Set(
-      uniqueCertificateIds
-        .map(
-          (certificateId) =>
-            certificateToOrganization.get(certificateId) || "Other",
-        )
-        .filter(Boolean),
-    );
-
-    organizationsForStudent.forEach((organization) => {
-      if (!organizationEnrollmentMap.has(organization)) {
-        organizationEnrollmentMap.set(organization, new Set());
-      }
-      organizationEnrollmentMap.get(organization).add(studentKey);
-    });
-  });
-
-  const organizationEnrollmentMix = Array.from(
-    organizationEnrollmentMap.entries(),
-  )
-    .map(([organization, studentIds]) => ({
-      organization,
-      count: studentIds.size,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
-
-  console.log("Final organizationEnrollmentMix:", organizationEnrollmentMix);
-
-  // Fallback: if no organization mix data, show organizations directly from certifications
-  const organizationsFallback = useMemo(() => {
-    if (organizationEnrollmentMix.length > 0) {
-      return organizationEnrollmentMix;
-    }
-
-    // Show all organizations from certificates with their enrollment counts
-    const orgStats = new Map();
-    certifications.forEach((cert) => {
-      const org = String(cert?.domain || cert?.platform || "Other").trim();
-      if (!org) return;
-      const current = orgStats.get(org) || { organization: org, count: 0 };
-      current.count += Number(cert?.enrolledCount || 0);
-      orgStats.set(org, current);
-    });
-
-    return Array.from(orgStats.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [organizationEnrollmentMix, certifications]);
+  // orgMixData is populated by the backend useEffect above and is the
+  // single source of truth for the Organisation Enrollment Mix pie chart.
 
   const certificationResultsData = useMemo(() => {
     const statsByCertificate = new Map();
@@ -960,28 +912,41 @@ export default function Dashboard() {
         </ChartCard>
 
         <ChartCard title="Organisation Enrollment Mix">
-          <ResponsiveContainer width="100%" height={300} debounce={75}>
-            <PieChart>
-              <Pie
-                data={organizationsFallback}
-                dataKey="count"
-                nameKey="organization"
-                cx="50%"
-                cy="50%"
-                outerRadius={95}
-                label={{ fontSize: 12, fill: "#374151" }}
-                isAnimationActive={!isLayoutResizing}
-                animationDuration={500}
-                animationEasing="ease-in-out"
-              >
-                {organizationsFallback.map((entry, index) => (
-                  <Cell key={`org-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => [`${value} students`, "Enrolled"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
-              <Legend verticalAlign="bottom" height={36} />
-            </PieChart>
-          </ResponsiveContainer>
+          {orgMixLoading ? (
+            <div className="flex h-[300px] items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
+                <span className="text-sm text-slate-500">Loading data…</span>
+              </div>
+            </div>
+          ) : orgMixData.length === 0 ? (
+            <div className="flex h-[300px] items-center justify-center">
+              <p className="text-sm text-slate-400">No enrollment data for this selection.</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300} debounce={75}>
+              <PieChart>
+                <Pie
+                  data={orgMixData}
+                  dataKey="count"
+                  nameKey="organization"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={95}
+                  label={{ fontSize: 12, fill: "#374151" }}
+                  isAnimationActive={!isLayoutResizing}
+                  animationDuration={500}
+                  animationEasing="ease-in-out"
+                >
+                  {orgMixData.map((entry, index) => (
+                    <Cell key={`org-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value} students`, "Enrolled"]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </ChartCard>
       </section>
 

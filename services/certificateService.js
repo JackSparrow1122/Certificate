@@ -1108,6 +1108,120 @@ export const getEnrollmentsByStudentId = async (studentId) => {
 };
 
 /**
+ * Returns organisation enrollment mix for the given project code(s).
+ * Queries certificate_enrollments directly from Firestore, joins with the
+ * provided certificate list to resolve domain/platform (organisation name),
+ * and returns [{organization, count}] sorted descending by count.
+ *
+ * @param {string[]} projectCodeList  - Array of project codes to include (empty = all).
+ * @param {Array}    certificationsList - Pre-loaded certificates array from state.
+ * @returns {Promise<Array<{organization: string, count: number}>>}
+ */
+export const getOrganizationEnrollmentMixByProjects = async (
+  projectCodeList,
+  certificationsList = [],
+) => {
+  if (isLocalDbMode()) {
+    // Local mode: derive mix from certifications array using enrolledCount field
+    const orgStats = new Map();
+    (certificationsList || []).forEach((cert) => {
+      const org = String(cert?.domain || cert?.platform || "Other").trim() || "Other";
+      const current = orgStats.get(org) || { organization: org, count: 0 };
+      current.count += Number(cert?.enrolledCount || 0);
+      orgStats.set(org, current);
+    });
+    return Array.from(orgStats.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }
+
+  try {
+    // Build a map: certificateId -> organization name from the certifications list
+    const certToOrg = new Map(
+      (certificationsList || []).map((cert) => [
+        String(cert?.id || "").trim(),
+        String(cert?.domain || cert?.platform || "").trim() || "Other",
+      ]),
+    );
+
+    const codes = (projectCodeList || [])
+      .map((code) => String(code || "").trim())
+      .filter(Boolean);
+
+    // Count enrolled students per organization across selected project codes.
+    // Use a unique-student key (email or studentId) so a student enrolled in
+    // multiple certs under the same org is only counted once per org.
+    const orgStudentSets = new Map(); // org -> Set of unique student keys
+
+    const fetchForProject = async (projectCode) => {
+      try {
+        const q = query(
+          collectionGroup(db, CERTIFICATE_ENROLLMENTS_SUBCOLLECTION),
+          where("projectCode", "==", projectCode),
+        );
+        const snapshot = await getDocs(q);
+        snapshot.forEach((enrollDoc) => {
+          const d = enrollDoc.data();
+          if (d.isDeleted === true) return;
+          if (String(d.status || "").trim().toLowerCase() === "unenrolled") return;
+
+          const certId = String(d.certificateId || "").trim();
+          if (!certId) return;
+
+          // Resolve organisation from cert map; fall back to inline domain field
+          const org =
+            certToOrg.get(certId) ||
+            String(d.domain || d.platform || "Other").trim() ||
+            "Other";
+
+          // Unique student key: prefer email, then studentId, then enrollment docId
+          const studentKey =
+            String(d.email || "").trim().toLowerCase() ||
+            String(d.studentId || "").trim() ||
+            enrollDoc.id;
+
+          if (!orgStudentSets.has(org)) orgStudentSets.set(org, new Set());
+          orgStudentSets.get(org).add(studentKey);
+        });
+      } catch (projectError) {
+        console.warn(
+          `getOrganizationEnrollmentMixByProjects: skipping projectCode=${projectCode}:`,
+          projectError,
+        );
+      }
+    };
+
+    if (codes.length === 0) {
+      // ALL colleges — query without projectCode filter by iterating all docs
+      // is expensive; fall back to certifications enrolledCount totals instead.
+      const orgStats = new Map();
+      (certificationsList || []).forEach((cert) => {
+        const org = String(cert?.domain || cert?.platform || "Other").trim() || "Other";
+        const current = orgStats.get(org) || { organization: org, count: 0 };
+        current.count += Number(cert?.enrolledCount || 0);
+        orgStats.set(org, current);
+      });
+      return Array.from(orgStats.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+    }
+
+    await Promise.allSettled(codes.map((code) => fetchForProject(code)));
+
+    return Array.from(orgStudentSets.entries())
+      .map(([organization, studentSet]) => ({
+        organization,
+        count: studentSet.size,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  } catch (error) {
+    console.error("Error getting organisation enrollment mix:", error);
+    return [];
+  }
+};
+
+/**
  * Returns per-certificate enrollment stats (enrolled / passed / failed counts)
  * for a given project code, sourced from the lightweight
  * certificate_enrollments subcollection rather than full student docs.
