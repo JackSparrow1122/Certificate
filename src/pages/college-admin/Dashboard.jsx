@@ -739,7 +739,7 @@ export default function AdminDashboard() {
       totalEnrollments,
       completionRate: `${avgProgress}%`,
       certificatesIssued: certCount,
-      activeProjectCodes: filteredProjects.length,
+      activeProjectCodes: filteredProjects.lencgth,
       barData,
       pieData,
       progressBands,
